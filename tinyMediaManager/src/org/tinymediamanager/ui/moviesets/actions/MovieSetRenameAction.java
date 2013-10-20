@@ -13,46 +13,46 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.tinymediamanager.ui.movies.actions;
+package org.tinymediamanager.ui.moviesets.actions;
 
 import java.awt.event.ActionEvent;
+import java.util.List;
 import java.util.ResourceBundle;
 
 import javax.swing.AbstractAction;
 import javax.swing.ImageIcon;
 import javax.swing.JOptionPane;
 
-import org.tinymediamanager.core.movie.tasks.MovieUpdateDatasourceTask;
+import org.tinymediamanager.core.movie.Movie;
+import org.tinymediamanager.core.movie.tasks.MovieRenameTask;
 import org.tinymediamanager.ui.MainWindow;
 import org.tinymediamanager.ui.TmmSwingWorker;
 import org.tinymediamanager.ui.UTF8Control;
+import org.tinymediamanager.ui.moviesets.MovieSetUIModule;
 
 /**
- * MovieUpdateDatasourceAction - update all movies from all datasources
- * 
  * @author Manuel Laggner
+ * 
  */
-public class MovieUpdateDatasourceAction extends AbstractAction {
-  private static final long           serialVersionUID = 6885253964781733478L;
+public class MovieSetRenameAction extends AbstractAction {
   private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
+  private static final long           serialVersionUID = 1677285197819210130L;
 
-  public MovieUpdateDatasourceAction(boolean withTitle) {
-    if (withTitle) {
-      putValue(NAME, BUNDLE.getString("update.datasource")); //$NON-NLS-1$
-    }
-    putValue(SMALL_ICON, new ImageIcon(getClass().getResource("/org/tinymediamanager/ui/images/Folder-Sync.png")));
-    putValue(LARGE_ICON_KEY, new ImageIcon(getClass().getResource("/org/tinymediamanager/ui/images/Folder-Sync.png")));
+  public MovieSetRenameAction() {
+    putValue(NAME, BUNDLE.getString("movie.rename")); //$NON-NLS-1$
+
+    putValue(LARGE_ICON_KEY, new ImageIcon(getClass().getResource("/org/tinymediamanager/ui/images/rename-icon.png")));
+    putValue(SMALL_ICON, new ImageIcon(getClass().getResource("/org/tinymediamanager/ui/images/rename-icon.png")));
+    putValue(SHORT_DESCRIPTION, BUNDLE.getString("movie.rename")); //$NON-NLS-1$
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-   */
   @Override
-  public void actionPerformed(ActionEvent e) {
-    TmmSwingWorker task = new MovieUpdateDatasourceTask();
-    if (!MainWindow.executeMainTask(task)) {
+  public void actionPerformed(ActionEvent arg0) {
+    List<Movie> selectedMovies = MovieSetUIModule.getInstance().getSelectionModel().getSelectedMoviesRecursive();
+
+    // rename
+    TmmSwingWorker renameTask = new MovieRenameTask(selectedMovies);
+    if (!MainWindow.executeMainTask(renameTask)) {
       JOptionPane.showMessageDialog(null, BUNDLE.getString("onlyoneoperation")); //$NON-NLS-1$
     }
   }

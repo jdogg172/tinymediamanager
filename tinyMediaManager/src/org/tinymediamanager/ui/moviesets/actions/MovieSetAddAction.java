@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.tinymediamanager.ui.movies.actions;
+package org.tinymediamanager.ui.moviesets.actions;
 
 import java.awt.event.ActionEvent;
 import java.util.ResourceBundle;
@@ -22,26 +22,29 @@ import javax.swing.AbstractAction;
 import javax.swing.ImageIcon;
 import javax.swing.JOptionPane;
 
-import org.tinymediamanager.core.movie.tasks.MovieUpdateDatasourceTask;
-import org.tinymediamanager.ui.MainWindow;
-import org.tinymediamanager.ui.TmmSwingWorker;
+import org.apache.commons.lang3.StringUtils;
+import org.tinymediamanager.core.movie.MovieList;
+import org.tinymediamanager.core.movie.MovieSet;
 import org.tinymediamanager.ui.UTF8Control;
 
 /**
- * MovieUpdateDatasourceAction - update all movies from all datasources
- * 
  * @author Manuel Laggner
+ * 
  */
-public class MovieUpdateDatasourceAction extends AbstractAction {
-  private static final long           serialVersionUID = 6885253964781733478L;
+public class MovieSetAddAction extends AbstractAction {
+  private static final long           serialVersionUID = 819724436270051906L;
   private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
 
-  public MovieUpdateDatasourceAction(boolean withTitle) {
+  /**
+   * Instantiates a new adds the movie set action.
+   */
+  public MovieSetAddAction(boolean withTitle) {
     if (withTitle) {
-      putValue(NAME, BUNDLE.getString("update.datasource")); //$NON-NLS-1$
+      putValue(NAME, BUNDLE.getString("movieset.add.desc")); //$NON-NLS-1$
     }
-    putValue(SMALL_ICON, new ImageIcon(getClass().getResource("/org/tinymediamanager/ui/images/Folder-Sync.png")));
-    putValue(LARGE_ICON_KEY, new ImageIcon(getClass().getResource("/org/tinymediamanager/ui/images/Folder-Sync.png")));
+    putValue(LARGE_ICON_KEY, new ImageIcon(getClass().getResource("/org/tinymediamanager/ui/images/Add.png")));
+    putValue(SMALL_ICON, new ImageIcon(getClass().getResource("/org/tinymediamanager/ui/images/Add.png")));
+    putValue(SHORT_DESCRIPTION, BUNDLE.getString("movieset.add.desc")); //$NON-NLS-1$
   }
 
   /*
@@ -51,9 +54,11 @@ public class MovieUpdateDatasourceAction extends AbstractAction {
    */
   @Override
   public void actionPerformed(ActionEvent e) {
-    TmmSwingWorker task = new MovieUpdateDatasourceTask();
-    if (!MainWindow.executeMainTask(task)) {
-      JOptionPane.showMessageDialog(null, BUNDLE.getString("onlyoneoperation")); //$NON-NLS-1$
+    String name = JOptionPane.showInputDialog(null, BUNDLE.getString("movieset.title"), "", 1); //$NON-NLS-1$
+    if (StringUtils.isNotEmpty(name)) {
+      MovieSet movieSet = new MovieSet(name);
+      movieSet.saveToDb();
+      MovieList.getInstance().addMovieSet(movieSet);
     }
   }
 }

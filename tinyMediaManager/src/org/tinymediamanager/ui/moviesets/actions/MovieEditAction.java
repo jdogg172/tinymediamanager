@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.tinymediamanager.ui.movies.actions;
+package org.tinymediamanager.ui.moviesets.actions;
 
 import java.awt.event.ActionEvent;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
 
@@ -25,16 +24,16 @@ import javax.swing.ImageIcon;
 
 import org.tinymediamanager.core.movie.Movie;
 import org.tinymediamanager.ui.UTF8Control;
-import org.tinymediamanager.ui.movies.MovieUIModule;
 import org.tinymediamanager.ui.movies.dialogs.MovieEditorDialog;
+import org.tinymediamanager.ui.moviesets.MovieSetUIModule;
 
 /**
- * MovieEditAction - edit movies
+ * MovieEditAction - edit movies from within moviesets
  * 
  * @author Manuel Laggner
  */
 public class MovieEditAction extends AbstractAction {
-  private static final long           serialVersionUID = -8473181347332963044L;
+  private static final long           serialVersionUID = 1848573591741154631L;
   private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
 
   public MovieEditAction(boolean withTitle) {
@@ -53,12 +52,11 @@ public class MovieEditAction extends AbstractAction {
    */
   @Override
   public void actionPerformed(ActionEvent e) {
-    List<Movie> selectedMovies = new ArrayList<Movie>(MovieUIModule.getInstance().getSelectionModel().getSelectedMovies());
+    List<Movie> selectedMovies = MovieSetUIModule.getInstance().getSelectionModel().getSelectedMovies();
 
     for (Movie movie : selectedMovies) {
-      MovieEditorDialog dialogMovieEditor = new MovieEditorDialog(movie, selectedMovies.size() > 1 ? true : false);
-      // dialogMovieEditor.setVisible(true);
-      if (!dialogMovieEditor.showDialog()) {
+      MovieEditorDialog editor = new MovieEditorDialog(movie, selectedMovies.size() > 1 ? true : false);
+      if (!editor.showDialog()) {
         break;
       }
     }

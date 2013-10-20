@@ -26,7 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.scraper.MediaArtwork.MediaArtworkType;
-import org.tinymediamanager.scraper.util.CachedUrl;
+import org.tinymediamanager.scraper.util.Url;
 
 /**
  * The Class MediaEntityImageFetcherTask.
@@ -34,23 +34,12 @@ import org.tinymediamanager.scraper.util.CachedUrl;
  * @author Manuel Laggner
  */
 public class MediaEntityImageFetcherTask implements Runnable {
-
-  /** The Constant LOGGER. */
   private final static Logger LOGGER = LoggerFactory.getLogger(MediaEntityImageFetcherTask.class);
 
-  /** The entity. */
   private MediaEntity         entity;
-
-  /** The url. */
   private String              url;
-
-  /** The type. */
   private MediaArtworkType    type;
-
-  /** The filename. */
   private String              filename;
-
-  /** The first image. */
   private boolean             firstImage;
 
   /**
@@ -116,10 +105,17 @@ public class MediaEntityImageFetcherTask implements Runnable {
       LOGGER.debug("writing " + type + " " + filename);
 
       // fetch and store images
-      CachedUrl cachedUrl = new CachedUrl(url);
+      Url url1 = new Url(url);
       FileOutputStream outputStream = new FileOutputStream(new File(entity.getPath(), filename));
-      InputStream is = cachedUrl.getInputStream();
+      InputStream is = url1.getInputStream();
       IOUtils.copy(is, outputStream);
+      outputStream.flush();
+      try {
+        outputStream.getFD().sync(); // wait until file has been completely written
+      }
+      catch (Exception e) {
+        // empty here -> just not let the thread crash
+      }
       outputStream.close();
       is.close();
 

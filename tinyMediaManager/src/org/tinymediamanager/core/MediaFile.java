@@ -350,20 +350,23 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
 
   /**
    * (re)sets the path (when renaming MediaEntity folder).<br>
-   * calculates relative path from old and exchanges new path (for subdirs like extrafanarts)
+   * Exchanges the beginning MF path from oldPath with newPath<br>
+   * <br>
+   * eg: <br>
+   * Params: /movie/alien1/ & /movie/Alien 1/<br>
+   * File: /movie/alien1/asdf/jklo/file.avi -> /movie/Alien 1/asdf/jklo/file.avi<br>
+   * <br>
+   * this id done by a simple string.replace()
    * 
    * @param oldPath
    *          the old path
    * @param newPath
    *          the new path
    */
-  public void fixPathForRenamedFolder(File oldPath, File newPath) {
-    String rel = Utils.relPath(oldPath, this.path); // relative from old
-    String newPathS = newPath.getPath();
-    if (!rel.isEmpty()) {
-      newPathS += File.separator + rel;
-    }
-    setPath(newPathS);
+  public void replacePathForRenamedFolder(File oldPath, File newPath) {
+    String p = getPath();
+    p = p.replace(oldPath.getAbsolutePath(), newPath.getAbsolutePath());
+    setPath(p);
   }
 
   /**
@@ -586,19 +589,28 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
    */
   private String getMediaInfo(StreamKind streamKind, int streamNumber, String... keys) {
     for (String key : keys) {
-      // Map<StreamKind, List<Map<String, String>>>
-      List stream = miSnapshot.get(streamKind);
+      List<Map<String, String>> stream = miSnapshot.get(streamKind);
       if (stream != null) {
         LinkedHashMap<String, String> info = (LinkedHashMap<String, String>) stream.get(streamNumber);
         if (info != null) {
           String value = info.get(key);
+          // System.out.println("  " + streamKind + " " + key + " = " + value);
           if (value != null && value.length() > 0) {
-            // System.out.println("  " + streamKind + " " + key + " = " + value);
             return value;
           }
         }
       }
     }
+
+    // fallback to the "old" logic
+    for (String key : keys) {
+      String value = mediaInfo.get(streamKind, streamNumber, key);
+      // System.out.println("  " + streamKind + " " + key + " = " + value);
+      if (value.length() > 0) {
+        return value;
+      }
+    }
+
     return "";
   }
 

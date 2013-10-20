@@ -32,10 +32,13 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.RandomAccessFile;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
@@ -67,6 +70,7 @@ import org.tinymediamanager.core.tvshow.tasks.TvShowRenameTask;
 import org.tinymediamanager.core.tvshow.tasks.TvShowScrapeTask;
 import org.tinymediamanager.core.tvshow.tasks.TvShowUpdateDatasourceTask;
 import org.tinymediamanager.scraper.util.CachedUrl;
+import org.tinymediamanager.scraper.util.StrgUtils;
 import org.tinymediamanager.thirdparty.MediaInfo;
 import org.tinymediamanager.ui.MainWindow;
 import org.tinymediamanager.ui.TmmSwingWorker;
@@ -86,14 +90,18 @@ import com.sun.jna.Platform;
 public class TinyMediaManager {
 
   /** The Constant LOGGER. */
-  private static final Logger LOGGER          = LoggerFactory.getLogger(TinyMediaManager.class);
+  private static final Logger     LOGGER          = LoggerFactory.getLogger(TinyMediaManager.class);
 
-  private static boolean      updateMovies    = false;
-  private static boolean      updateTv        = false;
-  private static boolean      scrapeNew       = false;
-  private static boolean      scrapeUnscraped = false;
-  private static boolean      renameNew       = false;
-  private static boolean      checkFiles      = false;
+  private static boolean          updateMovies    = false;
+  private static boolean          updateTv        = false;
+  private static boolean          scrapeNew       = false;
+  private static boolean          scrapeUnscraped = false;
+  private static boolean          renameNew       = false;
+  private static boolean          checkFiles      = false;
+
+  // datasource IDs
+  private static HashSet<Integer> updateMovieDs   = new HashSet<Integer>();
+  private static HashSet<Integer> updateTvDs      = new HashSet<Integer>();
 
   private static void syntax() {
     // @formatter:off
@@ -106,13 +114,17 @@ public class TinyMediaManager {
         "\n" +
         "PARAMETERS:\n" +
         "\n" +
-        "    -updateMovies        update movie datasources and add new movies/files to DB\n" +
-        "    -updateTv            update TvShow datasources and add new TvShows/episodes to DB\n" +
+        "    -updateMovies        update all movie datasources and add new movies/files to DB\n" +
+        "    -updateMoviesX       replace X with 1-9 - just updates a single movie datasource; ordering like GUI\n" +
+        "    -updateTv            update all TvShow datasources and add new TvShows/episodes to DB\n" +
+        "    -updateTvX           replace X with 1-9 - just updates a single TvShow datasource; ordering like GUI\n" +
         "    -update              update all (short for '-updateMovies -updateTv')\n" +
         "\n" +
         "    -scrapeNew           auto-scrape (force best match) new found movies/TvShows/episodes from former update(s)\n" +
         "    -scrapeUnscraped     auto-scrape (force best match) all movies, which have not yet been scraped (not for TV/episodes!)\n" +
         "    -renameNew           rename & cleanup of the new found movies/TvShows/episodes\n" +
+        "\n" +
+        "    -checkFiles          does a physical check, if all files in DB are existent on filesystem (might take long!)\n" +
         "\n");
     // @formatter:on
   }
@@ -130,8 +142,16 @@ public class TinyMediaManager {
         if (cmd.equalsIgnoreCase("-updateMovies")) {
           updateMovies = true;
         }
+        else if (cmd.matches("(?)-updateMovies[1-9]")) {
+          updateMovies = true;
+          updateMovieDs.add(Integer.parseInt(StrgUtils.substr(cmd, "(?)-updateMovies(\\d)")));
+        }
         else if (cmd.equalsIgnoreCase("-updateTv")) {
           updateTv = true;
+        }
+        else if (cmd.matches("(?)-updateTv[1-9]")) {
+          updateTv = true;
+          updateTvDs.add(Integer.parseInt(StrgUtils.substr(cmd, "(?)-updateTv(\\d)")));
         }
         else if (cmd.equalsIgnoreCase("-update")) {
           updateMovies = true;
@@ -168,6 +188,23 @@ public class TinyMediaManager {
         syntax();
         System.exit(0);
       }
+    }
+
+    // check if we have write permissions to this folder
+    try {
+      RandomAccessFile f = new RandomAccessFile("access.test", "rw");
+      f.close();
+      FileUtils.deleteQuietly(new File("access.test"));
+    }
+    catch (Exception e2) {
+      String msg = "Cannot write to TMM directory, have no rights - exiting.";
+      if (!GraphicsEnvironment.isHeadless()) {
+        JOptionPane.showMessageDialog(null, msg);
+      }
+      else {
+        System.out.println(msg);
+      }
+      System.exit(1);
     }
 
     LOGGER.info("=====================================================");
@@ -596,9 +633,21 @@ public class TinyMediaManager {
       // update movies //////////////////////////////////////////////
       if (updateMovies) {
         LOGGER.info("Commandline - updating movies...");
-        task = new MovieUpdateDatasourceTask();
-        task.execute();
-        task.get(); // blocking
+        if (updateMovieDs.isEmpty()) {
+          task = new MovieUpdateDatasourceTask();
+          task.execute();
+          task.get(); // blocking
+        }
+        else {
+          List<String> dataSources = new ArrayList<String>(Globals.settings.getMovieSettings().getMovieDataSource());
+          for (Integer i : updateMovieDs) {
+            if (dataSources != null && dataSources.size() >= i - 1) {
+              task = new MovieUpdateDatasourceTask(dataSources.get(i - 1));
+              task.execute();
+              task.get(); // blocking
+            }
+          }
+        }
         List<Movie> newMovies = MovieList.getInstance().getNewMovies();
 
         if (scrapeNew) {
@@ -657,9 +706,21 @@ public class TinyMediaManager {
       // update TvShows //////////////////////////////////////////////
       if (updateTv) {
         LOGGER.info("Commandline - updating TvShows and episodes...");
-        task = new TvShowUpdateDatasourceTask();
-        task.execute();
-        task.get(); // blocking
+        if (updateTvDs.isEmpty()) {
+          task = new TvShowUpdateDatasourceTask();
+          task.execute();
+          task.get(); // blocking
+        }
+        else {
+          List<String> dataSources = new ArrayList<String>(Globals.settings.getTvShowSettings().getTvShowDataSource());
+          for (Integer i : updateTvDs) {
+            if (dataSources != null && dataSources.size() >= i - 1) {
+              task = new TvShowUpdateDatasourceTask(dataSources.get(i - 1));
+              task.execute();
+              task.get(); // blocking
+            }
+          }
+        }
         List<TvShow> newTv = TvShowList.getInstance().getNewTvShows();
         List<TvShowEpisode> newEp = TvShowList.getInstance().getNewEpisodes();
 
@@ -681,7 +742,7 @@ public class TinyMediaManager {
         if (renameNew) {
           LOGGER.info("Commandline - rename & cleanup new episodes...");
           if (newTv.size() > 0 && newEp.size() > 0) {
-            task = new TvShowRenameTask(null, newEp); // just rename new EPs
+            task = new TvShowRenameTask(null, newEp, true); // just rename new EPs AND root folder
             task.execute();
             task.get(); // blocking
           }
@@ -689,16 +750,42 @@ public class TinyMediaManager {
       }
 
       if (checkFiles) {
+        boolean allOk = true;
         // check db
-        LOGGER.info("Check all MFs if existing");
+        LOGGER.info("Check all files if existing");
         for (Movie m : MovieList.getInstance().getMovies()) {
+          System.out.print(".");
           for (MediaFile mf : m.getMediaFiles()) {
             if (!mf.exists()) {
+              System.out.println();
               LOGGER.warn("MediaFile not found! " + mf.getFile().getAbsolutePath());
+              allOk = false;
             }
           }
         }
-        LOGGER.info("...done");
+        for (TvShow s : TvShowList.getInstance().getTvShows()) {
+          System.out.print(".");
+          for (MediaFile mf : s.getMediaFiles()) { // show MFs
+            if (!mf.exists()) {
+              System.out.println();
+              LOGGER.warn("MediaFile not found! " + mf.getFile().getAbsolutePath());
+              allOk = false;
+            }
+          }
+          for (TvShowEpisode episode : new ArrayList<TvShowEpisode>(s.getEpisodes())) {
+            for (MediaFile mf : episode.getMediaFiles()) { // episode MFs
+              if (!mf.exists()) {
+                System.out.println();
+                LOGGER.warn("MediaFile not found! " + mf.getFile().getAbsolutePath());
+                allOk = false;
+              }
+            }
+          }
+        }
+        System.out.println();
+        if (allOk) {
+          LOGGER.info("no problems found - everything ok :)");
+        }
       }
     }
     catch (Exception e) {
