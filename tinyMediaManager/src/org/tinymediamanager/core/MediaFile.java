@@ -554,12 +554,19 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
    * 
    * @return MediaInfo object
    */
-  private synchronized MediaInfo getMediaInfo() {
+  private MediaInfo getMediaInfo() {
     if (mediaInfo == null) {
       mediaInfo = new MediaInfo();
-      if (!mediaInfo.open(this.getFile())) {
+
+      try {
+        if (!mediaInfo.open(this.getFile())) {
+          LOGGER.error("Mediainfo could not open file: " + this.getPath() + File.separator + this.getFilename());
+        }
+      }
+      catch (Exception e) {
         LOGGER.error("Mediainfo could not open file: " + this.getPath() + File.separator + this.getFilename());
       }
+
       miSnapshot = mediaInfo.snapshot();
     }
     return mediaInfo;
@@ -568,7 +575,7 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
   /**
    * Closes the connection to the mediainfo lib.
    */
-  private synchronized void closeMediaInfo() {
+  private void closeMediaInfo() {
     if (mediaInfo != null) {
       mediaInfo.close();
       mediaInfo = null;
@@ -603,13 +610,14 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
     }
 
     // fallback to the "old" logic
-    for (String key : keys) {
-      String value = mediaInfo.get(streamKind, streamNumber, key);
-      // System.out.println("  " + streamKind + " " + key + " = " + value);
-      if (value.length() > 0) {
-        return value;
-      }
-    }
+    // not needed anylonger, since we fixed the streamCount() in MI
+    // for (String key : keys) {
+    // String value = mediaInfo.get(streamKind, streamNumber, key);
+    // System.out.println("OLD  " + streamKind + " " + key + " = " + value);
+    // if (value.length() > 0) {
+    // return value;
+    // }
+    // }
 
     return "";
   }
@@ -1051,13 +1059,14 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
       return;
     }
 
-    LOGGER.debug("start MediaInfo for " + this.filename);
+    LOGGER.debug("start MediaInfo for " + this.getFile().getAbsolutePath());
     mediaInfo = getMediaInfo();
     try {
       setFilesize(Long.parseLong(getMediaInfo(StreamKind.General, 0, "FileSize")));
     }
     catch (Exception e) {
       LOGGER.error("error getting MediaInfo for " + this.filename);
+      closeMediaInfo();
       return;
     }
 
@@ -1257,7 +1266,7 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
       case EXTRAFANART:
       case GRAPHIC:
         height = getMediaInfo(StreamKind.Image, 0, "Height");
-        scanType = getMediaInfo(StreamKind.Image, 0, "ScanType");
+        // scanType = getMediaInfo(StreamKind.Image, 0, "ScanType"); // no scantype on graphics
         width = getMediaInfo(StreamKind.Image, 0, "Width");
         videoCodec = getMediaInfo(StreamKind.Image, 0, "Encoded_Library/Name", "CodecID/Hint", "Format");
         // System.out.println(height + "-" + width + "-" + videoCodec);
@@ -1308,35 +1317,43 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
       }
     }
 
-    // overall bitrate (OverallBitRate/String)
-    String br = getMediaInfo(StreamKind.General, 0, "OverallBitRate");
-    if (!br.isEmpty()) {
-      try {
-        setOverallBitRate(Integer.valueOf(br) / 1024); // in kbps
-      }
-      catch (NumberFormatException e) {
-        setOverallBitRate(0);
-      }
-    }
+    switch (type) {
+      case VIDEO:
+      case VIDEO_EXTRA:
+      case TRAILER:
+      case AUDIO:
+        // overall bitrate (OverallBitRate/String)
+        String br = getMediaInfo(StreamKind.General, 0, "OverallBitRate");
+        if (!br.isEmpty()) {
+          try {
+            setOverallBitRate(Integer.valueOf(br) / 1024); // in kbps
+          }
+          catch (NumberFormatException e) {
+            setOverallBitRate(0);
+          }
+        }
 
-    // Duration;Play time of the stream in ms
-    // Duration/String;Play time in format : XXx YYy only, YYy omited if zero
-    // Duration/String1;Play time in format : HHh MMmn SSs MMMms, XX om.if.z.
-    // Duration/String2;Play time in format : XXx YYy only, YYy omited if zero
-    // Duration/String3;Play time in format : HH:MM:SS.MMM
-    String dur = getMediaInfo(StreamKind.General, 0, "Duration");
-    if (!dur.isEmpty()) {
-      try {
-        setDuration(Integer.valueOf(dur) / 1000);
-      }
-      catch (NumberFormatException e) {
-        setDuration(0);
-      }
+        // Duration;Play time of the stream in ms
+        // Duration/String;Play time in format : XXx YYy only, YYy omited if zero
+        // Duration/String1;Play time in format : HHh MMmn SSs MMMms, XX om.if.z.
+        // Duration/String2;Play time in format : XXx YYy only, YYy omited if zero
+        // Duration/String3;Play time in format : HH:MM:SS.MMM
+        String dur = getMediaInfo(StreamKind.General, 0, "Duration");
+        if (!dur.isEmpty()) {
+          try {
+            setDuration(Integer.valueOf(dur) / 1000);
+          }
+          catch (NumberFormatException e) {
+            setDuration(0);
+          }
+        }
+        /*
+         * String.format("%d min, %d sec", TimeUnit.MILLISECONDS.toMinutes(millis), TimeUnit.MILLISECONDS.toSeconds(millis) -
+         * TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(millis)));
+         */
+      default:
+        break;
     }
-    /*
-     * String.format("%d min, %d sec", TimeUnit.MILLISECONDS.toMinutes(millis), TimeUnit.MILLISECONDS.toSeconds(millis) -
-     * TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(millis)));
-     */
 
     // close mediainfo lib
     closeMediaInfo();

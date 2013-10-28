@@ -88,6 +88,12 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
   @Override
   public Void doInBackground() {
     try {
+      long start = System.currentTimeMillis();
+      // cleanup just added for a new UDS run
+      for (Movie movie : movieList.getMovies()) {
+        movie.justAdded = false;
+      }
+
       for (String ds : dataSources) {
 
         startProgressBar("prepare scan '" + ds + "'");
@@ -150,8 +156,9 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
             break;
           }
           Movie movie = movieList.getMovies().get(i);
+
+          // check only movies matching datasource
           if (!ds.equals(movie.getDataSource())) {
-            // check only movies matching datasource
             continue;
           }
 
@@ -161,14 +168,17 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
             movieList.removeMovie(movie);
           }
           else {
-            // check and delete all not found MediaFiles
-            List<MediaFile> mediaFiles = new ArrayList<MediaFile>(movie.getMediaFiles());
-            for (MediaFile mf : mediaFiles) {
-              if (!mf.exists()) {
-                movie.removeFromMediaFiles(mf);
+            // have a look if that movie has just been added -> so we don't need any cleanup
+            if (!movie.justAdded) {
+              // check and delete all not found MediaFiles
+              List<MediaFile> mediaFiles = new ArrayList<MediaFile>(movie.getMediaFiles());
+              for (MediaFile mf : mediaFiles) {
+                if (!mf.exists()) {
+                  movie.removeFromMediaFiles(mf);
+                }
               }
+              movie.saveToDb();
             }
-            movie.saveToDb();
             submitTask(new MediaFileInformationFetcherTask(movie.getMediaFiles(), movie, false));
           }
         } // end movie loop
@@ -193,7 +203,8 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
         }
 
       } // END datasource loop
-      LOGGER.info("Done updating datasource :)");
+      long end = System.currentTimeMillis();
+      LOGGER.info("Done updating datasource :) - took " + Utils.MSECtoHHMMSS(end - start));
 
       if (cancel) {
         cancel(false);// swing cancel
@@ -322,6 +333,7 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
         movie.getMovieSet().saveToDb();
         movie.saveToDb();
       }
+      movie.justAdded = true;
       movieList.addMovie(movie);
     }
   }
@@ -574,6 +586,7 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
         }
 
         movie.saveToDb();
+        movie.justAdded = true;
         movieList.addMovie(movie);
       }
     }

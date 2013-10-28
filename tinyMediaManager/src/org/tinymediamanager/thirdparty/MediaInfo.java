@@ -77,14 +77,6 @@ public class MediaInfo implements Closeable {
    * Instantiates a new media info.
    */
   public MediaInfo() {
-    try {
-      handle = MediaInfoLibrary.INSTANCE.New();
-    }
-    catch (LinkageError e) {
-      // throw new MediaInfoException(e);
-      LOGGER.error("Failed to load mediainfo", e);
-      handle = null;
-    }
   }
 
   /**
@@ -94,7 +86,18 @@ public class MediaInfo implements Closeable {
    *          the file
    * @return true, if successful
    */
-  public synchronized boolean open(File file) {
+  public boolean open(File file) throws MediaInfoException {
+    // create handle
+    try {
+      if (handle == null) {
+        handle = MediaInfoLibrary.INSTANCE.New();
+      }
+    }
+    catch (LinkageError e) {
+      LOGGER.error("Failed to load mediainfo", e);
+      throw new MediaInfoException(e);
+    }
+
     if (file != null && isLoaded()) {
       return file.isFile() && MediaInfoLibrary.INSTANCE.Open(handle, new WString(file.getAbsolutePath())) > 0;
     }
@@ -108,7 +111,7 @@ public class MediaInfo implements Closeable {
    * 
    * @return the string
    */
-  public synchronized String inform() {
+  public String inform() {
     if (isLoaded()) {
       return MediaInfoLibrary.INSTANCE.Inform(handle).toString();
     }
@@ -137,7 +140,7 @@ public class MediaInfo implements Closeable {
    *          the value
    * @return the string
    */
-  public synchronized String option(String option, String value) {
+  public String option(String option, String value) {
     if (isLoaded()) {
       return MediaInfoLibrary.INSTANCE.Option(handle, new WString(option), new WString(value)).toString();
     }
@@ -193,7 +196,7 @@ public class MediaInfo implements Closeable {
    *          the search kind
    * @return the string
    */
-  public synchronized String get(StreamKind streamKind, int streamNumber, String parameter, InfoKind infoKind, InfoKind searchKind) {
+  public String get(StreamKind streamKind, int streamNumber, String parameter, InfoKind infoKind, InfoKind searchKind) {
     if (isLoaded()) {
       return MediaInfoLibrary.INSTANCE.Get(handle, streamKind.ordinal(), streamNumber, new WString(parameter), infoKind.ordinal(),
           searchKind.ordinal()).toString();
@@ -231,7 +234,7 @@ public class MediaInfo implements Closeable {
    *          the info kind
    * @return the string
    */
-  public synchronized String get(StreamKind streamKind, int streamNumber, int parameterIndex, InfoKind infoKind) {
+  public String get(StreamKind streamKind, int streamNumber, int parameterIndex, InfoKind infoKind) {
     if (isLoaded()) {
       return MediaInfoLibrary.INSTANCE.GetI(handle, streamKind.ordinal(), streamNumber, parameterIndex, infoKind.ordinal()).toString();
     }
@@ -247,7 +250,7 @@ public class MediaInfo implements Closeable {
    *          the stream kind
    * @return the int
    */
-  public synchronized int streamCount(StreamKind streamKind) {
+  public int streamCount(StreamKind streamKind) {
     if (isLoaded()) {
       // return MediaInfoLibrary.INSTANCE.Count_Get(handle, streamKind.ordinal(), -1);
       // We should use NativeLong for -1, but it fails on 64-bit
@@ -273,7 +276,7 @@ public class MediaInfo implements Closeable {
    *          the stream number
    * @return the int
    */
-  public synchronized int parameterCount(StreamKind streamKind, int streamNumber) {
+  public int parameterCount(StreamKind streamKind, int streamNumber) {
     if (isLoaded()) {
       return MediaInfoLibrary.INSTANCE.Count_Get(handle, streamKind.ordinal(), streamNumber);
     }
@@ -336,7 +339,7 @@ public class MediaInfo implements Closeable {
    * @see java.io.Closeable#close()
    */
   @Override
-  public synchronized void close() {
+  public void close() {
     if (isLoaded()) {
       MediaInfoLibrary.INSTANCE.Close(handle);
     }
@@ -345,23 +348,21 @@ public class MediaInfo implements Closeable {
   /**
    * Dispose.
    */
-  public synchronized void dispose() {
-    if (handle == null)
-      return;
+  public void dispose() {
+    if (!isLoaded()) {
+      throw new IllegalStateException();
+    }
 
     // delete handle
     MediaInfoLibrary.INSTANCE.Delete(handle);
     handle = null;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see java.lang.Object#finalize()
-   */
   @Override
-  protected void finalize() {
-    dispose();
+  protected void finalize() throws Throwable {
+    if (isLoaded()) {
+      dispose();
+    }
   }
 
   /**
