@@ -33,8 +33,6 @@ import javax.swing.SwingWorker;
 
 import org.apache.commons.lang3.StringUtils;
 import org.imgscalr.Scalr;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.tinymediamanager.core.ImageCache;
 import org.tinymediamanager.scraper.util.Url;
 import org.tinymediamanager.ui.UTF8Control;
@@ -51,7 +49,6 @@ public class ImageLabel extends JLabel {
 
   private static final long                  serialVersionUID = -2524445544386464158L;
   protected static final ResourceBundle      BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
-  private static final Logger                LOGGER           = LoggerFactory.getLogger(ImageLabel.class);
 
   protected BufferedImage                    originalImage;
   protected String                           imageUrl;
@@ -253,10 +250,12 @@ public class ImageLabel extends JLabel {
     }
     else {
       // draw border and background
-      g.setColor(Color.BLACK);
-      g.drawRect(0, 0, this.getWidth() - 1, this.getHeight() - 1);
-      g.setColor(getParent().getBackground());
-      g.fillRect(1, 1, this.getWidth() - 2, this.getHeight() - 2);
+      if (drawBorder) {
+        g.setColor(Color.BLACK);
+        g.drawRect(0, 0, this.getWidth() - 1, this.getHeight() - 1);
+        g.setColor(getParent().getBackground());
+        g.fillRect(1, 1, this.getWidth() - 2, this.getHeight() - 2);
+      }
 
       // calculate diagonal
       int diagonalSize = (int) Math.sqrt(this.getWidth() * this.getWidth() + this.getHeight() * this.getHeight());
