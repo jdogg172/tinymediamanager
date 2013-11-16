@@ -1129,15 +1129,17 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
           }
           String language = getMediaInfo(StreamKind.Audio, i, "Language");
           if (language.isEmpty()) {
-            // try to parse from filename
-            String shortname = getBasename().toLowerCase();
-            Set<String> langArray = Utils.KEY_TO_LOCALE_MAP.keySet();
-            for (String l : langArray) {
-              if (shortname.equalsIgnoreCase(l) || shortname.matches("(?i).*[ _.-]+" + l + "$")) {// ends with lang + delimiter prefix
-                String lang = Utils.getDisplayLanguage(l);
-                LOGGER.debug("found language '" + l + "' in audiofile; displaying it as '" + lang + "'");
-                stream.setLanguage(lang);
-                break;
+            if (!isDiscFile()) { // video_ts parsed 'ts' as Tsonga
+              // try to parse from filename
+              String shortname = getBasename().toLowerCase();
+              Set<String> langArray = Utils.KEY_TO_LOCALE_MAP.keySet();
+              for (String l : langArray) {
+                if (shortname.equalsIgnoreCase(l) || shortname.matches("(?i).*[ _.-]+" + l + "$")) {// ends with lang + delimiter prefix
+                  String lang = Utils.getDisplayLanguage(l);
+                  LOGGER.debug("found language '" + l + "' in audiofile; displaying it as '" + lang + "'");
+                  stream.setLanguage(lang);
+                  break;
+                }
               }
             }
           }
@@ -1197,7 +1199,8 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
         break;
 
       case SUBTITLE:
-        if (subtitles == null || subtitles.size() == 0) {
+        if (subtitles == null || subtitles.size() == 0 || force) {
+          subtitles.clear();
           MediaFileSubtitle sub = new MediaFileSubtitle();
           String shortname = getBasename().toLowerCase();
           if (shortname.contains("forced")) {
@@ -1290,6 +1293,11 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
       String extensions = getMediaInfo(StreamKind.General, 0, "Codec/Extensions", "Format");
       // get first extension
       setContainerFormat(StringUtils.isEmpty(extensions) ? "" : new Scanner(extensions).next().toLowerCase());
+
+      // if container format is still empty -> insert the extension
+      if (StringUtils.isBlank(containerFormat)) {
+        setContainerFormat(getExtension());
+      }
     }
 
     if (height.isEmpty() || scanType.isEmpty()) {

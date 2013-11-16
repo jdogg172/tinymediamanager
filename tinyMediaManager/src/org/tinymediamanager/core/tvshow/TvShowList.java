@@ -135,7 +135,7 @@ public class TvShowList extends AbstractModelObject {
 
     for (int i = tvShowList.size() - 1; i >= 0; i--) {
       TvShow tvShow = tvShowList.get(i);
-      if (path.equals(tvShow.getDataSource())) {
+      if (!new File(path).equals(new File(tvShow.getDataSource()))) {
         removeTvShow(tvShow);
       }
     }
@@ -375,10 +375,10 @@ public class TvShowList extends AbstractModelObject {
    *          the path
    * @return the movie by path
    */
-  public synchronized TvShow getTvShowByPath(String path) {
+  public synchronized TvShow getTvShowByPath(File path) {
     // iterate over all tv shows and check whether this path is being owned by one
     for (TvShow tvShow : getTvShows()) {
-      if (tvShow.getPath().compareTo(path) == 0) {
+      if (new File(tvShow.getPath()).compareTo(path) == 0) {
         return tvShow;
       }
     }

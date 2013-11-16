@@ -178,7 +178,7 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
           break;
         }
         TvShow tvShow = tvShowList.getTvShows().get(i);
-        if (!path.equals(tvShow.getDataSource())) {
+        if (!new File(path).equals(new File(tvShow.getDataSource()))) {
           // check only Tv shows matching datasource
           continue;
         }
@@ -218,7 +218,7 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
       if (Globals.settings.getTvShowSettings().isBuildImageCacheOnImport()) {
         List<File> imageFiles = new ArrayList<File>();
         for (TvShow tvShow : new ArrayList<TvShow>(tvShowList.getTvShows())) {
-          if (!path.equals(tvShow.getDataSource())) {
+          if (!new File(path).equals(new File(tvShow.getDataSource()))) {
             continue;
           }
           for (MediaFile mf : new ArrayList<MediaFile>(tvShow.getMediaFiles())) {
@@ -342,7 +342,7 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
    */
   private void createTvShowFromDirectory(File dir, String datasource) {
     // search for this tvshow folder in database
-    TvShow tvShow = tvShowList.getTvShowByPath(dir.getPath());
+    TvShow tvShow = tvShowList.getTvShowByPath(dir);
     if (tvShow == null) {
       // tvShow did not exist - try to parse a NFO file in parent folder
       tvShow = TvShow.parseNFO(dir);
