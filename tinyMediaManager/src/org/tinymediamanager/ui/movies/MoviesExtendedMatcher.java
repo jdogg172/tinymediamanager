@@ -15,6 +15,7 @@
  */
 package org.tinymediamanager.ui.movies;
 
+import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -25,6 +26,7 @@ import org.tinymediamanager.core.MediaFileAudioStream;
 import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.movie.Movie;
 import org.tinymediamanager.core.movie.MovieActor;
+import org.tinymediamanager.core.movie.MovieProducer;
 import org.tinymediamanager.scraper.MediaGenres;
 
 import ca.odell.glazedlists.matchers.Matcher;
@@ -35,17 +37,11 @@ import ca.odell.glazedlists.matchers.Matcher;
  * @author Manuel Laggner
  */
 public class MoviesExtendedMatcher implements Matcher<Movie> {
-
-  /**
-   * The Enum SearchOptions.
-   * 
-   * @author Manuel Laggner
-   */
   public enum SearchOptions {
-    DUPLICATES, WATCHED, GENRE, CAST, TAG, MOVIESET, VIDEO_FORMAT, VIDEO_CODEC, AUDIO_CODEC
+    DUPLICATES, WATCHED, GENRE, CAST, TAG, MOVIESET, VIDEO_FORMAT, VIDEO_CODEC, AUDIO_CODEC, DATASOURCE, MISSING_METADATA, MISSING_ARTWORK,
+    MISSING_SUBTITLES, NEW_MOVIES
   }
 
-  /** The search options. */
   private HashMap<SearchOptions, Object> searchOptions;
 
   /**
@@ -152,6 +148,42 @@ public class MoviesExtendedMatcher implements Matcher<Movie> {
       }
     }
 
+    // check against datasource
+    if (searchOptions.containsKey(SearchOptions.DATASOURCE)) {
+      String datasource = (String) searchOptions.get(SearchOptions.DATASOURCE);
+      if (!new File(datasource).equals(new File(movie.getDataSource()))) {
+        return false;
+      }
+    }
+
+    // check against missing metadata
+    if (searchOptions.containsKey(SearchOptions.MISSING_METADATA)) {
+      if (movie.isScraped()) {
+        return false;
+      }
+    }
+
+    // check against missing artwork
+    if (searchOptions.containsKey(SearchOptions.MISSING_ARTWORK)) {
+      if (movie.getHasImages()) {
+        return false;
+      }
+    }
+
+    // check against missing subtitles
+    if (searchOptions.containsKey(SearchOptions.MISSING_SUBTITLES)) {
+      if (movie.hasSubtitles()) {
+        return false;
+      }
+    }
+
+    // check against new movies
+    if (searchOptions.containsKey(SearchOptions.NEW_MOVIES)) {
+      if (!movie.isNewlyAdded()) {
+        return false;
+      }
+    }
+
     return true;
   }
 
@@ -223,6 +255,16 @@ public class MoviesExtendedMatcher implements Matcher<Movie> {
       for (MovieActor cast : movie.getActors()) {
         if (StringUtils.isNotEmpty(cast.getName())) {
           matcher = pattern.matcher(cast.getName());
+          if (matcher.find()) {
+            return true;
+          }
+        }
+      }
+
+      // producers
+      for (MovieProducer producer : movie.getProducers()) {
+        if (StringUtils.isNotEmpty(producer.getName())) {
+          matcher = pattern.matcher(producer.getName());
           if (matcher.find()) {
             return true;
           }

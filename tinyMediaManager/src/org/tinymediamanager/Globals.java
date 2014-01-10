@@ -30,6 +30,7 @@ import javax.persistence.PersistenceException;
 import org.apache.commons.io.FileUtils;
 import org.tinymediamanager.TmmThreadPool.TmmThreadFactory;
 import org.tinymediamanager.core.Constants;
+import org.tinymediamanager.core.License;
 import org.tinymediamanager.core.Settings;
 import org.tinymediamanager.ui.MainWindow;
 
@@ -39,14 +40,8 @@ import org.tinymediamanager.ui.MainWindow;
  * @author Manuel Laggner
  */
 public class Globals {
-
-  /** The settings. */
   public static final Settings           settings = Settings.getInstance();
-
-  /** The emf. */
-  private static EntityManagerFactory    emf;
-
-  /** The entity manager. */
+  public static EntityManagerFactory     entityManagerFactory;
   public static EntityManager            entityManager;
 
   // public static final ExecutorService executor2 = Executors.newFixedThreadPool(10);
@@ -58,6 +53,17 @@ public class Globals {
                                                       new LinkedBlockingQueue<Runnable>(), // our queue
                                                       new TmmThreadFactory("global"));
 
+  private static final boolean           donator  = License.isValid();
+
+  /**
+   * Have we donated?
+   * 
+   * @return true/false
+   */
+  public static boolean isDonator() {
+    return donator;
+  }
+
   /**
    * Start database.
    * 
@@ -65,15 +71,20 @@ public class Globals {
    *           the exception
    */
   public static void startDatabase() throws Exception {
-    emf = Persistence.createEntityManagerFactory(Constants.DB);
+    if (System.getProperty("tmmenhancer") != null) {
+      com.objectdb.Enhancer.enhance("org.tinymediamanager.core.*");
+      com.objectdb.Enhancer.enhance("org.tinymediamanager.core.movie.*");
+      com.objectdb.Enhancer.enhance("org.tinymediamanager.core.tvshow.*");
+    }
+    entityManagerFactory = Persistence.createEntityManagerFactory(Constants.DB);
     try {
-      entityManager = emf.createEntityManager();
+      entityManager = entityManagerFactory.createEntityManager();
     }
     catch (PersistenceException e) {
       if (e.getCause().getMessage().contains("does not match db file")) {
         // happens when there's a recovery file which does not match (cannot be recovered) - just delete and try again
         FileUtils.deleteQuietly(new File(Constants.DB + "$"));
-        entityManager = emf.createEntityManager();
+        entityManager = entityManagerFactory.createEntityManager();
       }
       else {
         // unknown
@@ -90,7 +101,7 @@ public class Globals {
    */
   public static void shutdownDatabase() throws Exception {
     entityManager.close();
-    emf.close();
+    entityManagerFactory.close();
   }
 
   /** The logo. */

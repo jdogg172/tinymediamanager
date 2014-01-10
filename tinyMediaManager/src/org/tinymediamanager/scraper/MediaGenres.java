@@ -36,6 +36,7 @@ public class MediaGenres extends DynaEnum<MediaGenres> {
   public final static MediaGenres ACTION          = new MediaGenres("ACTION", 0, "Action");
   public final static MediaGenres ADVENTURE       = new MediaGenres("ADVENTURE", 1, "Adventure");
   public final static MediaGenres ANIMATION       = new MediaGenres("ANIMATION", 2, "Animation");
+  public final static MediaGenres ANIME           = new MediaGenres("ANIME", -1, "Anime");
   public final static MediaGenres ANIMAL          = new MediaGenres("ANIMAL", 3, "Animal");
   public final static MediaGenres BIOGRAPHY       = new MediaGenres("BIOGRAPHY", 4, "Biography");
   public final static MediaGenres COMEDY          = new MediaGenres("COMEDY", 5, "Comedy");
@@ -120,13 +121,14 @@ public class MediaGenres extends DynaEnum<MediaGenres> {
    * 
    * @param propName
    *          the property
-   * @return
+   * @return array of alternate names
    */
   public static String[] loadAlternateNames(String propName) {
     ArrayList<String> alt = new ArrayList<String>();
     for (Locale loc : Utils.getLanguages()) {
-      if (loc.getLanguage().equals("en")) {
-        // FIXME: all english is translated to german? wtf? but not needed, since EN has the name set...
+      if (loc == null || loc.getLanguage().equals("en")) {
+        // English not needed, since it's in default properties
+        // and for invalid languages (like NB) it will be null
         continue;
       }
       ResourceBundle b = ResourceBundle.getBundle("messages", loc, new UTF8Control()); //$NON-NLS-1$

@@ -40,6 +40,8 @@ import org.tinymediamanager.scraper.ITvShowMetadataProvider;
 import org.tinymediamanager.scraper.MediaSearchOptions;
 import org.tinymediamanager.scraper.MediaSearchResult;
 import org.tinymediamanager.scraper.MediaType;
+import org.tinymediamanager.scraper.anidb.AniDBMetadataProvider;
+import org.tinymediamanager.scraper.fanarttv.FanartTvMetadataProvider;
 import org.tinymediamanager.scraper.thetvdb.TheTvDbMetadataProvider;
 
 /**
@@ -48,34 +50,30 @@ import org.tinymediamanager.scraper.thetvdb.TheTvDbMetadataProvider;
  * @author Manuel Laggner
  */
 public class TvShowList extends AbstractModelObject {
+  private static final Logger    LOGGER                = LoggerFactory.getLogger(TvShowList.class);
+  private static TvShowList      instance              = null;
 
-  /** The Constant logger. */
-  private static final Logger    LOGGER         = LoggerFactory.getLogger(TvShowList.class);
-
-  /** The instance. */
-  private static TvShowList      instance       = null;
-
-  /** The tv show list. */
-  private List<TvShow>           tvShowList     = ObservableCollections.observableList(new ArrayList<TvShow>());
-
-  /** The tag listener. */
-  private PropertyChangeListener tagListener;
-
-  /** The tags observable. */
-  private List<String>           tagsObservable = ObservableCollections.observableList(new ArrayList<String>());
+  private List<TvShow>           tvShowList            = ObservableCollections.observableList(new ArrayList<TvShow>());
+  private List<String>           tvShowTagsObservable  = ObservableCollections.observableList(new ArrayList<String>());
+  private List<String>           episodeTagsObservable = ObservableCollections.observableList(new ArrayList<String>());
+  private PropertyChangeListener propertyChangeListener;
 
   /**
    * Instantiates a new TvShowList.
    */
   private TvShowList() {
     // the tag listener: its used to always have a full list of all tags used in tmm
-    tagListener = new PropertyChangeListener() {
+    propertyChangeListener = new PropertyChangeListener() {
       @Override
       public void propertyChange(PropertyChangeEvent evt) {
         // listen to changes of tags
-        if ("tag".equals(evt.getPropertyName())) {
+        if ("tag".equals(evt.getPropertyName()) && evt.getSource() instanceof TvShow) {
           TvShow tvShow = (TvShow) evt.getSource();
-          updateTags(tvShow);
+          updateTvShowTags(tvShow);
+        }
+        if ("tag".equals(evt.getPropertyName()) && evt.getSource() instanceof TvShowEpisode) {
+          TvShowEpisode episode = (TvShowEpisode) evt.getSource();
+          updateEpisodeTags(episode);
         }
         if (EPISODE_COUNT.equals(evt.getPropertyName())) {
           firePropertyChange(EPISODE_COUNT, 0, 1);
@@ -116,7 +114,7 @@ public class TvShowList extends AbstractModelObject {
     int oldValue = tvShowList.size();
 
     tvShowList.add(newValue);
-    newValue.addPropertyChangeListener(tagListener);
+    newValue.addPropertyChangeListener(propertyChangeListener);
     firePropertyChange(TV_SHOWS, null, tvShowList);
     firePropertyChange(ADDED_TV_SHOW, null, newValue);
     firePropertyChange(TV_SHOW_COUNT, oldValue, tvShowList.size());
@@ -135,7 +133,7 @@ public class TvShowList extends AbstractModelObject {
 
     for (int i = tvShowList.size() - 1; i >= 0; i--) {
       TvShow tvShow = tvShowList.get(i);
-      if (!new File(path).equals(new File(tvShow.getDataSource()))) {
+      if (new File(path).equals(new File(tvShow.getDataSource()))) {
         removeTvShow(tvShow);
       }
     }
@@ -200,10 +198,13 @@ public class TvShowList extends AbstractModelObject {
             tvShow.initializeAfterLoading();
             for (TvShowEpisode episode : tvShow.getEpisodes()) {
               episode.initializeAfterLoading();
+              updateEpisodeTags(episode);
             }
 
             // for performance reasons we add tv shows directly
             tvShowList.add(tvShow);
+            updateTvShowTags(tvShow);
+            tvShow.addPropertyChangeListener(propertyChangeListener);
           }
           else {
             LOGGER.error("retrieved no tv show: " + obj);
@@ -241,6 +242,10 @@ public class TvShowList extends AbstractModelObject {
   public ITvShowMetadataProvider getMetadataProvider(TvShowScrapers scraper) {
     ITvShowMetadataProvider metadataProvider = null;
     switch (scraper) {
+      case ANIDB:
+        LOGGER.debug("get instance of AniDbMetadataProvider");
+        metadataProvider = new AniDBMetadataProvider();
+        break;
       case TVDB:
       default:
         LOGGER.debug("get instance of TheTvDbMetadataProvider");
@@ -260,7 +265,8 @@ public class TvShowList extends AbstractModelObject {
   public List<IMediaArtworkProvider> getArtworkProviders() {
     List<TvShowArtworkScrapers> scrapers = new ArrayList<TvShowArtworkScrapers>();
     scrapers.add(TvShowArtworkScrapers.TVDB);
-
+    scrapers.add(TvShowArtworkScrapers.ANIDB);
+    scrapers.add(TvShowArtworkScrapers.FANART_TV);
     return getArtworkProviders(scrapers);
   }
 
@@ -279,13 +285,33 @@ public class TvShowList extends AbstractModelObject {
     // the tv db
     if (scrapers.contains(TvShowArtworkScrapers.TVDB)) {
       try {
-        LOGGER.debug("get instance of TheTvDbMetadataProvider");
-        artworkProvider = new TheTvDbMetadataProvider();
-        artworkProviders.add(artworkProvider);
-
+        if (Globals.settings.getTvShowSettings().isImageScraperTvdb()) {
+          LOGGER.debug("get instance of TheTvDbMetadataProvider");
+          artworkProvider = new TheTvDbMetadataProvider();
+          artworkProviders.add(artworkProvider);
+        }
       }
       catch (Exception e) {
         LOGGER.warn("failed to get instance of TheTvDbMetadataProvider", e);
+      }
+    }
+
+    // anidb
+    if (scrapers.contains(TvShowArtworkScrapers.ANIDB)) {
+      artworkProviders.add(new AniDBMetadataProvider());
+    }
+
+    // fanart.tv
+    if (scrapers.contains(TvShowArtworkScrapers.FANART_TV)) {
+      try {
+        if (Globals.settings.getTvShowSettings().isImageScraperFanartTv()) {
+          LOGGER.debug("get instance of FanartTvMetadataProvider");
+          artworkProvider = new FanartTvMetadataProvider();
+          artworkProviders.add(artworkProvider);
+        }
+      }
+      catch (Exception e) {
+        LOGGER.warn("failed to get instance of FanartTvMetadataProvider", e);
       }
     }
 
@@ -321,63 +347,77 @@ public class TvShowList extends AbstractModelObject {
     return searchResult;
   }
 
-  /**
-   * Update tags.
-   * 
-   * @param tvShow
-   *          the tv show
-   */
-  private void updateTags(TvShow tvShow) {
+  private void updateTvShowTags(TvShow tvShow) {
     for (String tagInTvShow : tvShow.getTags()) {
       boolean tagFound = false;
-      for (String tag : tagsObservable) {
+      for (String tag : tvShowTagsObservable) {
         if (tagInTvShow.equals(tag)) {
           tagFound = true;
           break;
         }
       }
       if (!tagFound) {
-        addTag(tagInTvShow);
+        addTvShowTag(tagInTvShow);
       }
     }
   }
 
-  /**
-   * Adds the tag.
-   * 
-   * @param newTag
-   *          the new tag
-   */
-  private void addTag(String newTag) {
-    for (String tag : tagsObservable) {
+  private void addTvShowTag(String newTag) {
+    for (String tag : tvShowTagsObservable) {
       if (tag.equals(newTag)) {
         return;
       }
     }
 
-    tagsObservable.add(newTag);
-    firePropertyChange("tag", null, tagsObservable);
+    tvShowTagsObservable.add(newTag);
+    firePropertyChange("tag", null, tvShowTagsObservable);
   }
 
-  /**
-   * Gets the tags in tv shows.
-   * 
-   * @return the tags in tv shows
-   */
   public List<String> getTagsInTvShows() {
-    return tagsObservable;
+    return tvShowTagsObservable;
+  }
+
+  private void updateEpisodeTags(TvShowEpisode episode) {
+    for (String tagEpisode : episode.getTags()) {
+      boolean tagFound = false;
+      for (String tag : episodeTagsObservable) {
+        if (tagEpisode.equals(tag)) {
+          tagFound = true;
+          break;
+        }
+      }
+      if (!tagFound) {
+        addEpisodeTag(tagEpisode);
+      }
+    }
+  }
+
+  private void addEpisodeTag(String newTag) {
+    for (String tag : episodeTagsObservable) {
+      if (tag.equals(newTag)) {
+        return;
+      }
+    }
+
+    episodeTagsObservable.add(newTag);
+    firePropertyChange("tag", null, episodeTagsObservable);
+  }
+
+  public List<String> getTagsInEpisodes() {
+    return episodeTagsObservable;
   }
 
   /**
-   * Gets the movie by path.
+   * Gets the TV show by path.
    * 
    * @param path
    *          the path
    * @return the movie by path
    */
-  public synchronized TvShow getTvShowByPath(File path) {
+  public TvShow getTvShowByPath(File path) {
+    ArrayList<TvShow> tvShows = new ArrayList<TvShow>(tvShowList);
     // iterate over all tv shows and check whether this path is being owned by one
-    for (TvShow tvShow : getTvShows()) {
+    for (TvShow tvShow : tvShows) {
       if (new File(tvShow.getPath()).compareTo(path) == 0) {
         return tvShow;
       }
@@ -387,58 +427,26 @@ public class TvShowList extends AbstractModelObject {
   }
 
   /**
-   * Gets the tv episode by file.
-   * 
-   * @param file
-   *          the file
-   * @return the tv episode by file
-   */
-  public synchronized TvShowEpisode getTvEpisodeByFile(File file) {
-    // validy check
-    if (file == null) {
-      return null;
-    }
-
-    // check if that file is in any tv show/episode (iterating thread safe)
-    for (int i = 0; i < getTvShows().size(); i++) {
-      TvShow show = getTvShows().get(i);
-      for (int j = 0; j < show.getEpisodes().size(); j++) {
-        TvShowEpisode episode = show.getEpisodes().get(j);
-        for (int k = 0; k < episode.getMediaFiles().size(); k++) {
-          MediaFile mediaFile = episode.getMediaFiles().get(k);
-          if (file.equals(mediaFile.getFile())) {
-            return episode;
-          }
-        }
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Gets the tv episodes by file.
+   * Gets the episodes by file. Filter out all episodes from the Database which are part of this file
    * 
    * @param file
    *          the file
    * @return the tv episodes by file
    */
-  public synchronized List<TvShowEpisode> getTvEpisodesByFile(File file) {
+  public List<TvShowEpisode> getTvEpisodesByFile(TvShow tvShow, File file) {
     List<TvShowEpisode> episodes = new ArrayList<TvShowEpisode>(1);
     // validy check
     if (file == null) {
       return episodes;
     }
 
-    // check if that file is in any tv show/episode (iterating thread safe)
-    for (int i = 0; i < getTvShows().size(); i++) {
-      TvShow show = getTvShows().get(i);
-      for (int j = 0; j < show.getEpisodes().size(); j++) {
-        TvShowEpisode episode = show.getEpisodes().get(j);
-        for (int k = 0; k < episode.getMediaFiles().size(); k++) {
-          MediaFile mediaFile = episode.getMediaFiles().get(k);
-          if (file.equals(mediaFile.getFile())) {
-            episodes.add(episode);
-          }
+    // check if that file is in this tv show/episode (iterating thread safe)
+    for (int j = 0; j < tvShow.getEpisodes().size(); j++) {
+      TvShowEpisode episode = tvShow.getEpisodes().get(j);
+      for (int k = 0; k < episode.getMediaFiles().size(); k++) {
+        MediaFile mediaFile = episode.getMediaFiles().get(k);
+        if (file.equals(mediaFile.getFile())) {
+          episodes.add(episode);
         }
       }
     }

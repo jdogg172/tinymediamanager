@@ -69,17 +69,9 @@ import com.omertron.themoviedbapi.model.Trailer;
  * @author Manuel Laggner
  */
 public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtworkProvider, IMediaTrailerProvider {
-
-  /** The Constant logger. */
   private static final Logger           LOGGER            = LoggerFactory.getLogger(TmdbMetadataProvider.class);
-
-  /** The tmdb. */
-  private static TheMovieDbApi          tmdb;
-
-  /** The Constant connectionCounter. */
   private static final RingBuffer<Long> connectionCounter = new RingBuffer<Long>(30);
-
-  /** The provider info. */
+  private static TheMovieDbApi          tmdb;
   private static MediaProviderInfo      providerInfo      = new MediaProviderInfo("tmdb", "themoviedb.org",
                                                               "Scraper for themoviedb.org which is able to scrape movie metadata, artwork and trailers");
 
@@ -116,11 +108,6 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
    * Starts a search for a movie in themoviedb.org
    * 
    * @see org.tinymediamanager.scraper.IMediaMetadataProvider#search(org.tinymediamanager .scraper.SearchQuery)
-   */
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.tinymediamanager.scraper.IMediaMetadataProvider#search(org.tinymediamanager .scraper.MediaSearchOptions)
    */
   @Override
   public List<MediaSearchResult> search(MediaSearchOptions query) throws Exception {
@@ -189,7 +176,7 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
       // 3. try with search string and year
       if (moviesFound.size() == 0) {
         trackConnections();
-        moviesFound = tmdb.searchMovie(searchString, year, query.get(MediaSearchOptions.SearchParam.LANGUAGE), false, 0);
+        moviesFound = tmdb.searchMovie(searchString, year, query.get(MediaSearchOptions.SearchParam.LANGUAGE), false, 0).getResults();
         LOGGER.debug("found " + moviesFound.size() + " results with search string");
       }
 
@@ -197,7 +184,7 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
       if (searchString.matches(".*\\s\\d{4}$") && (moviesFound == null || moviesFound.size() == 0)) {
         // nada found & last part seems to be date; strip off and try again
         searchString = searchString.replaceFirst("\\s\\d{4}$", "");
-        moviesFound = tmdb.searchMovie(searchString, year, query.get(MediaSearchOptions.SearchParam.LANGUAGE), false, 0);
+        moviesFound = tmdb.searchMovie(searchString, year, query.get(MediaSearchOptions.SearchParam.LANGUAGE), false, 0).getResults();
         LOGGER.debug("found " + moviesFound.size() + " results with search string removed year");
       }
 
@@ -304,12 +291,8 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
       baseUrl = tmdb.getConfiguration().getBaseUrl();
 
       if (movie.getBelongsToCollection() != null) {
-        md.setTmdbIdSet(movie.getBelongsToCollection().getId());
-        md.setCollectionName(movie.getBelongsToCollection().getName());
-        // CollectionInfo info = tmdb.getCollectionInfo(md.getTmdbIdSet(), options.getLanguage().name());
-        // if (info != null) {
-        // md.setCollectionName(info.getName());
-        // }
+        md.storeMetadata(MediaMetadata.TMDBID_SET, movie.getBelongsToCollection().getId());
+        md.storeMetadata(MediaMetadata.COLLECTION_NAME, movie.getBelongsToCollection().getName());
       }
     }
 
@@ -328,15 +311,15 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
       }
     }
 
-    md.setTmdbId(movie.getId());
-    md.setPlot(movie.getOverview());
-    md.setTitle(movie.getTitle());
-    md.setOriginalTitle(movie.getOriginalTitle());
-    md.setTagline(movie.getTagline());
+    md.setId(MediaMetadata.TMDBID, movie.getId());
+    md.storeMetadata(MediaMetadata.PLOT, movie.getOverview());
+    md.storeMetadata(MediaMetadata.TITLE, movie.getTitle());
+    md.storeMetadata(MediaMetadata.ORIGINAL_TITLE, movie.getOriginalTitle());
+    md.storeMetadata(MediaMetadata.TAGLINE, movie.getTagline());
 
-    md.setRating(movie.getVoteAverage());
-    md.setRuntime(movie.getRuntime());
-    md.setVoteCount(movie.getVoteCount());
+    md.storeMetadata(MediaMetadata.RATING, movie.getVoteAverage());
+    md.storeMetadata(MediaMetadata.RUNTIME, movie.getRuntime());
+    md.storeMetadata(MediaMetadata.VOTE_COUNT, movie.getVoteCount());
 
     String spokenLanguages = "";
     for (Language lang : movie.getSpokenLanguages()) {
@@ -346,7 +329,7 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
 
       spokenLanguages += lang.getIsoCode();
     }
-    md.setSpokenLanguages(spokenLanguages);
+    md.storeMetadata(MediaMetadata.SPOKEN_LANGUAGES, spokenLanguages);
 
     String countries = "";
     for (ProductionCountry country : movie.getProductionCountries()) {
@@ -355,10 +338,10 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
       }
       countries += country.getIsoCode();
     }
-    md.setCountry(countries);
+    md.storeMetadata(MediaMetadata.COUNTRY, countries);
 
     if (movie.getImdbID() != null && MetadataUtil.isValidImdbId(movie.getImdbID())) {
-      md.setImdbId(movie.getImdbID());
+      md.setId(MediaMetadata.IMDBID, movie.getImdbID());
     }
 
     // production companies
@@ -370,20 +353,20 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
       }
       productionCompanies.append(company.getName().trim());
     }
-    md.setProductionCompany(productionCompanies.toString());
+    md.storeMetadata(MediaMetadata.PRODUCTION_COMPANY, productionCompanies.toString());
 
     // parse release date to year
     String releaseDate = movie.getReleaseDate();
     if (!StringUtils.isEmpty(releaseDate) && releaseDate.length() > 3) {
-      md.setYear(releaseDate.substring(0, 4));
+      md.storeMetadata(MediaMetadata.YEAR, releaseDate.substring(0, 4));
     }
-    md.setReleaseDate(releaseDate);
+    md.storeMetadata(MediaMetadata.RELEASE_DATE, releaseDate);
 
     // get certification
     List<ReleaseInfo> releaseInfo = null;
     synchronized (tmdb) {
       trackConnections();
-      releaseInfo = tmdb.getMovieReleaseInfo(movie.getId(), options.getLanguage().name());
+      releaseInfo = tmdb.getMovieReleaseInfo(movie.getId(), options.getLanguage().name()).getResults();
     }
 
     for (ReleaseInfo info : releaseInfo) {
@@ -413,7 +396,7 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
     List<Person> cast = null;
     synchronized (tmdb) {
       trackConnections();
-      cast = tmdb.getMovieCasts(movie.getId());
+      cast = tmdb.getMovieCasts(movie.getId()).getResults();
     }
 
     for (Person castMember : cast) {
@@ -425,9 +408,15 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
       else if (castMember.getPersonType() == PersonType.CREW) {
         if ("Director".equals(castMember.getJob())) {
           cm.setType(MediaCastMember.CastType.DIRECTOR);
+          cm.setPart(castMember.getDepartment());
         }
         else if ("Writing".equals(castMember.getDepartment())) {
           cm.setType(MediaCastMember.CastType.WRITER);
+          cm.setPart(castMember.getDepartment());
+        }
+        else if ("Production".equals(castMember.getDepartment())) {
+          cm.setType(MediaCastMember.CastType.PRODUCER);
+          cm.setPart(castMember.getJob());
         }
         else {
           continue;
@@ -438,7 +427,7 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
       }
 
       cm.setName(castMember.getName());
-      cm.setPart(castMember.getDepartment());
+
       if (!StringUtils.isEmpty(castMember.getProfilePath())) {
         cm.setImageUrl(baseUrl + "w185" + castMember.getProfilePath());
       }
@@ -504,29 +493,20 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
       return md;
     }
 
-    md.setTmdbId(movie.getId());
-    md.setPlot(movie.getOverview());
-    md.setTitle(movie.getTitle());
-    md.setOriginalTitle(movie.getOriginalTitle());
-    md.setTagline(movie.getTagline());
+    md.setId(MediaMetadata.TMDBID, movie.getId());
+    md.storeMetadata(MediaMetadata.PLOT, movie.getOverview());
+    md.storeMetadata(MediaMetadata.TITLE, movie.getTitle());
+    md.storeMetadata(MediaMetadata.ORIGINAL_TITLE, movie.getOriginalTitle());
+    md.storeMetadata(MediaMetadata.TAGLINE, movie.getTagline());
 
     if (movie.getBelongsToCollection() != null) {
-      md.setTmdbIdSet(movie.getBelongsToCollection().getId());
-      md.setCollectionName(movie.getBelongsToCollection().getName());
-      // CollectionInfo info = tmdb.getCollectionInfo(md.getTmdbIdSet(), options.getLanguage().name());
-      // if (info != null) {
-      // md.setCollectionName(info.getName());
-      // }
+      md.storeMetadata(MediaMetadata.TMDBID_SET, movie.getBelongsToCollection().getId());
+      md.storeMetadata(MediaMetadata.COLLECTION_NAME, movie.getBelongsToCollection().getName());
     }
 
     return md;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.tinymediamanager.scraper.IMediaArtworkProvider#getArtwork(org. tinymediamanager.scraper.MediaScrapeOptions)
-   */
   @Override
   public List<MediaArtwork> getArtwork(MediaScrapeOptions options) throws Exception {
     LOGGER.debug("getArtwork() " + options.toString());
@@ -544,7 +524,7 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
     synchronized (tmdb) {
       trackConnections();
       // posters and fanart
-      movieImages = tmdb.getMovieImages(tmdbId, "");
+      movieImages = tmdb.getMovieImages(tmdbId, "").getResults();
     }
 
     List<MediaArtwork> artwork = prepareArtwork(movieImages, artworkType, tmdbId);
@@ -558,15 +538,7 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
     return artwork;
   }
 
-  /**
-   * Gets the trailers.
-   * 
-   * @param options
-   *          the options
-   * @return the trailers
-   * @throws Exception
-   *           the exception
-   */
+  @Override
   public List<MediaTrailer> getTrailers(MediaScrapeOptions options) throws Exception {
     LOGGER.debug("getTrailers() " + options.toString());
     List<MediaTrailer> trailers = new ArrayList<MediaTrailer>();
@@ -590,8 +562,8 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
       synchronized (tmdb) {
         trackConnections();
         // get trailers from tmdb (with specified langu and without)
-        List<Trailer> tmdbTrailers = tmdb.getMovieTrailers(tmdbId, options.getLanguage().name());
-        List<Trailer> tmdbTrailersWoLang = tmdb.getMovieTrailers(tmdbId, "");
+        List<Trailer> tmdbTrailers = tmdb.getMovieTrailers(tmdbId, options.getLanguage().name()).getResults();
+        List<Trailer> tmdbTrailersWoLang = tmdb.getMovieTrailers(tmdbId, "").getResults();
         tmdbTrailers.addAll(tmdbTrailersWoLang);
 
         for (Trailer tmdbTrailer : tmdbTrailers) {
@@ -661,10 +633,6 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
    */
   private static class ArtworkComparator implements Comparator<Artwork> {
     /*
-     * (non-Javadoc)
-     * 
-     * @see java.util.Comparator#compare(java.lang.Object, java.lang.Object)
-     * 
      * sort artwork: primary by language: preferred lang (ie de), en, others; then: score
      */
     @Override
@@ -768,7 +736,7 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
     synchronized (tmdb) {
       trackConnections();
       try {
-        movieSetsFound = tmdb.searchCollection(setName, Globals.settings.getMovieSettings().getScraperLanguage().name(), 0);
+        movieSetsFound = tmdb.searchCollection(setName, Globals.settings.getMovieSettings().getScraperLanguage().name(), 0).getResults();
         String baseUrl = tmdb.getConfiguration().getBaseUrl();
         for (Collection collection : movieSetsFound) {
           collection.setPosterPath(baseUrl + "w342" + collection.getPosterPath());
@@ -838,7 +806,7 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
     List<Artwork> tmdbArtwork = null;
     synchronized (tmdb) {
       trackConnections();
-      tmdbArtwork = tmdb.getCollectionImages(tmdbId, "");
+      tmdbArtwork = tmdb.getCollectionImages(tmdbId, "").getResults();
     }
 
     List<MediaArtwork> artwork = prepareArtwork(tmdbArtwork, type, tmdbId);

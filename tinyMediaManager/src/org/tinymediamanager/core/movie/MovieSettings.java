@@ -72,6 +72,15 @@ public class MovieSettings extends AbstractModelObject {
   private final static String           SCRAPER_THRESHOLD                        = "scraperThreshold";
   private final static String           DETECT_MOVIE_MULTI_DIR                   = "detectMovieMultiDir";
   private final static String           BUILD_IMAGE_CACHE_ON_IMPORT              = "buildImageCacheOnImport";
+  private final static String           BAD_WORDS                                = "badWords";
+  private final static String           ENTRY                                    = "entry";
+  private final static String           RUNTIME_FROM_MI                          = "runtimeFromMediaInfo";
+  private final static String           ASCII_REPLACEMENT                        = "asciiReplacement";
+  private final static String           YEAR_COLUMN_VISIBLE                      = "yearColumnVisible";
+  private final static String           NFO_COLUMN_VISIBLE                       = "nfoColumnVisible";
+  private final static String           IMAGE_COLUMN_VISIBLE                     = "imageColumnVisible";
+  private final static String           TRAILER_COLUMN_VISIBLE                   = "trailerColumnVisible";
+  private final static String           SUBTITLE_COLUMN_VISIBLE                  = "subtitleColumnVisible";
 
   @XmlElementWrapper(name = MOVIE_DATA_SOURCE)
   @XmlElement(name = PATH)
@@ -88,6 +97,10 @@ public class MovieSettings extends AbstractModelObject {
   @XmlElementWrapper(name = MOVIE_FANART_FILENAME)
   @XmlElement(name = FILENAME)
   private final List<MovieFanartNaming> movieFanartFilenames                     = new ArrayList<MovieFanartNaming>();
+
+  @XmlElementWrapper(name = BAD_WORDS)
+  @XmlElement(name = ENTRY)
+  private final List<String>            badWords                                 = ObservableCollections.observableList(new ArrayList<String>());
 
   private MovieConnectors               movieConnector                           = MovieConnectors.XBMC;
   private String                        movieRenamerPathname                     = "$T ($Y)";
@@ -120,6 +133,13 @@ public class MovieSettings extends AbstractModelObject {
   private boolean                       detectMovieMultiDir                      = false;
   private boolean                       buildImageCacheOnImport                  = false;
   private boolean                       movieRenamerCreateMoviesetForSingleMovie = false;
+  private boolean                       runtimeFromMediaInfo                     = false;
+  private boolean                       asciiReplacement                         = false;
+  private boolean                       yearColumnVisible                        = true;
+  private boolean                       nfoColumnVisible                         = true;
+  private boolean                       imageColumnVisible                       = true;
+  private boolean                       trailerColumnVisible                     = true;
+  private boolean                       subtitleColumnVisible                    = true;
 
   public MovieSettings() {
   }
@@ -538,5 +558,91 @@ public class MovieSettings extends AbstractModelObject {
     boolean oldValue = this.movieRenamerCreateMoviesetForSingleMovie;
     this.movieRenamerCreateMoviesetForSingleMovie = newValue;
     firePropertyChange(MOVIE_RENAMER_MOVIESET_SINGLE_MOVIE, oldValue, newValue);
+  }
+
+  public boolean isRuntimeFromMediaInfo() {
+    return runtimeFromMediaInfo;
+  }
+
+  public void setRuntimeFromMediaInfo(boolean newValue) {
+    boolean oldValue = this.runtimeFromMediaInfo;
+    this.runtimeFromMediaInfo = newValue;
+    firePropertyChange(RUNTIME_FROM_MI, oldValue, newValue);
+  }
+
+  public boolean isAsciiReplacement() {
+    return asciiReplacement;
+  }
+
+  public void setAsciiReplacement(boolean newValue) {
+    boolean oldValue = this.asciiReplacement;
+    this.asciiReplacement = newValue;
+    firePropertyChange(ASCII_REPLACEMENT, oldValue, newValue);
+  }
+
+  public void addBadWord(String badWord) {
+    if (!badWords.contains(badWord)) {
+      badWords.add(badWord);
+      firePropertyChange(BAD_WORDS, null, badWords);
+    }
+  }
+
+  public void removeBadWord(String badWord) {
+    badWords.remove(badWord);
+    firePropertyChange(BAD_WORDS, null, badWords);
+  }
+
+  public List<String> getBadWords() {
+    return badWords;
+  }
+
+  public boolean isYearColumnVisible() {
+    return yearColumnVisible;
+  }
+
+  public void setYearColumnVisible(boolean newValue) {
+    boolean oldValue = this.yearColumnVisible;
+    this.yearColumnVisible = newValue;
+    firePropertyChange(YEAR_COLUMN_VISIBLE, oldValue, newValue);
+  }
+
+  public boolean isNfoColumnVisible() {
+    return nfoColumnVisible;
+  }
+
+  public void setNfoColumnVisible(boolean newValue) {
+    boolean oldValue = this.nfoColumnVisible;
+    this.nfoColumnVisible = newValue;
+    firePropertyChange(NFO_COLUMN_VISIBLE, oldValue, newValue);
+  }
+
+  public boolean isImageColumnVisible() {
+    return imageColumnVisible;
+  }
+
+  public void setImageColumnVisible(boolean newValue) {
+    boolean oldValue = this.imageColumnVisible;
+    this.imageColumnVisible = newValue;
+    firePropertyChange(IMAGE_COLUMN_VISIBLE, oldValue, newValue);
+  }
+
+  public boolean isTrailerColumnVisible() {
+    return trailerColumnVisible;
+  }
+
+  public void setTrailerColumnVisible(boolean newValue) {
+    boolean oldValue = this.trailerColumnVisible;
+    this.trailerColumnVisible = newValue;
+    firePropertyChange(TRAILER_COLUMN_VISIBLE, oldValue, newValue);
+  }
+
+  public boolean isSubtitleColumnVisible() {
+    return subtitleColumnVisible;
+  }
+
+  public void setSubtitleColumnVisible(boolean newValue) {
+    boolean oldValue = this.subtitleColumnVisible;
+    this.subtitleColumnVisible = newValue;
+    firePropertyChange(SUBTITLE_COLUMN_VISIBLE, oldValue, newValue);
   }
 }

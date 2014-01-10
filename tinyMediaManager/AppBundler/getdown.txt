@@ -13,6 +13,7 @@ ui.mac_dock_icon = ../tmm.icns
 
 # Application jar files, on classpath
 code = tmm.jar
+code = lib/api-common.jar
 code = lib/asm.jar
 code = lib/betterbeansbinding-core.jar
 code = lib/betterbeansbinding-el.jar
@@ -72,6 +73,7 @@ resource = getdown-new.jar
 resource = version
 resource = splashscreen.png
 resource = objectdb.conf
+resource = changelog.txt
 resource = [!windows] env.txt
 
 # translations
@@ -115,6 +117,9 @@ tmm.class = org.tinymediamanager.TinyMediaManager
 
 # allow offline use
 allow_offline = true
+
+# do not create .v files
+skip_md5_cache = true
 
 # jvm args
 # NOTE: please consider to write fundamental changes to the commandline start scripts too 

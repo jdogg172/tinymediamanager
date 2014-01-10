@@ -36,7 +36,6 @@ import javax.persistence.Transient;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.jdesktop.observablecollections.ObservableCollections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
@@ -44,6 +43,7 @@ import org.tinymediamanager.core.MediaEntity;
 import org.tinymediamanager.core.MediaEntityImageFetcherTask;
 import org.tinymediamanager.core.MediaFile;
 import org.tinymediamanager.core.MediaFileType;
+import org.tinymediamanager.core.Utils;
 import org.tinymediamanager.core.tvshow.connector.TvShowEpisodeToXbmcNfoConnector;
 import org.tinymediamanager.scraper.MediaArtwork;
 import org.tinymediamanager.scraper.MediaArtwork.MediaArtworkType;
@@ -58,27 +58,25 @@ import org.tinymediamanager.scraper.MediaMetadata;
 @Entity
 @Inheritance(strategy = javax.persistence.InheritanceType.JOINED)
 public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpisode> {
-  private static final Logger LOGGER            = LoggerFactory.getLogger(TvShowEpisode.class);
+  private static final Logger LOGGER     = LoggerFactory.getLogger(TvShowEpisode.class);
 
-  private TvShow              tvShow            = null;
-  private int                 episode           = 0;
-  private int                 season            = -1;
-  private Date                firstAired        = null;
-  private String              director          = "";
-  private String              writer            = "";
-  private boolean             disc              = false;
-  private boolean             watched           = false;
-  private int                 votes             = 0;
-  private boolean             subtitles         = false;
+  private TvShow              tvShow     = null;
+  private int                 episode    = 0;
+  private int                 season     = -1;
+  private Date                firstAired = null;
+  private String              director   = "";
+  private String              writer     = "";
+  private boolean             disc       = false;
+  private boolean             watched    = false;
+  private int                 votes      = 0;
+  private boolean             subtitles  = false;
 
   @Transient
-  private boolean             newlyAdded        = false;
+  private boolean             newlyAdded = false;
 
   @OneToMany(cascade = CascadeType.ALL)
-  private List<TvShowActor>   actors            = new ArrayList<TvShowActor>();
-
-  @Transient
-  private List<TvShowActor>   actorsObservables = ObservableCollections.observableList(actors);
+  private List<TvShowActor>   actors     = new ArrayList<TvShowActor>(0);
+  private List<String>        tags       = new ArrayList<String>(0);
 
   static {
     mediaFileComparator = new TvShowMediaFileComparator();
@@ -98,7 +96,7 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
   public TvShowEpisode(TvShowEpisode source) {
     // the reference to the tv show and the media files are the only things we don't copy
     tvShow = source.tvShow;
-    mediaFilesObservable.addAll(source.mediaFilesObservable);
+    getMediaFiles().addAll(source.getMediaFiles());
 
     // clone the rest
     path = new String(source.path);
@@ -126,7 +124,7 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
     watched = source.watched;
     votes = source.votes;
     subtitles = source.subtitles;
-    actorsObservables.addAll(source.actorsObservables);
+    actors.addAll(source.actors);
   }
 
   /**
@@ -336,7 +334,8 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
   public void initializeAfterLoading() {
     super.initializeAfterLoading();
 
-    actorsObservables = ObservableCollections.observableList(actors);
+    // remove empty tag and null values
+    Utils.removeEmptyStringsFromList(tags);
   }
 
   /**
@@ -363,19 +362,18 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
    *          the new metadata
    */
   public void setMetadata(MediaMetadata metadata) {
-
-    setTitle(metadata.getTitle());
-    setPlot(metadata.getPlot());
+    setTitle(metadata.getStringValue(MediaMetadata.TITLE));
+    setPlot(metadata.getStringValue(MediaMetadata.PLOT));
     setIds(metadata.getIds());
 
     try {
-      setFirstAired(metadata.getFirstAired());
+      setFirstAired(metadata.getStringValue(MediaMetadata.RELEASE_DATE));
     }
     catch (ParseException e) {
       LOGGER.warn(e.getMessage());
     }
 
-    setRating((float) metadata.getRating());
+    setRating(metadata.getFloatValue(MediaMetadata.RATING));
 
     List<TvShowActor> actors = new ArrayList<TvShowActor>();
     String director = "";
@@ -436,7 +434,7 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
     // worst case: multi episode in multiple files
     // e.g. warehouse13.s01e01e02.Part1.avi/warehouse13.s01e01e02.Part2.avi
     for (MediaFile mf : getMediaFiles(MediaFileType.VIDEO)) {
-      episodesInNfo.addAll(TvShowList.getInstance().getTvEpisodesByFile(mf.getFile()));
+      episodesInNfo.addAll(TvShowList.getInstance().getTvEpisodesByFile(tvShow, mf.getFile()));
     }
 
     TvShowEpisodeToXbmcNfoConnector.setData(episodesInNfo);
@@ -519,7 +517,7 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
    *          the obj
    */
   public void addActor(TvShowActor obj) {
-    actorsObservables.add(obj);
+    actors.add(obj);
     firePropertyChange(ACTORS, null, this.getActors());
   }
 
@@ -533,7 +531,13 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
     if (tvShow != null) {
       allActors.addAll(tvShow.getActors());
     }
-    allActors.addAll(actorsObservables);
+    allActors.addAll(actors);
+    return allActors;
+  }
+
+  public List<TvShowActor> getGuests() {
+    List<TvShowActor> allActors = new ArrayList<TvShowActor>();
+    allActors.addAll(actors);
     return allActors;
   }
 
@@ -544,7 +548,7 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
    *          the obj
    */
   public void removeActor(TvShowActor obj) {
-    actorsObservables.remove(obj);
+    actors.remove(obj);
     firePropertyChange(ACTORS, null, this.getActors());
   }
 
@@ -559,16 +563,16 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
 
     // first add the new ones
     for (TvShowActor actor : newActors) {
-      if (!actorsObservables.contains(actor)) {
-        actorsObservables.add(actor);
+      if (!actors.contains(actor)) {
+        actors.add(actor);
       }
     }
 
     // second remove unused
-    for (int i = actorsObservables.size() - 1; i >= 0; i--) {
-      TvShowActor actor = actorsObservables.get(i);
+    for (int i = actors.size() - 1; i >= 0; i--) {
+      TvShowActor actor = actors.get(i);
       if (!newActors.contains(actor)) {
-        actorsObservables.remove(actor);
+        actors.remove(actor);
       }
     }
 
@@ -679,8 +683,9 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
    * @return the media info video format
    */
   public String getMediaInfoVideoFormat() {
-    if (mediaFiles.size() > 0) {
-      MediaFile mediaFile = getMediaFiles(MediaFileType.VIDEO).get(0);
+    List<MediaFile> videos = getMediaFiles(MediaFileType.VIDEO);
+    if (videos.size() > 0) {
+      MediaFile mediaFile = videos.get(0);
       return mediaFile.getVideoFormat();
     }
 
@@ -693,8 +698,9 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
    * @return the media info video codec
    */
   public String getMediaInfoVideoCodec() {
-    if (mediaFiles.size() > 0) {
-      MediaFile mediaFile = getMediaFiles(MediaFileType.VIDEO).get(0);
+    List<MediaFile> videos = getMediaFiles(MediaFileType.VIDEO);
+    if (videos.size() > 0) {
+      MediaFile mediaFile = videos.get(0);
       return mediaFile.getVideoCodec();
     }
 
@@ -707,8 +713,9 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
    * @return the media info audio codec
    */
   public String getMediaInfoAudioCodecAndChannels() {
-    if (mediaFiles.size() > 0) {
-      MediaFile mediaFile = getMediaFiles(MediaFileType.VIDEO).get(0);
+    List<MediaFile> videos = getMediaFiles(MediaFileType.VIDEO);
+    if (videos.size() > 0) {
+      MediaFile mediaFile = videos.get(0);
       return mediaFile.getAudioCodec() + "_" + mediaFile.getAudioChannels();
     }
 
@@ -840,5 +847,116 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
 
   public void setNewlyAdded(boolean newlyAdded) {
     this.newlyAdded = newlyAdded;
+  }
+
+  /**
+   * Event to trigger a season poster changed for the UI
+   */
+  void setPosterChanged() {
+    firePropertyChange(SEASON_POSTER, null, "");
+  }
+
+  /**
+   * checks if this TV show has been scraped.<br>
+   * On a fresh DB, just reading local files, everything is again "unscraped". <br>
+   * detect minimum of filled values as "scraped"
+   * 
+   * @return isScraped
+   */
+  @Override
+  public boolean isScraped() {
+    if (!scraped) {
+      if (!plot.isEmpty() && firstAired != null && season > -1 && episode > -1) {
+        return true;
+      }
+    }
+    return scraped;
+  }
+
+  /**
+   * Adds the to tags.
+   * 
+   * @param newTag
+   *          the new tag
+   */
+  public void addToTags(String newTag) {
+    if (StringUtils.isBlank(newTag)) {
+      return;
+    }
+
+    for (String tag : tags) {
+      if (tag.equals(newTag)) {
+        return;
+      }
+    }
+
+    tags.add(newTag);
+    firePropertyChange(TAG, null, tags);
+    firePropertyChange(TAGS_AS_STRING, null, newTag);
+  }
+
+  /**
+   * Removes the from tags.
+   * 
+   * @param removeTag
+   *          the remove tag
+   */
+  public void removeFromTags(String removeTag) {
+    tags.remove(removeTag);
+    firePropertyChange(TAG, null, tags);
+    firePropertyChange(TAGS_AS_STRING, null, removeTag);
+  }
+
+  /**
+   * Sets the tags.
+   * 
+   * @param newTags
+   *          the new tags
+   */
+  public void setTags(List<String> newTags) {
+    // two way sync of tags
+
+    // first, add new ones
+    for (String tag : newTags) {
+      if (!this.tags.contains(tag)) {
+        this.tags.add(tag);
+      }
+    }
+
+    // second remove old ones
+    for (int i = this.tags.size() - 1; i >= 0; i--) {
+      String tag = this.tags.get(i);
+      if (!newTags.contains(tag)) {
+        this.tags.remove(tag);
+      }
+    }
+
+    firePropertyChange(TAG, null, tags);
+    firePropertyChange(TAGS_AS_STRING, null, tags);
+  }
+
+  /**
+   * Gets the tag as string.
+   * 
+   * @return the tag as string
+   */
+  public String getTagAsString() {
+    StringBuilder sb = new StringBuilder();
+    for (String tag : tags) {
+      if (!StringUtils.isEmpty(sb)) {
+        sb.append(", ");
+      }
+      sb.append(tag);
+    }
+    return sb.toString();
+  }
+
+  /**
+   * Gets the tags.
+   * 
+   * @return the tags
+   */
+  public List<String> getTags() {
+    return this.tags;
   }
 }

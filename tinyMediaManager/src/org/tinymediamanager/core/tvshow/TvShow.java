@@ -17,6 +17,9 @@ package org.tinymediamanager.core.tvshow;
 
 import static org.tinymediamanager.core.Constants.*;
 
+import java.awt.Dimension;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FilenameFilter;
@@ -49,7 +52,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
-import org.jdesktop.observablecollections.ObservableCollections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
@@ -81,55 +83,51 @@ import org.tinymediamanager.scraper.util.Url;
 @Entity
 @Inheritance(strategy = javax.persistence.InheritanceType.JOINED)
 public class TvShow extends MediaEntity {
-  private static final Logger      LOGGER             = LoggerFactory.getLogger(TvShow.class);
+  private static final Logger         LOGGER             = LoggerFactory.getLogger(TvShow.class);
 
-  private String                   dataSource         = "";
-  private String                   director           = "";
-  private String                   writer             = "";
-  private int                      runtime            = 0;
-  private int                      votes              = 0;
-  private Date                     firstAired         = null;
-  private String                   status             = "";
-  private String                   studio             = "";
-  private boolean                  watched            = false;
-  private String                   sortTitle          = "";
+  private String                      dataSource         = "";
+  private String                      director           = "";
+  private String                      writer             = "";
+  private int                         runtime            = 0;
+  private int                         votes              = 0;
+  private Date                        firstAired         = null;
+  private String                      status             = "";
+  private String                      studio             = "";
+  private boolean                     watched            = false;
+  private String                      sortTitle          = "";
 
-  private List<TvShowEpisode>      episodes           = new ArrayList<TvShowEpisode>();
-  private List<String>             tags               = new ArrayList<String>();
-  private HashMap<Integer, String> seasonPosterUrlMap = new HashMap<Integer, String>();
-  private HashMap<Integer, String> seasonPosterMap    = new HashMap<Integer, String>();
+  @OneToMany(cascade = { CascadeType.ALL })
+  private List<TvShowEpisode>         episodes           = new ArrayList<TvShowEpisode>(0);
+  private List<String>                tags               = new ArrayList<String>(0);
+  private HashMap<Integer, String>    seasonPosterUrlMap = new HashMap<Integer, String>(0);
+  @Deprecated
+  private HashMap<Integer, String>    seasonPosterMap    = new HashMap<Integer, String>(0);
 
   @Transient
-  private List<TvShowEpisode>      episodesObservable = ObservableCollections.observableList(episodes);
+  private HashMap<Integer, MediaFile> seasonPosters      = new HashMap<Integer, MediaFile>(0);
 
   @Transient
-  private List<TvShowSeason>       seasons            = ObservableCollections.observableList(new ArrayList<TvShowSeason>());
+  private List<TvShowSeason>          seasons            = new ArrayList<TvShowSeason>(0);
 
   @OneToMany(cascade = CascadeType.ALL)
-  private List<TvShowActor>        actors             = new ArrayList<TvShowActor>();
+  private List<TvShowActor>           actors             = new ArrayList<TvShowActor>(0);
+
+  private List<String>                genres             = new ArrayList<String>(0);
 
   @Transient
-  private List<TvShowActor>        actorsObservables  = ObservableCollections.observableList(actors);
-
-  private List<String>             genres             = new ArrayList<String>();
-
-  @Transient
-  private List<MediaGenres>        genresForAccess    = new ArrayList<MediaGenres>();
-
-  @Transient
-  private List<String>             tagsObservable     = ObservableCollections.observableList(tags);
+  private List<MediaGenres>           genresForAccess    = new ArrayList<MediaGenres>(0);
 
   @OneToMany(cascade = CascadeType.ALL)
-  private List<MediaTrailer>       trailer            = new ArrayList<MediaTrailer>();
-
-  @Transient
-  private List<MediaTrailer>       trailerObservable  = ObservableCollections.observableList(trailer);
+  private List<MediaTrailer>          trailer            = new ArrayList<MediaTrailer>(0);
 
   @Enumerated(EnumType.STRING)
-  private Certification            certification      = Certification.NOT_RATED;
+  private Certification               certification      = Certification.NOT_RATED;
 
   @Transient
-  private String                   titleSortable      = "";
+  private String                      titleSortable      = "";
+
+  @Transient
+  private PropertyChangeListener      propertyChangeListener;
 
   static {
     mediaFileComparator = new TvShowMediaFileComparator();
@@ -139,6 +137,15 @@ public class TvShow extends MediaEntity {
    * Instantiates a tv show. To initialize the propertychangesupport after loading
    */
   public TvShow() {
+    // give tag events from episodes up to the TvShowList
+    propertyChangeListener = new PropertyChangeListener() {
+      @Override
+      public void propertyChange(PropertyChangeEvent evt) {
+        if ("tag".equals(evt.getPropertyName()) && evt.getSource() instanceof TvShowEpisode) {
+          firePropertyChange(evt);
+        }
+      }
+    };
   }
 
   /*
@@ -189,7 +196,7 @@ public class TvShow extends MediaEntity {
    * @return the episodes
    */
   public List<TvShowEpisode> getEpisodes() {
-    return episodesObservable;
+    return episodes;
   }
 
   /**
@@ -199,14 +206,15 @@ public class TvShow extends MediaEntity {
    *          the episode
    */
   public void addEpisode(TvShowEpisode episode) {
-    int oldValue = episodesObservable.size();
-    episodesObservable.add(episode);
+    int oldValue = episodes.size();
+    episodes.add(episode);
+    episode.addPropertyChangeListener(propertyChangeListener);
     addToSeason(episode);
 
-    Collections.sort(episodesObservable);
+    Collections.sort(episodes);
 
     firePropertyChange(ADDED_EPISODE, null, episode);
-    firePropertyChange(EPISODE_COUNT, oldValue, episodesObservable.size());
+    firePropertyChange(EPISODE_COUNT, oldValue, episodes.size());
   }
 
   /**
@@ -215,7 +223,7 @@ public class TvShow extends MediaEntity {
    * @return the episode count
    */
   public int getEpisodeCount() {
-    return episodesObservable.size();
+    return episodes.size();
   }
 
   /**
@@ -267,19 +275,47 @@ public class TvShow extends MediaEntity {
     Utils.removeEmptyStringsFromList(tags);
     Utils.removeEmptyStringsFromList(genres);
 
-    actorsObservables = ObservableCollections.observableList(actors);
-    episodesObservable = ObservableCollections.observableList(episodes);
-    tagsObservable = ObservableCollections.observableList(tags);
-    trailerObservable = ObservableCollections.observableList(trailer);
-
     // load genres
     for (String genre : new ArrayList<String>(genres)) {
       addGenre(MediaGenres.getGenre(genre));
     }
 
     // create the seasons structure
-    for (TvShowEpisode episode : episodes) {
+    for (TvShowEpisode episode : new ArrayList<TvShowEpisode>(this.episodes)) {
       addToSeason(episode);
+    }
+
+    // migration from old structure
+    if (!seasonPosterMap.isEmpty()) {
+      for (Entry<Integer, String> entry : seasonPosterMap.entrySet()) {
+        setSeasonPoster(entry.getKey(), new File(path, entry.getValue()));
+      }
+      seasonPosterMap.clear();
+      saveToDb();
+    }
+
+    // create season poster map
+    Pattern pattern = Pattern.compile("(?i)season([0-9]{1,2})-poster\\..{2,4}");
+    for (MediaFile mf : getMediaFiles(MediaFileType.SEASON_POSTER)) {
+      if (mf.getFilename().startsWith("season-special-poster")) {
+        seasonPosters.put(-1, mf);
+      }
+      else {
+        // parse out the season from the name
+        Matcher matcher = pattern.matcher(mf.getFilename());
+        if (matcher.matches()) {
+          try {
+            int season = Integer.parseInt(matcher.group(1));
+            seasonPosters.put(season, mf);
+          }
+          catch (Exception e) {
+          }
+        }
+      }
+    }
+
+    for (TvShowEpisode episode : episodes) {
+      episode.addPropertyChangeListener(propertyChangeListener);
     }
   }
 
@@ -308,18 +344,19 @@ public class TvShow extends MediaEntity {
    * remove all episodes from this tv show.
    */
   public void removeAllEpisodes() {
-    int oldValue = episodesObservable.size();
-    if (episodesObservable.size() > 0) {
+    int oldValue = episodes.size();
+    if (episodes.size() > 0) {
       Globals.entityManager.getTransaction().begin();
-      for (int i = episodesObservable.size() - 1; i >= 0; i--) {
-        TvShowEpisode episode = episodesObservable.get(i);
-        episodesObservable.remove(episode);
+      for (int i = episodes.size() - 1; i >= 0; i--) {
+        TvShowEpisode episode = episodes.get(i);
+        episodes.remove(episode);
+        episode.removePropertyChangeListener(propertyChangeListener);
         Globals.entityManager.remove(episode);
       }
       Globals.entityManager.getTransaction().commit();
     }
 
-    firePropertyChange(EPISODE_COUNT, oldValue, episodesObservable.size());
+    firePropertyChange(EPISODE_COUNT, oldValue, episodes.size());
   }
 
   /**
@@ -329,19 +366,20 @@ public class TvShow extends MediaEntity {
    *          the episode
    */
   public void removeEpisode(TvShowEpisode episode) {
-    if (episodesObservable.contains(episode)) {
-      int oldValue = episodesObservable.size();
+    if (episodes.contains(episode)) {
+      int oldValue = episodes.size();
 
       synchronized (Globals.entityManager) {
         Globals.entityManager.getTransaction().begin();
-        episodesObservable.remove(episode);
+        episodes.remove(episode);
+        episode.removePropertyChangeListener(propertyChangeListener);
         Globals.entityManager.remove(episode);
         Globals.entityManager.persist(this);
         Globals.entityManager.getTransaction().commit();
       }
 
       firePropertyChange(REMOVED_EPISODE, null, episode);
-      firePropertyChange(EPISODE_COUNT, oldValue, episodesObservable.size());
+      firePropertyChange(EPISODE_COUNT, oldValue, episodes.size());
     }
   }
 
@@ -453,7 +491,7 @@ public class TvShow extends MediaEntity {
    */
   public void setMetadata(MediaMetadata metadata, TvShowScraperMetadataConfig config) {
     // check if metadata has at least a name
-    if (StringUtils.isEmpty(metadata.getTitle())) {
+    if (StringUtils.isEmpty(metadata.getStringValue(MediaMetadata.TITLE))) {
       LOGGER.warn("wanted to save empty metadata for " + getTitle());
       return;
     }
@@ -469,25 +507,25 @@ public class TvShow extends MediaEntity {
     }
 
     if (config.isTitle()) {
-      setTitle(metadata.getTitle());
+      setTitle(metadata.getStringValue(MediaMetadata.TITLE));
     }
 
     if (config.isPlot()) {
-      setPlot(metadata.getPlot());
+      setPlot(metadata.getStringValue(MediaMetadata.PLOT));
     }
 
     if (config.isYear()) {
-      setYear(metadata.getYear());
+      setYear(metadata.getStringValue(MediaMetadata.YEAR));
     }
 
     if (config.isRating()) {
-      setRating((float) metadata.getRating());
-      setVotes(metadata.getVoteCount());
+      setRating(metadata.getFloatValue(MediaMetadata.RATING));
+      setVotes(metadata.getIntegerValue(MediaMetadata.VOTE_COUNT));
     }
 
     if (config.isAired()) {
       try {
-        setFirstAired(metadata.getFirstAired());
+        setFirstAired(metadata.getStringValue(MediaMetadata.RELEASE_DATE));
       }
       catch (ParseException e) {
 
@@ -495,19 +533,15 @@ public class TvShow extends MediaEntity {
     }
 
     if (config.isStatus()) {
-      setStatus(metadata.getStatus());
+      setStatus(metadata.getStringValue(MediaMetadata.STATUS));
     }
 
     if (config.isRuntime()) {
-      setRuntime(metadata.getRuntime());
-    }
-
-    if (config.isYear()) {
-      setYear(metadata.getYear());
+      setRuntime(metadata.getIntegerValue(MediaMetadata.RUNTIME));
     }
 
     if (config.isCast()) {
-      setStudio(metadata.getStudio());
+      setStudio(metadata.getStringValue(MediaMetadata.PRODUCTION_COMPANY));
       List<TvShowActor> actors = new ArrayList<TvShowActor>();
       String director = "";
       String writer = "";
@@ -548,7 +582,9 @@ public class TvShow extends MediaEntity {
     }
 
     if (config.isCertification()) {
-      setCertification(metadata.getCertifications().get(0));
+      if (metadata.getCertifications().size() > 0) {
+        setCertification(metadata.getCertifications().get(0));
+      }
     }
 
     if (config.isGenres()) {
@@ -893,14 +929,14 @@ public class TvShow extends MediaEntity {
       return;
     }
 
-    for (String tag : tagsObservable) {
+    for (String tag : tags) {
       if (tag.equals(newTag)) {
         return;
       }
     }
 
-    tagsObservable.add(newTag);
-    firePropertyChange(TAG, null, tagsObservable);
+    tags.add(newTag);
+    firePropertyChange(TAG, null, tags);
     firePropertyChange(TAGS_AS_STRING, null, newTag);
   }
 
@@ -911,8 +947,8 @@ public class TvShow extends MediaEntity {
    *          the remove tag
    */
   public void removeFromTags(String removeTag) {
-    tagsObservable.remove(removeTag);
-    firePropertyChange(TAG, null, tagsObservable);
+    tags.remove(removeTag);
+    firePropertyChange(TAG, null, tags);
     firePropertyChange(TAGS_AS_STRING, null, removeTag);
   }
 
@@ -927,21 +963,21 @@ public class TvShow extends MediaEntity {
 
     // first, add new ones
     for (String tag : newTags) {
-      if (!this.tagsObservable.contains(tag)) {
-        this.tagsObservable.add(tag);
+      if (!this.tags.contains(tag)) {
+        this.tags.add(tag);
       }
     }
 
     // second remove old ones
-    for (int i = this.tagsObservable.size() - 1; i >= 0; i--) {
-      String tag = this.tagsObservable.get(i);
+    for (int i = this.tags.size() - 1; i >= 0; i--) {
+      String tag = this.tags.get(i);
       if (!newTags.contains(tag)) {
-        this.tagsObservable.remove(tag);
+        this.tags.remove(tag);
       }
     }
 
-    firePropertyChange(TAG, null, tagsObservable);
-    firePropertyChange(TAGS_AS_STRING, null, tagsObservable);
+    firePropertyChange(TAG, null, tags);
+    firePropertyChange(TAGS_AS_STRING, null, tags);
   }
 
   /**
@@ -966,7 +1002,7 @@ public class TvShow extends MediaEntity {
    * @return the tags
    */
   public List<String> getTags() {
-    return this.tagsObservable;
+    return this.tags;
   }
 
   /**
@@ -1039,7 +1075,7 @@ public class TvShow extends MediaEntity {
    *          the obj
    */
   public void addActor(TvShowActor obj) {
-    actorsObservables.add(obj);
+    actors.add(obj);
     firePropertyChange(ACTORS, null, this.getActors());
   }
 
@@ -1049,7 +1085,7 @@ public class TvShow extends MediaEntity {
    * @return the actors
    */
   public List<TvShowActor> getActors() {
-    return this.actorsObservables;
+    return this.actors;
   }
 
   /**
@@ -1059,7 +1095,7 @@ public class TvShow extends MediaEntity {
    *          the obj
    */
   public void removeActor(TvShowActor obj) {
-    actorsObservables.remove(obj);
+    actors.remove(obj);
     firePropertyChange(ACTORS, null, this.getActors());
   }
 
@@ -1074,16 +1110,16 @@ public class TvShow extends MediaEntity {
 
     // first add the new ones
     for (TvShowActor actor : newActors) {
-      if (!actorsObservables.contains(actor)) {
-        actorsObservables.add(actor);
+      if (!actors.contains(actor)) {
+        actors.add(actor);
       }
     }
 
     // second remove unused
-    for (int i = actorsObservables.size() - 1; i >= 0; i--) {
-      TvShowActor actor = actorsObservables.get(i);
+    for (int i = actors.size() - 1; i >= 0; i--) {
+      TvShowActor actor = actors.get(i);
       if (!newActors.contains(actor)) {
-        actorsObservables.remove(actor);
+        actors.remove(actor);
       }
     }
 
@@ -1096,7 +1132,7 @@ public class TvShow extends MediaEntity {
    * @return the trailers
    */
   public List<MediaTrailer> getTrailers() {
-    return this.trailerObservable;
+    return this.trailer;
   }
 
   /**
@@ -1106,16 +1142,16 @@ public class TvShow extends MediaEntity {
    *          the obj
    */
   public void addTrailer(MediaTrailer obj) {
-    trailerObservable.add(obj);
-    firePropertyChange(TRAILER, null, trailerObservable);
+    trailer.add(obj);
+    firePropertyChange(TRAILER, null, trailer);
   }
 
   /**
    * Removes the all trailers.
    */
   public void removeAllTrailers() {
-    trailerObservable.clear();
-    firePropertyChange(TRAILER, null, trailerObservable);
+    trailer.clear();
+    firePropertyChange(TRAILER, null, trailer);
   }
 
   /**
@@ -1416,14 +1452,17 @@ public class TvShow extends MediaEntity {
     for (File file : files) {
       Matcher matcher = pattern.matcher(file.getName());
       if (matcher.matches()) {
-        // setBanner(FilenameUtils.getName(file.getName()));
         LOGGER.debug("found season poster " + file.getPath());
         try {
           int season = Integer.parseInt(matcher.group(1));
-          setSeasonPoster(season, FilenameUtils.getName(file.getName()));
+          setSeasonPoster(season, file);
         }
         catch (Exception e) {
         }
+      }
+      else if (file.getName().startsWith("season-specials-poster")) {
+        LOGGER.debug("found season specials poster " + file.getPath());
+        setSeasonPoster(-1, file);
       }
     }
   }
@@ -1433,15 +1472,17 @@ public class TvShow extends MediaEntity {
    */
   public void scrapeAllEpisodes() {
     List<TvShowEpisode> episodes = new ArrayList<TvShowEpisode>();
-    for (TvShowEpisode episode : episodesObservable) {
+    for (TvShowEpisode episode : new ArrayList<TvShowEpisode>(this.episodes)) {
       if (episode.getSeason() > -1 && episode.getEpisode() > -1) {
         episodes.add(episode);
       }
     }
 
     // scrape episodes in a task
-    TvShowEpisodeScrapeTask task = new TvShowEpisodeScrapeTask(episodes);
-    Globals.executor.execute(task);
+    if (episodes.size() > 0) {
+      TvShowEpisodeScrapeTask task = new TvShowEpisodeScrapeTask(episodes);
+      Globals.executor.execute(task);
+    }
   }
 
   /**
@@ -1500,11 +1541,20 @@ public class TvShow extends MediaEntity {
    * @return the season poster
    */
   String getSeasonPoster(int season) {
-    String poster = seasonPosterMap.get(season);
-    if (StringUtils.isBlank(poster)) {
+    MediaFile poster = seasonPosters.get(season);
+    if (poster == null) {
       return "";
     }
-    return path + File.separator + poster;
+    return poster.getFile().getAbsolutePath();
+  }
+
+  Dimension getSeasonPosterSize(int season) {
+    MediaFile seasonPoster = seasonPosters.get(season);
+    if (seasonPoster != null) {
+      return new Dimension(seasonPoster.getVideoWidth(), seasonPoster.getVideoHeight());
+    }
+
+    return new Dimension(0, 0);
   }
 
   /**
@@ -1515,8 +1565,23 @@ public class TvShow extends MediaEntity {
    * @param path
    *          the path
    */
-  void setSeasonPoster(int season, String path) {
-    seasonPosterMap.put(season, path);
+  void setSeasonPoster(int season, File file) {
+    MediaFile mf = new MediaFile(file, MediaFileType.SEASON_POSTER);
+    mf.gatherMediaInformation();
+    addToMediaFiles(mf);
+
+    if (seasonPosters.containsKey(season)) {
+      seasonPosters.remove(season);
+    }
+    seasonPosters.put(season, mf);
+  }
+
+  void clearSeasonPoster(int season) {
+    MediaFile mf = seasonPosters.get(season);
+    if (mf != null) {
+      removeFromMediaFiles(mf);
+    }
+    seasonPosters.remove(season);
   }
 
   /**
@@ -1527,7 +1592,7 @@ public class TvShow extends MediaEntity {
    */
   public List<MediaFile> getEpisodesMediaFiles() {
     List<MediaFile> mediaFiles = new ArrayList<MediaFile>();
-    for (TvShowEpisode episode : episodes) {
+    for (TvShowEpisode episode : new ArrayList<TvShowEpisode>(this.episodes)) {
       for (MediaFile mf : episode.getMediaFiles()) {
 
         if (!mediaFiles.contains(mf)) {
@@ -1553,97 +1618,11 @@ public class TvShow extends MediaEntity {
       }
     }
 
-    for (TvShowEpisode episode : episodes) {
+    for (TvShowEpisode episode : new ArrayList<TvShowEpisode>(this.episodes)) {
       filesToCache.addAll(episode.getImagesToCache());
     }
 
     return filesToCache;
-  }
-
-  /**
-   * The Class SeasonPosterImageFetcher.
-   * 
-   * @author Manuel Laggner
-   */
-  private class SeasonPosterImageFetcher implements Runnable {
-
-    /** The filename. */
-    private String       filename;
-
-    /** The tv show season. */
-    private TvShowSeason tvShowSeason;
-
-    /** The url. */
-    private String       url;
-
-    /**
-     * Instantiates a new season poster image fetcher.
-     * 
-     * @param filename
-     *          the filename
-     * @param tvShowSeason
-     *          the tv show season
-     * @param url
-     *          the url
-     */
-    SeasonPosterImageFetcher(String filename, TvShowSeason tvShowSeason, String url) {
-      this.filename = filename;
-      this.tvShowSeason = tvShowSeason;
-      this.url = url;
-    }
-
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.lang.Runnable#run()
-     */
-    @Override
-    public void run() {
-      String oldFilename = "";
-      try {
-        if (tvShowSeason != null) {
-          oldFilename = tvShowSeason.getPoster();
-          tvShowSeason.setPoster("");
-        }
-
-        // debug message
-        LOGGER.debug("writing season poster " + filename);
-
-        // fetch and store images
-        Url url1 = new Url(url);
-        FileOutputStream outputStream = new FileOutputStream(filename);
-        InputStream is = url1.getInputStream();
-        IOUtils.copy(is, outputStream);
-        outputStream.close();
-        outputStream.flush();
-        try {
-          outputStream.getFD().sync(); // wait until file has been completely written
-        }
-        catch (Exception e) {
-          // empty here -> just not let the thread crash
-        }
-        is.close();
-
-        ImageCache.invalidateCachedImage(filename);
-        if (tvShowSeason != null) {
-          tvShowSeason.setPoster(FilenameUtils.getName(filename));
-        }
-      }
-      catch (IOException e) {
-        LOGGER.debug("fetch image", e);
-        // fallback
-        if (tvShowSeason != null) {
-          tvShowSeason.setPoster(oldFilename);
-        }
-      }
-      catch (Exception e) {
-        LOGGER.error("Thread crashed", e);
-        MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, this, "message.scrape.tvshowartworkfailed"));
-      }
-      finally {
-        saveToDb();
-      }
-    }
   }
 
   @Override
@@ -1653,7 +1632,7 @@ public class TvShow extends MediaEntity {
   public TvShowEpisode getEpisode(int season, int episode) {
     TvShowEpisode ep = null;
 
-    for (TvShowEpisode e : new ArrayList<TvShowEpisode>(episodes)) {
+    for (TvShowEpisode e : new ArrayList<TvShowEpisode>(this.episodes)) {
       if (e.getSeason() == season && e.getEpisode() == episode) {
         ep = e;
         break;
@@ -1668,7 +1647,7 @@ public class TvShow extends MediaEntity {
    * @return true/false
    */
   public boolean isNewlyAdded() {
-    for (TvShowEpisode episode : episodes) {
+    for (TvShowEpisode episode : new ArrayList<TvShowEpisode>(this.episodes)) {
       if (episode.isNewlyAdded()) {
         return true;
       }
@@ -1688,9 +1667,68 @@ public class TvShow extends MediaEntity {
     if (!scraped) {
       if (!plot.isEmpty() && !(year.isEmpty() || year.equals("0")) && !(genres == null || genres.size() == 0)
           && !(actors == null || actors.size() == 0)) {
-        setScraped(true);
+        return true;
       }
     }
     return scraped;
+  }
+
+  private class SeasonPosterImageFetcher implements Runnable {
+    private String       filename;
+    private TvShowSeason tvShowSeason;
+    private String       url;
+
+    SeasonPosterImageFetcher(String filename, TvShowSeason tvShowSeason, String url) {
+      this.filename = filename;
+      this.tvShowSeason = tvShowSeason;
+      this.url = url;
+    }
+
+    @Override
+    public void run() {
+      String oldFilename = "";
+      try {
+        if (tvShowSeason != null) {
+          oldFilename = tvShowSeason.getPoster();
+          tvShowSeason.clearPoster();
+        }
+
+        LOGGER.debug("writing season poster " + filename);
+
+        // fetch and store images
+        Url url1 = new Url(url);
+        FileOutputStream outputStream = new FileOutputStream(filename);
+        InputStream is = url1.getInputStream();
+        IOUtils.copy(is, outputStream);
+        outputStream.close();
+        outputStream.flush();
+        try {
+          outputStream.getFD().sync(); // wait until file has been completely written
+        }
+        catch (Exception e) {
+          // empty here -> just not let the thread crash
+        }
+        is.close();
+
+        ImageCache.invalidateCachedImage(filename);
+        if (tvShowSeason != null) {
+          tvShowSeason.setPoster(new File(filename));
+        }
+      }
+      catch (IOException e) {
+        LOGGER.debug("fetch image", e);
+        // fallback
+        if (tvShowSeason != null) {
+          tvShowSeason.setPoster(new File(oldFilename));
+        }
+      }
+      catch (Exception e) {
+        LOGGER.error("Thread crashed", e);
+        MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, this, "message.scrape.tvshowartworkfailed"));
+      }
+      finally {
+        saveToDb();
+      }
+    }
   }
 }

@@ -63,6 +63,7 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
   private static Pattern                             fanartPattern      = Pattern.compile("(?i)(.*-fanart|.*\\.fanart|fanart)[0-9]{0,2}\\..{2,4}");
   private static Pattern                             bannerPattern      = Pattern.compile("(?i)(.*-banner|banner)\\..{2,4}");
   private static Pattern                             thumbPattern       = Pattern.compile("(?i)(.*-thumb|thumb)[0-9]{0,2}\\..{2,4}");
+  private static Pattern                             seasonPattern      = Pattern.compile("(?i)season([0-9]{0,2}|-specials)-poster\\..{2,4}");
 
   public static final String                         VIDEO_FORMAT_480P  = "480p";
   public static final String                         VIDEO_FORMAT_576P  = "576p";
@@ -91,8 +92,8 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
   @Enumerated(EnumType.STRING)
   private MediaFileType                              type               = MediaFileType.UNKNOWN;
 
-  private List<MediaFileAudioStream>                 audioStreams       = new ArrayList<MediaFileAudioStream>();
-  private List<MediaFileSubtitle>                    subtitles          = new ArrayList<MediaFileSubtitle>();
+  private List<MediaFileAudioStream>                 audioStreams       = new ArrayList<MediaFileAudioStream>(0);
+  private List<MediaFileSubtitle>                    subtitles          = new ArrayList<MediaFileSubtitle>(0);
 
   @Transient
   private MediaInfo                                  mediaInfo;
@@ -192,21 +193,21 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
     }
 
     if (Globals.settings.getVideoFileType().contains("." + ext)) {
-      if (name.contains("sample") || name.contains("trailer") || foldername.contains("sample")) {
+      if (name.contains("trailer") || foldername.contains("trailer")) {
         return MediaFileType.TRAILER;
       }
 
+      if (name.contains("sample") || foldername.contains("sample")) {
+        return MediaFileType.SAMPLE;
+      }
+
       // best approach so far: https://github.com/brentosmith/xbmc-dvdextras
-      if (name.matches("(?i).*[ _.-]extras[ _.-].*") || foldername.equalsIgnoreCase("extras")) {
+      if (name.matches("(?i).*[ _.-]extra[s]?[ _.-].*") || foldername.equalsIgnoreCase("extras")) {
         return MediaFileType.VIDEO_EXTRA;
       }
 
       return MediaFileType.VIDEO;
     }
-
-    // if (name.contains("subs") || name.contains("subtitle") || foldername.contains("subs")) {
-    // return MediaFileType.SUBTITLE;
-    // }
 
     return MediaFileType.UNKNOWN;
   }
@@ -223,6 +224,12 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
     Matcher matcher = moviesetPattern.matcher(name);
     if (matcher.matches()) {
       return MediaFileType.GRAPHIC;
+    }
+
+    // *season(XX|-specials)-poster.*
+    matcher = seasonPattern.matcher(name);
+    if (matcher.matches()) {
+      return MediaFileType.SEASON_POSTER;
     }
 
     // *-poster.* or poster.* or folder.* or movie.*
@@ -273,7 +280,18 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
    */
   public boolean isGraphic() {
     return (type.equals(MediaFileType.GRAPHIC) || type.equals(MediaFileType.BANNER) || type.equals(MediaFileType.FANART)
-        || type.equals(MediaFileType.POSTER) || type.equals(MediaFileType.THUMB) || type.equals(MediaFileType.EXTRAFANART));
+        || type.equals(MediaFileType.POSTER) || type.equals(MediaFileType.THUMB) || type.equals(MediaFileType.EXTRAFANART) || type
+          .equals(MediaFileType.SEASON_POSTER));
+  }
+
+  /**
+   * Is this a playable video file?.
+   * 
+   * @return true/false
+   */
+  public boolean isVideo() {
+    return (type.equals(MediaFileType.VIDEO) || type.equals(MediaFileType.VIDEO_EXTRA) || type.equals(MediaFileType.TRAILER) || type
+        .equals(MediaFileType.SAMPLE));
   }
 
   /**
@@ -295,12 +313,7 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
   public File getFile() {
     if (file == null) {
       File f = new File(this.path, this.filename);
-      // if (f.exists()) {
       file = f;
-      // }
-      // else {
-      // return null;
-      // }
     }
     return file;
   }
@@ -580,6 +593,7 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
       mediaInfo.close();
       mediaInfo = null;
     }
+    miSnapshot = null;
   }
 
   /**
@@ -1085,6 +1099,7 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
     switch (type) {
       case VIDEO:
       case VIDEO_EXTRA:
+      case SAMPLE:
       case TRAILER:
         height = getMediaInfo(StreamKind.Video, 0, "Height");
         scanType = getMediaInfo(StreamKind.Video, 0, "ScanType");
@@ -1268,6 +1283,7 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
       case THUMB:
       case EXTRAFANART:
       case GRAPHIC:
+      case SEASON_POSTER:
         height = getMediaInfo(StreamKind.Image, 0, "Height");
         // scanType = getMediaInfo(StreamKind.Image, 0, "ScanType"); // no scantype on graphics
         width = getMediaInfo(StreamKind.Image, 0, "Width");
@@ -1328,6 +1344,7 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
     switch (type) {
       case VIDEO:
       case VIDEO_EXTRA:
+      case SAMPLE:
       case TRAILER:
       case AUDIO:
         // overall bitrate (OverallBitRate/String)
@@ -1368,16 +1385,6 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
   }
 
   /**
-   * Save to db.
-   */
-  public synchronized void saveToDb() {
-    // update DB
-    Globals.entityManager.getTransaction().begin();
-    Globals.entityManager.persist(this);
-    Globals.entityManager.getTransaction().commit();
-  }
-
-  /**
    * Checks if is valid mediainfo format.
    * 
    * @return true, if is valid mediainfo format
@@ -1393,7 +1400,7 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
 
     // parse audio, video and graphic files
     if (type.equals(MediaFileType.VIDEO) || type.equals(MediaFileType.VIDEO_EXTRA) || type.equals(MediaFileType.TRAILER)
-        || type.equals(MediaFileType.SUBTITLE) || type.equals(MediaFileType.AUDIO) || isGraphic()) {
+        || type.equals(MediaFileType.SAMPLE) || type.equals(MediaFileType.SUBTITLE) || type.equals(MediaFileType.AUDIO) || isGraphic()) {
       return true;
     }
 

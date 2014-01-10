@@ -25,7 +25,6 @@ import org.junit.Test;
 import org.tinymediamanager.Globals;
 import org.tinymediamanager.core.MediaFile;
 import org.tinymediamanager.core.tvshow.TvShowEpisodeAndSeasonParser.EpisodeMatchingResult;
-import org.tinymediamanager.scraper.util.StrgUtils;
 
 /**
  * The Class TvShowTest.
@@ -97,16 +96,16 @@ public class TvShowTest {
     Globals.settings.getTvShowSettings().setRenamerSeparator(".");
 
     // display renamed EP name :)
-    System.out.println(TvShowRenamer.generateFilename(dmf));
+    System.out.println(TvShowRenamer.generateFilename(show, dmf));
 
     Globals.settings.getTvShowSettings().setRenamerAddTitle(false);
-    System.out.println(TvShowRenamer.generateFilename(dmf));
+    System.out.println(TvShowRenamer.generateFilename(show, dmf));
 
     Globals.settings.getTvShowSettings().setRenamerAddShow(false);
-    System.out.println(TvShowRenamer.generateFilename(dmf));
+    System.out.println(TvShowRenamer.generateFilename(show, dmf));
 
     Globals.settings.getTvShowSettings().setRenamerAddSeason(false);
-    System.out.println(TvShowRenamer.generateFilename(dmf));
+    System.out.println(TvShowRenamer.generateFilename(show, dmf));
   }
 
   /**
@@ -185,8 +184,12 @@ public class TvShowTest {
       sb.append(" E:");
       sb.append(ep);
     }
-    System.out.println(StrgUtils.padRight(sb.toString().trim(), 40) + name);
+    System.out.println(padRight(sb.toString().trim(), 40) + name);
     return sb.toString().trim();
+  }
+
+  private String padRight(String s, int n) {
+    return String.format("%1$-" + n + "s", s);
   }
 
 }

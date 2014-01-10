@@ -54,6 +54,7 @@ import org.tinymediamanager.core.movie.MovieSet;
 import org.tinymediamanager.scraper.IMediaArtworkProvider;
 import org.tinymediamanager.scraper.MediaMetadata;
 import org.tinymediamanager.scraper.MediaScrapeOptions;
+import org.tinymediamanager.scraper.MediaType;
 import org.tinymediamanager.scraper.tmdb.TmdbMetadataProvider;
 import org.tinymediamanager.ui.EqualsLayout;
 import org.tinymediamanager.ui.MainWindow;
@@ -74,69 +75,31 @@ import com.jgoodies.forms.layout.RowSpec;
  * @author Manuel Laggner
  */
 public class MovieSetEditorDialog extends JDialog {
-
-  /** The Constant LOGGER. */
+  private static final long           serialVersionUID    = -4446433759280691976L;
   private static final Logger         LOGGER              = LoggerFactory.getLogger(MovieSetEditorDialog.class);
-
-  /** The Constant BUNDLE. */
   private static final ResourceBundle BUNDLE              = ResourceBundle.getBundle("messages", new UTF8Control());     //$NON-NLS-1$
 
-  /** The Constant serialVersionUID. */
-  private static final long           serialVersionUID    = -4446433759280691976L;
-
-  /** The movie set to edit. */
   private MovieSet                    movieSetToEdit;
-
-  /** The tf name. */
-  private JTextField                  tfName;
-
-  /** The table movies. */
-  private JTable                      tableMovies;
-
-  /** The lbl poster. */
-  private ImageLabel                  lblPoster;
-
-  /** The lbl fanart. */
-  private ImageLabel                  lblFanart;
-
-  /** The tp overview. */
-  private JTextPane                   tpOverview;
-
-  /** The movies in set. */
   private List<Movie>                 moviesInSet         = ObservableCollections.observableList(new ArrayList<Movie>());
-
-  /** The removed movies. */
   private List<Movie>                 removedMovies       = new ArrayList<Movie>();
+  private List<IMediaArtworkProvider> artworkProviders    = new ArrayList<IMediaArtworkProvider>();
+  private boolean                     continueQueue       = true;
 
-  /** The action remove movie. */
-  private final Action                actionRemoveMovie   = new RemoveMovieAction();
-
-  /** The action move movie up. */
-  private final Action                actionMoveMovieUp   = new MoveUpAction();
-
-  /** The action move movie down. */
-  private final Action                actionMoveMovieDown = new MoveDownAction();
-
-  /** The action ok. */
-  private final Action                actionOk            = new OkAction();
-
-  /** The action cancel. */
-  private final Action                actionCancel        = new CancelAction();
-
-  /** The action abort. */
-  private final Action                actionAbort         = new AbortAction();
-
-  /** The tf tmdb id. */
+  /** UI components */
+  private JTextField                  tfName;
+  private JTable                      tableMovies;
+  private ImageLabel                  lblPoster;
+  private ImageLabel                  lblFanart;
+  private JTextPane                   tpOverview;
   private JTextField                  tfTmdbId;
 
-  /** The action search tmdb id. */
+  private final Action                actionMoveMovieDown = new MoveDownAction();
+  private final Action                actionRemoveMovie   = new RemoveMovieAction();
+  private final Action                actionMoveMovieUp   = new MoveUpAction();
+  private final Action                actionOk            = new OkAction();
+  private final Action                actionCancel        = new CancelAction();
+  private final Action                actionAbort         = new AbortAction();
   private final Action                actionSearchTmdbId  = new SwingAction();
-
-  /** The artwork providers. */
-  private List<IMediaArtworkProvider> artworkProviders    = new ArrayList<IMediaArtworkProvider>();
-
-  /** The continue queue. */
-  private boolean                     continueQueue       = true;
 
   /**
    * Instantiates a new movie set editor.
@@ -195,7 +158,7 @@ public class MovieSetEditorDialog extends JDialog {
         HashMap<String, Object> ids = new HashMap<String, Object>(movieSetToEdit.getIds());
         ids.put("tmdbId", tmdbId);
         // MovieSetImageChooserDialog dialog = new MovieSetImageChooserDialog(tmdbId, ImageType.POSTER, lblPoster);
-        ImageChooserDialog dialog = new ImageChooserDialog(ids, ImageType.POSTER, artworkProviders, lblPoster, null, null);
+        ImageChooserDialog dialog = new ImageChooserDialog(ids, ImageType.POSTER, artworkProviders, lblPoster, null, null, MediaType.MOVIE);
         dialog.setLocationRelativeTo(MainWindow.getActiveInstance());
         dialog.setVisible(true);
       }
@@ -252,7 +215,7 @@ public class MovieSetEditorDialog extends JDialog {
         }
         HashMap<String, Object> ids = new HashMap<String, Object>(movieSetToEdit.getIds());
         ids.put("tmdbId", tmdbId);
-        ImageChooserDialog dialog = new ImageChooserDialog(ids, ImageType.FANART, artworkProviders, lblFanart, null, null);
+        ImageChooserDialog dialog = new ImageChooserDialog(ids, ImageType.FANART, artworkProviders, lblFanart, null, null, MediaType.MOVIE);
         // MovieSetImageChooserDialog dialog = new MovieSetImageChooserDialog(tmdbId, ImageType.FANART, lblFanart);
         dialog.setLocationRelativeTo(MainWindow.getActiveInstance());
         dialog.setVisible(true);
@@ -613,8 +576,8 @@ public class MovieSetEditorDialog extends JDialog {
             options.setLanguage(Globals.settings.getMovieSettings().getScraperLanguage());
             options.setCountry(Globals.settings.getMovieSettings().getCertificationCountry());
             MediaMetadata md = tmdb.getMetadata(options);
-            if (md.getTmdbIdSet() > 0) {
-              tfTmdbId.setText(String.valueOf(md.getTmdbIdSet()));
+            if (md.getIntegerValue(MediaMetadata.TMDBID_SET) > 0) {
+              tfTmdbId.setText(String.valueOf(md.getIntegerValue(MediaMetadata.TMDBID_SET)));
               break;
             }
           }

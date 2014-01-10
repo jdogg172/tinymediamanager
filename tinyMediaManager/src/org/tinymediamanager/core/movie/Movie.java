@@ -49,7 +49,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
-import org.jdesktop.observablecollections.ObservableCollections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
@@ -87,55 +86,50 @@ import com.omertron.themoviedbapi.model.CollectionInfo;
 @Inheritance(strategy = javax.persistence.InheritanceType.JOINED)
 public class Movie extends MediaEntity {
   @XmlTransient
-  private static final Logger LOGGER            = LoggerFactory.getLogger(Movie.class);
+  private static final Logger LOGGER          = LoggerFactory.getLogger(Movie.class);
 
-  private String              sortTitle         = "";
-  private String              tagline           = "";
-  private int                 votes             = 0;
-  private int                 runtime           = 0;
-  private String              director          = "";
-  private String              writer            = "";
-  private String              dataSource        = "";
-  private boolean             watched           = false;
+  private String              sortTitle       = "";
+  private String              tagline         = "";
+  private int                 votes           = 0;
+  private int                 runtime         = 0;
+  private String              director        = "";
+  private String              writer          = "";
+  private String              dataSource      = "";
+  private boolean             watched         = false;
   private MovieSet            movieSet;
-  private boolean             isDisc            = false;
-  private String              spokenLanguages   = "";
-  private boolean             subtitles         = false;
-  private String              country           = "";
-  private Date                releaseDate       = null;
-  private boolean             multiMovieDir     = false;                                        // we detected more movies in same folder
+  private boolean             isDisc          = false;
+  private String              spokenLanguages = "";
+  private boolean             subtitles       = false;
+  private String              country         = "";
+  private Date                releaseDate     = null;
+  private boolean             multiMovieDir   = false;                               // we detected more movies in same folder
+  private int                 top250          = 0;
 
-  private List<String>        genres            = new ArrayList<String>();
-  private List<String>        tags              = new ArrayList<String>();
-  private List<String>        extraThumbs       = new ArrayList<String>();
-  private List<String>        extraFanarts      = new ArrayList<String>();
+  private List<String>        genres          = new ArrayList<String>(0);
+  private List<String>        tags            = new ArrayList<String>(0);
+  private List<String>        extraThumbs     = new ArrayList<String>(0);
+  private List<String>        extraFanarts    = new ArrayList<String>(0);
 
   @Enumerated(EnumType.STRING)
-  private Certification       certification     = Certification.NOT_RATED;
+  private Certification       certification   = Certification.NOT_RATED;
 
   @OneToMany(cascade = CascadeType.ALL)
-  private List<MovieActor>    actors            = new ArrayList<MovieActor>();
+  private List<MovieActor>    actors          = new ArrayList<MovieActor>(0);
 
   @OneToMany(cascade = CascadeType.ALL)
-  private List<MediaTrailer>  trailer           = new ArrayList<MediaTrailer>();
+  private List<MovieProducer> producers       = new ArrayList<MovieProducer>(0);
+
+  @OneToMany(cascade = CascadeType.ALL)
+  private List<MediaTrailer>  trailer         = new ArrayList<MediaTrailer>(0);
 
   @Transient
-  private String              titleSortable     = "";
+  private String              titleSortable   = "";
 
   @Transient
-  private boolean             newlyAdded        = false;
+  private boolean             newlyAdded      = false;
 
   @Transient
-  private List<MediaGenres>   genresForAccess   = new ArrayList<MediaGenres>();
-
-  @Transient
-  private List<MovieActor>    actorsObservables = ObservableCollections.observableList(actors);
-
-  @Transient
-  private List<MediaTrailer>  trailerObservable = ObservableCollections.observableList(trailer);
-
-  @Transient
-  private List<String>        tagsObservable    = ObservableCollections.observableList(tags);
+  private List<MediaGenres>   genresForAccess = new ArrayList<MediaGenres>(0);
 
   static {
     mediaFileComparator = new MovieMediaFileComparator();
@@ -159,7 +153,7 @@ public class Movie extends MediaEntity {
     if (!scraped) {
       if (!plot.isEmpty() && !(year.isEmpty() || year.equals("0")) && !(genres == null || genres.size() == 0)
           && !(actors == null || actors.size() == 0)) {
-        setScraped(true);
+        return true;
       }
     }
     return scraped;
@@ -267,15 +261,6 @@ public class Movie extends MediaEntity {
   }
 
   /**
-   * Sets the observables.
-   */
-  private void setObservables() {
-    actorsObservables = ObservableCollections.observableList(actors);
-    trailerObservable = ObservableCollections.observableList(trailer);
-    tagsObservable = ObservableCollections.observableList(tags);
-  }
-
-  /**
    * Initialize after loading.
    */
   public void initializeAfterLoading() {
@@ -284,9 +269,6 @@ public class Movie extends MediaEntity {
     // remove empty tag and null values
     Utils.removeEmptyStringsFromList(tags);
     Utils.removeEmptyStringsFromList(genres);
-
-    // set observables
-    setObservables();
 
     // load genres
     for (String genre : new ArrayList<String>(genres)) {
@@ -301,9 +283,8 @@ public class Movie extends MediaEntity {
    *          the obj
    */
   public void addActor(MovieActor obj) {
-    actorsObservables.add(obj);
+    actors.add(obj);
     firePropertyChange(ACTORS, null, this.getActors());
-
   }
 
   /**
@@ -312,7 +293,7 @@ public class Movie extends MediaEntity {
    * @return the trailers
    */
   public List<MediaTrailer> getTrailers() {
-    return this.trailerObservable;
+    return this.trailer;
   }
 
   /**
@@ -322,16 +303,16 @@ public class Movie extends MediaEntity {
    *          the obj
    */
   public void addTrailer(MediaTrailer obj) {
-    trailerObservable.add(obj);
-    firePropertyChange(TRAILER, null, trailerObservable);
+    trailer.add(obj);
+    firePropertyChange(TRAILER, null, trailer);
   }
 
   /**
    * Removes the all trailers.
    */
   public void removeAllTrailers() {
-    trailerObservable.clear();
-    firePropertyChange(TRAILER, null, trailerObservable);
+    trailer.clear();
+    firePropertyChange(TRAILER, null, trailer);
   }
 
   /**
@@ -341,9 +322,8 @@ public class Movie extends MediaEntity {
    * @param trailerToDownload
    *          the MediaTrailer object to download
    * @return true/false if successful
-   * @author Myron Boyle
    */
-  public Boolean downladTtrailer(MediaTrailer trailerToDownload) {
+  public Boolean downloadTtrailer(MediaTrailer trailerToDownload) {
     try {
       // get trailer filename from first mediafile
       String tfile = MovieRenamer.createDestinationForFilename(Globals.settings.getMovieSettings().getMovieRenamerFilename(), this) + "-trailer.";
@@ -386,14 +366,14 @@ public class Movie extends MediaEntity {
       return;
     }
 
-    for (String tag : tagsObservable) {
+    for (String tag : tags) {
       if (tag.equals(newTag)) {
         return;
       }
     }
 
-    tagsObservable.add(newTag);
-    firePropertyChange(TAG, null, tagsObservable);
+    tags.add(newTag);
+    firePropertyChange(TAG, null, tags);
     firePropertyChange(TAGS_AS_STRING, null, newTag);
   }
 
@@ -404,8 +384,8 @@ public class Movie extends MediaEntity {
    *          the remove tag
    */
   public void removeFromTags(String removeTag) {
-    tagsObservable.remove(removeTag);
-    firePropertyChange(TAG, null, tagsObservable);
+    tags.remove(removeTag);
+    firePropertyChange(TAG, null, tags);
     firePropertyChange(TAGS_AS_STRING, null, removeTag);
   }
 
@@ -420,23 +400,23 @@ public class Movie extends MediaEntity {
 
     // first, add new ones
     for (String tag : newTags) {
-      if (!this.tagsObservable.contains(tag)) {
-        this.tagsObservable.add(tag);
+      if (!this.tags.contains(tag)) {
+        this.tags.add(tag);
       }
     }
 
     // second remove old ones
-    for (int i = this.tagsObservable.size() - 1; i >= 0; i--) {
-      String tag = this.tagsObservable.get(i);
+    for (int i = this.tags.size() - 1; i >= 0; i--) {
+      String tag = this.tags.get(i);
       if (!newTags.contains(tag)) {
-        this.tagsObservable.remove(tag);
+        this.tags.remove(tag);
       }
     }
 
-    Utils.removeEmptyStringsFromList(tagsObservable);
+    Utils.removeEmptyStringsFromList(tags);
 
-    firePropertyChange(TAG, null, tagsObservable);
-    firePropertyChange(TAGS_AS_STRING, null, tagsObservable);
+    firePropertyChange(TAG, null, tags);
+    firePropertyChange(TAGS_AS_STRING, null, tags);
   }
 
   /**
@@ -461,7 +441,7 @@ public class Movie extends MediaEntity {
    * @return the tags
    */
   public List<String> getTags() {
-    return this.tagsObservable;
+    return this.tags;
   }
 
   /**
@@ -540,7 +520,7 @@ public class Movie extends MediaEntity {
    * @return the actors
    */
   public List<MovieActor> getActors() {
-    return this.actorsObservables;
+    return this.actors;
   }
 
   /**
@@ -620,6 +600,9 @@ public class Movie extends MediaEntity {
    * @return the runtime
    */
   public int getRuntime() {
+    if (Globals.settings.getMovieSettings().isRuntimeFromMediaInfo()) {
+      return getRuntimeFromMediaFilesInMinutes();
+    }
     return runtime == 0 ? getRuntimeFromMediaFilesInMinutes() : runtime;
   }
 
@@ -653,7 +636,7 @@ public class Movie extends MediaEntity {
       return false;
     }
 
-    for (MediaFile file : mediaFiles) {
+    for (MediaFile file : new ArrayList<MediaFile>(getMediaFiles())) {
       if (filename.compareTo(file.getFilename()) == 0) {
         return true;
       }
@@ -669,7 +652,7 @@ public class Movie extends MediaEntity {
    *          the obj
    */
   public void removeActor(MovieActor obj) {
-    actorsObservables.remove(obj);
+    actors.remove(obj);
     firePropertyChange(ACTORS, null, this.getActors());
   }
 
@@ -882,39 +865,39 @@ public class Movie extends MediaEntity {
    */
   public void setMetadata(MediaMetadata metadata, MovieScraperMetadataConfig config) {
     // check if metadata has at least a name
-    if (StringUtils.isEmpty(metadata.getTitle())) {
+    if (StringUtils.isEmpty(metadata.getStringValue(MediaMetadata.TITLE))) {
       LOGGER.warn("wanted to save empty metadata for " + getTitle());
       return;
     }
 
-    if (StringUtils.isNotBlank(metadata.getImdbId())) {
-      setImdbId(metadata.getImdbId());
+    if (StringUtils.isNotBlank(metadata.getStringValue(MediaMetadata.IMDBID))) {
+      setImdbId(metadata.getStringValue(MediaMetadata.IMDBID));
     }
-    if (metadata.getTmdbId() > 0) {
-      setTmdbId(metadata.getTmdbId());
+    if (metadata.getIntegerValue(MediaMetadata.TMDBID) > 0) {
+      setTmdbId(metadata.getIntegerValue(MediaMetadata.TMDBID));
     }
 
     // set chosen metadata
     if (config.isTitle()) {
-      setTitle(metadata.getTitle());
+      setTitle(metadata.getStringValue(MediaMetadata.TITLE));
     }
 
     if (config.isOriginalTitle()) {
-      setOriginalTitle(metadata.getOriginalTitle());
+      setOriginalTitle(metadata.getStringValue(MediaMetadata.ORIGINAL_TITLE));
     }
 
     if (config.isTagline()) {
-      setTagline(metadata.getTagline());
+      setTagline(metadata.getStringValue(MediaMetadata.TAGLINE));
     }
 
     if (config.isPlot()) {
-      setPlot(metadata.getPlot());
+      setPlot(metadata.getStringValue(MediaMetadata.PLOT));
     }
 
     if (config.isYear()) {
-      setYear(metadata.getYear());
+      setYear(metadata.getStringValue(MediaMetadata.YEAR));
       try {
-        setReleaseDate(metadata.getReleaseDate());
+        setReleaseDate(metadata.getStringValue(MediaMetadata.RELEASE_DATE));
       }
       catch (ParseException e) {
         LOGGER.warn(e.getMessage());
@@ -922,16 +905,17 @@ public class Movie extends MediaEntity {
     }
 
     if (config.isRating()) {
-      setRating((float) metadata.getRating());
-      setVotes(metadata.getVoteCount());
+      setRating(metadata.getFloatValue(MediaMetadata.RATING));
+      setVotes(metadata.getIntegerValue(MediaMetadata.VOTE_COUNT));
+      setTop250(metadata.getIntegerValue(MediaMetadata.TOP_250));
     }
 
     if (config.isRuntime()) {
-      setRuntime(metadata.getRuntime());
+      setRuntime(metadata.getIntegerValue(MediaMetadata.RUNTIME));
     }
 
-    setSpokenLanguages(metadata.getSpokenLanguages());
-    setCountry(metadata.getCountry());
+    setSpokenLanguages(metadata.getStringValue(MediaMetadata.SPOKEN_LANGUAGES));
+    setCountry(metadata.getStringValue(MediaMetadata.COUNTRY));
 
     // certifications
     if (config.isCertification()) {
@@ -942,8 +926,9 @@ public class Movie extends MediaEntity {
 
     // cast
     if (config.isCast()) {
-      setProductionCompany(metadata.getProductionCompany());
+      setProductionCompany(metadata.getStringValue(MediaMetadata.PRODUCTION_COMPANY));
       List<MovieActor> actors = new ArrayList<MovieActor>();
+      List<MovieProducer> producers = new ArrayList<MovieProducer>();
       String director = "";
       String writer = "";
       for (MediaCastMember member : metadata.getCastMembers()) {
@@ -952,7 +937,7 @@ public class Movie extends MediaEntity {
             MovieActor actor = new MovieActor();
             actor.setName(member.getName());
             actor.setCharacter(member.getCharacter());
-            actor.setThumb(member.getImageUrl());
+            actor.setThumbUrl(member.getImageUrl());
             actors.add(actor);
             break;
 
@@ -970,6 +955,14 @@ public class Movie extends MediaEntity {
             writer += member.getName();
             break;
 
+          case PRODUCER:
+            MovieProducer producer = new MovieProducer();
+            producer.setName(member.getName());
+            producer.setRole(member.getPart());
+            producer.setThumbUrl(member.getImageUrl());
+            producers.add(producer);
+            break;
+
           default:
             break;
         }
@@ -977,6 +970,7 @@ public class Movie extends MediaEntity {
       setActors(actors);
       setDirector(director);
       setWriter(writer);
+      setProducers(producers);
       writeActorImages();
     }
 
@@ -993,9 +987,10 @@ public class Movie extends MediaEntity {
 
     // create MovieSet
     if (config.isCollection()) {
-      int col = metadata.getTmdbIdSet();
+      int col = metadata.getIntegerValue(MediaMetadata.TMDBID_SET);
       if (col != 0) {
-        MovieSet movieSet = MovieList.getInstance().getMovieSet(metadata.getCollectionName(), metadata.getTmdbIdSet());
+        MovieSet movieSet = MovieList.getInstance().getMovieSet(metadata.getStringValue(MediaMetadata.COLLECTION_NAME),
+            metadata.getIntegerValue(MediaMetadata.TMDBID));
         if (movieSet.getTmdbId() == 0) {
           movieSet.setTmdbId(col);
           // get movieset metadata
@@ -1069,14 +1064,14 @@ public class Movie extends MediaEntity {
       md.setId(entry.getKey(), entry.getValue());
     }
 
-    md.setTitle(title);
-    md.setOriginalTitle(originalTitle);
-    md.setTagline(tagline);
-    md.setPlot(plot);
-    md.setYear(year);
-    md.setRating(rating);
-    md.setVoteCount(votes);
-    md.setRuntime(runtime);
+    md.storeMetadata(MediaMetadata.TITLE, title);
+    md.storeMetadata(MediaMetadata.ORIGINAL_TITLE, originalTitle);
+    md.storeMetadata(MediaMetadata.TAGLINE, tagline);
+    md.storeMetadata(MediaMetadata.PLOT, plot);
+    md.storeMetadata(MediaMetadata.YEAR, year);
+    md.storeMetadata(MediaMetadata.RATING, rating);
+    md.storeMetadata(MediaMetadata.VOTE_COUNT, votes);
+    md.storeMetadata(MediaMetadata.RUNTIME, runtime);
     md.addCertification(certification);
 
     return md;
@@ -1233,18 +1228,47 @@ public class Movie extends MediaEntity {
   public void setActors(List<MovieActor> newActors) {
     // two way sync of actors
 
-    // first add the new ones
-    for (MovieActor actor : newActors) {
-      if (!actorsObservables.contains(actor)) {
-        actorsObservables.add(actor);
+    // first remove unused
+    for (int i = actors.size() - 1; i >= 0; i--) {
+      MovieActor actor = actors.get(i);
+      if (!newActors.contains(actor)) {
+        actors.remove(actor);
       }
     }
 
-    // second remove unused
-    for (int i = actorsObservables.size() - 1; i >= 0; i--) {
-      MovieActor actor = actorsObservables.get(i);
-      if (!newActors.contains(actor)) {
-        actorsObservables.remove(actor);
+    // second add the new ones
+    for (int i = 0; i < newActors.size(); i++) {
+      MovieActor actor = newActors.get(i);
+      if (!actors.contains(actor)) {
+        actors.add(i, actor);
+      }
+      else {
+        int indexOldList = actors.indexOf(actor);
+        if (i != indexOldList) {
+          MovieActor oldActor = actors.remove(indexOldList);
+          actors.add(i, oldActor);
+        }
+      }
+    }
+
+    // third - rename thumbs if needed
+    if (Globals.settings.getMovieSettings().isWriteActorImages()) {
+      for (MovieActor actor : actors) {
+        if (StringUtils.isNotBlank(actor.getThumbPath())) {
+          // build expected filename
+          String actorName = getPath() + File.separator + MovieActor.ACTOR_DIR + File.separator + actor.getName().replace(" ", "_") + "."
+              + FilenameUtils.getExtension(actor.getThumbPath());
+          // check if equal
+          if (!actorName.equals(actor.getThumbPath())) {
+            // rename
+            try {
+              FileUtils.moveFile(new File(actor.getThumbPath()), new File(actorName));
+            }
+            catch (IOException e) {
+              LOGGER.warn("couldn't rename actor thumb (" + actor.getThumbPath() + "): " + e.getMessage());
+            }
+          }
+        }
       }
     }
 
@@ -1386,6 +1410,7 @@ public class Movie extends MediaEntity {
         filename = "";
         break;
     }
+
     return filename;
   }
 
@@ -1459,23 +1484,6 @@ public class Movie extends MediaEntity {
    * @return the nfo filename
    */
   public String getNfoFilename(MovieNfoNaming nfo) {
-    if (isDisc) {
-      // detect if this directory is a DVD or BR directory
-      File dir = new File(path, "VIDEO_TS");
-      if (dir.exists()) {
-        // we need to pass the subdir in this case
-        // info for that file naming: http://wiki.xbmc.org/index.php?title=NFO_files/movies
-        return "VIDEO_TS" + File.separator + "VIDEO_TS.nfo";
-      }
-
-      dir = new File(path, "BDMV");
-      if (dir.exists()) {
-        // we need to pass the subdir in this case
-        // info for that file naming: http://forum.xbmc.org/showthread.php?tid=155523
-        return "BDMV" + File.separator + "index.nfo";
-      }
-    }
-
     List<MediaFile> mfs = getMediaFiles(MediaFileType.VIDEO);
     if (mfs != null && mfs.size() > 0) {
       return getNfoFilename(nfo, mfs.get(0).getFilename());
@@ -1495,8 +1503,24 @@ public class Movie extends MediaEntity {
    * @return the nfo filename
    */
   public String getNfoFilename(MovieNfoNaming nfo, String newMovieFilename) {
-    String filename = "";
+    if (isDisc) {
+      // detect if this directory is a DVD or BR directory
+      File dir = new File(path, "VIDEO_TS");
+      if (dir.exists()) {
+        // we need to pass the subdir in this case
+        // info for that file naming: http://wiki.xbmc.org/index.php?title=NFO_files/movies
+        return "VIDEO_TS" + File.separator + "VIDEO_TS.nfo";
+      }
 
+      dir = new File(path, "BDMV");
+      if (dir.exists()) {
+        // we need to pass the subdir in this case
+        // info for that file naming: http://forum.xbmc.org/showthread.php?tid=155523
+        return "BDMV" + File.separator + "index.nfo";
+      }
+    }
+
+    String filename = "";
     switch (nfo) {
       case FILENAME_NFO:
         String movieFilename = FilenameUtils.getBaseName(newMovieFilename);
@@ -1533,6 +1557,11 @@ public class Movie extends MediaEntity {
         posternames.add(MoviePosterNaming.FILENAME_POSTER_JPG);
         posternames.add(MoviePosterNaming.FILENAME_POSTER_PNG);
       }
+      else if (isDisc()) {
+        // override poster naming for disc files
+        posternames.add(MoviePosterNaming.POSTER_JPG);
+        posternames.add(MoviePosterNaming.POSTER_PNG);
+      }
       else {
         posternames = Globals.settings.getMovieSettings().getMoviePosterFilenames();
       }
@@ -1565,6 +1594,11 @@ public class Movie extends MediaEntity {
         // Fixate the name regardless of setting
         fanartnames.add(MovieFanartNaming.FILENAME_FANART_JPG);
         fanartnames.add(MovieFanartNaming.FILENAME_FANART_PNG);
+      }
+      else if (isDisc()) {
+        // override fanart naming for disc files
+        fanartnames.add(MovieFanartNaming.FANART_JPG);
+        fanartnames.add(MovieFanartNaming.FANART_PNG);
       }
       else {
         fanartnames = Globals.settings.getMovieSettings().getMovieFanartFilenames();
@@ -1906,8 +1940,6 @@ public class Movie extends MediaEntity {
 
   /**
    * Gets the media info video format (i.e. 720p).
-   * 
-   * @return the media info video format
    */
   public String getMediaInfoVideoFormat() {
     List<MediaFile> videos = getMediaFiles(MediaFileType.VIDEO);
@@ -1921,8 +1953,6 @@ public class Movie extends MediaEntity {
 
   /**
    * Gets the media info video codec (i.e. divx)
-   * 
-   * @return the media info video codec
    */
   public String getMediaInfoVideoCodec() {
     List<MediaFile> videos = getMediaFiles(MediaFileType.VIDEO);
@@ -1936,8 +1966,6 @@ public class Movie extends MediaEntity {
 
   /**
    * Gets the media info audio codec (i.e mp3) and channels (i.e. 6 at 5.1 sound)
-   * 
-   * @return the media info audio codec
    */
   public String getMediaInfoAudioCodecAndChannels() {
     List<MediaFile> videos = getMediaFiles(MediaFileType.VIDEO);
@@ -1976,8 +2004,6 @@ public class Movie extends MediaEntity {
 
   /**
    * Gets the images to cache.
-   * 
-   * @return the images to cache
    */
   public List<File> getImagesToCache() {
     // get files to cache
@@ -2091,5 +2117,60 @@ public class Movie extends MediaEntity {
 
   public List<MediaFile> getVideoFiles() {
     return getMediaFiles(MediaFileType.VIDEO);
+  }
+
+  public int getTop250() {
+    return top250;
+  }
+
+  public void setTop250(int newValue) {
+    int oldValue = this.top250;
+    this.top250 = newValue;
+    firePropertyChange(TOP250, oldValue, newValue);
+  }
+
+  public void addProducer(MovieProducer obj) {
+    producers.add(obj);
+    firePropertyChange(PRODUCERS, null, producers);
+
+  }
+
+  public void removeProducer(MovieProducer obj) {
+    producers.remove(obj);
+    firePropertyChange(PRODUCERS, null, producers);
+  }
+
+  public void setProducers(List<MovieProducer> newProducers) {
+    // two way sync of producers
+
+    // first remove unused
+    for (int i = producers.size() - 1; i >= 0; i--) {
+      MovieProducer producer = producers.get(i);
+      if (!newProducers.contains(producer)) {
+        producers.remove(producer);
+      }
+    }
+
+    // second add the new ones
+    for (int i = 0; i < newProducers.size(); i++) {
+      MovieProducer producer = newProducers.get(i);
+      if (!producers.contains(producer)) {
+        // new producer
+        producers.add(i, producer);
+      }
+      else {
+        int indexOldList = producers.indexOf(producer);
+        if (i != indexOldList) {
+          MovieProducer oldProducer = producers.remove(indexOldList);
+          producers.add(i, oldProducer);
+        }
+      }
+    }
+
+    firePropertyChange(PRODUCERS, null, producers);
+  }
+
+  public List<MovieProducer> getProducers() {
+    return this.producers;
   }
 }

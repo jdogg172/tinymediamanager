@@ -188,7 +188,6 @@ public class ImageLabel extends JLabel {
   private BufferedImage getScaledImage(Dimension size) {
     if (!size.equals(this.size)) {
       // rescale the image
-      // System.out.println("rescaling: " + imagePath + " " + imageUrl);
       scaledImage = Scalr.resize(originalImage, Scalr.Method.QUALITY, Scalr.Mode.AUTOMATIC, size.width, size.height, Scalr.OP_ANTIALIAS);
       this.size = size;
     }
@@ -323,12 +322,12 @@ public class ImageLabel extends JLabel {
     if (respectFactor) {
       // calculate on available height
       size.y = maxHeight;
-      size.x = size.y * originalWidth / originalHeight;
+      size.x = (int) (size.y * (double) originalWidth / (double) originalHeight);
 
       if (size.x > maxWidth) {
         // calculate on available height
         size.x = maxWidth;
-        size.y = size.x * originalHeight / originalWidth;
+        size.y = (int) (size.x * (double) originalHeight / (double) originalWidth);
       }
     }
     else {
@@ -461,6 +460,7 @@ public class ImageLabel extends JLabel {
       finally {
         size = null;
       }
+      revalidate();
       repaint();
     }
   }

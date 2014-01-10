@@ -86,24 +86,24 @@ public class AboutDialog extends JDialog {
       contentPanel.add(lblLogo, "2, 2, 1, 9, default, top");
     }
     {
-      JLabel lblTinymediamanager = new JLabel("tinyMediaManager");
-      lblTinymediamanager.setFont(new Font("Dialog", Font.BOLD, 18));
+      JLabel lblTinymediamanager = new JLabel("tinyMediaManager"); //$NON-NLS-1$
+      lblTinymediamanager.setFont(lblTinymediamanager.getFont().deriveFont(Font.BOLD).deriveFont(18f));
       contentPanel.add(lblTinymediamanager, "4, 2, 3, 1, center, default");
     }
     {
-      JLabel lblByManuel = new JLabel("\u00A9 2012 - 2013 by Manuel Laggner");
+      JLabel lblByManuel = new JLabel("\u00A9 2012 - 2013 by Manuel Laggner"); //$NON-NLS-1$
       contentPanel.add(lblByManuel, "4, 4, 3, 1, center, default");
     }
     {
-      JLabel lblVersion = new JLabel("Version: " + ReleaseInfo.getRealVersion());
+      JLabel lblVersion = new JLabel(BUNDLE.getString("tmm.version") + ": " + ReleaseInfo.getRealVersion()); //$NON-NLS-1$ 
       contentPanel.add(lblVersion, "6, 8, left, top");
     }
     {
-      JLabel lblBuild = new JLabel("Build date: " + ReleaseInfo.getRealBuildDate());
+      JLabel lblBuild = new JLabel(BUNDLE.getString("tmm.builddate") + ": " + ReleaseInfo.getRealBuildDate());//$NON-NLS-1$
       contentPanel.add(lblBuild, "6, 10, left, top");
     }
     {
-      JLabel lblHomepage = new JLabel("Homepage");
+      JLabel lblHomepage = new JLabel(BUNDLE.getString("tmm.homepage")); //$NON-NLS-1$
       contentPanel.add(lblHomepage, "2, 12, right, default");
     }
     {
@@ -123,11 +123,11 @@ public class AboutDialog extends JDialog {
       contentPanel.add(lblHomepage, "6, 12");
     }
     {
-      JLabel lblThanksTo = new JLabel("Thanks to");
+      JLabel lblThanksTo = new JLabel(BUNDLE.getString("tmm.thanksto")); //$NON-NLS-1$
       contentPanel.add(lblThanksTo, "2, 16, right, default");
     }
     {
-      JLabel lblMyronForHelping = new JLabel("Myron for helping me with coding, scrapers, localization, setup, builds...");
+      JLabel lblMyronForHelping = new JLabel("Myron for helping me with coding, scrapers, localization, setup, everything...");
       contentPanel.add(lblMyronForHelping, "6, 16");
     }
     {
@@ -143,16 +143,20 @@ public class AboutDialog extends JDialog {
       contentPanel.add(lblMatthewSandersFor, "6, 22");
     }
     {
-      JLabel lblXzener = new JLabel("Our translators: xsintive, kriss1981, Joostzilla, zbynek.fiala, carlosmarchi");
+      JLabel lblXzener = new JLabel("Our translators: xsintive, kriss1981, Joostzilla, zbynek.fiala, carlosmarchi,");
       contentPanel.add(lblXzener, "6, 24");
     }
     {
+      JLabel lblXzener = new JLabel("                              zagoslav, piodio, roliverosc, Peppe_sr, roandr");
+      contentPanel.add(lblXzener, "6, 26");
+    }
+    {
       JLabel lblLibs = new JLabel("The creators of all libs I've used");
-      contentPanel.add(lblLibs, "6, 26");
+      contentPanel.add(lblLibs, "6, 28");
     }
     {
       JLabel lblTester = new JLabel("Everyone who tested and provided feedback");
-      contentPanel.add(lblTester, "6, 28");
+      contentPanel.add(lblTester, "6, 30");
     }
     {
       JPanel buttonPane = new JPanel();

@@ -21,11 +21,8 @@ package org.tinymediamanager.core.tvshow;
  * @author Manuel Laggner
  */
 public enum TvShowArtworkScrapers {
+  TVDB("The TV Database"), ANIDB("AniDB"), FANART_TV("Fanart.tv");
 
-  /** The tmdb. */
-  TVDB("The TV Database");
-
-  /** The title. */
   private String title;
 
   /**
@@ -38,13 +35,8 @@ public enum TvShowArtworkScrapers {
     this.title = title;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see java.lang.Enum#toString()
-   */
+  @Override
   public String toString() {
     return this.title;
   }
-
 }

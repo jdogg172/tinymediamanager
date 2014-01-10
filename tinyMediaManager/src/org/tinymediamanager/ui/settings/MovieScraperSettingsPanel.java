@@ -16,7 +16,6 @@
 package org.tinymediamanager.ui.settings;
 
 import java.awt.Color;
-import java.awt.Font;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.util.ResourceBundle;
@@ -74,7 +73,7 @@ public class MovieScraperSettingsPanel extends JPanel {
   private JPanel                      panelScraperMetadataContainer;
   private JCheckBox                   cbScraperOfdbde;
   private JCheckBox                   cbScraperTmdb;
-  private JPanel                      panel;
+  private JPanel                      panelTrailer;
   private JCheckBox                   cbTheMovieDatabase;
   private JCheckBox                   cbHdtrailersnet;
   private JCheckBox                   cbOfdbde;
@@ -90,11 +89,11 @@ public class MovieScraperSettingsPanel extends JPanel {
   public MovieScraperSettingsPanel() {
     setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC, FormFactory.RELATED_GAP_COLSPEC,
         ColumnSpec.decode("default:grow"), }, new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
-        FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("default:grow"), FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("default:grow"), }));
+        FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("default:grow"), }));
     JPanel panelMovieScrapers = new JPanel();
     panelMovieScrapers.setBorder(new TitledBorder(UIManager.getBorder("TitledBorder.border"), BUNDLE.getString("scraper.metadata.defaults"),
         TitledBorder.LEADING, TitledBorder.TOP, null, null)); //$NON-NLS-1$
-    add(panelMovieScrapers, "2, 2, fill, top");
+    add(panelMovieScrapers, "2, 2, fill, fill");
     panelMovieScrapers.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.DEFAULT_COLSPEC, FormFactory.RELATED_GAP_COLSPEC,
         ColumnSpec.decode("default:grow"), }, new RowSpec[] { FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
         FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
@@ -141,10 +140,27 @@ public class MovieScraperSettingsPanel extends JPanel {
     cbCertificationCountry = new JComboBox(CountryCode.values());
     panelMovieScrapers.add(cbCertificationCountry, "3, 14, fill, default");
 
+    panelTrailer = new JPanel();
+    panelTrailer.setBorder(new TitledBorder(UIManager.getBorder("TitledBorder.border"), BUNDLE.getString("scraper.trailer"), TitledBorder.LEADING,
+        TitledBorder.TOP, null, null)); //$NON-NLS-1$
+    add(panelTrailer, "4, 2, fill, fill");
+    panelTrailer.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.DEFAULT_COLSPEC, }, new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC,
+        FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC,
+        FormFactory.DEFAULT_ROWSPEC, }));
+
+    cbTheMovieDatabase = new JCheckBox("The Movie Database");
+    panelTrailer.add(cbTheMovieDatabase, "1, 2");
+
+    cbHdtrailersnet = new JCheckBox("HD-Trailers.net");
+    panelTrailer.add(cbHdtrailersnet, "1, 4");
+
+    cbOfdbde = new JCheckBox("OFDb.de");
+    panelTrailer.add(cbOfdbde, "1, 6");
+
     panelScraperMetadataContainer = new JPanel();
     panelScraperMetadataContainer.setBorder(new TitledBorder(UIManager.getBorder("TitledBorder.border"), BUNDLE
         .getString("scraper.metadata.defaults"), TitledBorder.LEADING, TitledBorder.TOP, null, new Color(51, 51, 51))); //$NON-NLS-1$
-    add(panelScraperMetadataContainer, "4, 2, fill, top");
+    add(panelScraperMetadataContainer, "2, 4, fill, fill");
     panelScraperMetadataContainer.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), },
         new RowSpec[] { FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
 
@@ -154,31 +170,15 @@ public class MovieScraperSettingsPanel extends JPanel {
     chckbxAutomaticallyScrapeImages = new JCheckBox(BUNDLE.getString("Settings.default.autoscrape")); //$NON-NLS-1$
     panelScraperMetadataContainer.add(chckbxAutomaticallyScrapeImages, "2, 3");
 
-    panel = new JPanel();
-    panel.setBorder(new TitledBorder(UIManager.getBorder("TitledBorder.border"), BUNDLE.getString("scraper.trailer"), TitledBorder.LEADING,
-        TitledBorder.TOP, null, null)); //$NON-NLS-1$
-    add(panel, "2, 4, fill, fill");
-    panel.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.DEFAULT_COLSPEC, }, new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC,
-        FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC,
-        FormFactory.DEFAULT_ROWSPEC, }));
-
-    cbTheMovieDatabase = new JCheckBox("The Movie Database");
-    panel.add(cbTheMovieDatabase, "1, 2");
-
-    cbHdtrailersnet = new JCheckBox("HD-Trailers.net");
-    panel.add(cbHdtrailersnet, "1, 4");
-
-    cbOfdbde = new JCheckBox("OFDb.de");
-    panel.add(cbOfdbde, "1, 6");
-
     panelAutomaticScraper = new JPanel();
-    panelAutomaticScraper.setBorder(new TitledBorder(null, "Automatic scraper", TitledBorder.LEADING, TitledBorder.TOP, null, null));
+    panelAutomaticScraper.setBorder(new TitledBorder(null,
+        BUNDLE.getString("Settings.automaticscraper"), TitledBorder.LEADING, TitledBorder.TOP, null, null)); //$NON-NLS-1$
     add(panelAutomaticScraper, "4, 4, fill, fill");
     panelAutomaticScraper.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.DEFAULT_COLSPEC, FormFactory.RELATED_GAP_COLSPEC,
         ColumnSpec.decode("default:grow"), }, new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
         FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
 
-    JLabel lblScraperTreshold = new JLabel(BUNDLE.getString("Settings.scraperTreshold"));
+    JLabel lblScraperTreshold = new JLabel(BUNDLE.getString("Settings.scraperTreshold")); //$NON-NLS-1$
     panelAutomaticScraper.add(lblScraperTreshold, "1, 2, default, top");
 
     sliderThreshold = new JSlider();
@@ -205,8 +205,8 @@ public class MovieScraperSettingsPanel extends JPanel {
     lblScraperThresholdHint = new JTextPane();
     panelAutomaticScraper.add(lblScraperThresholdHint, "1, 6, 3, 1");
     lblScraperThresholdHint.setOpaque(false);
-    lblScraperThresholdHint.setFont(new Font("Dialog", Font.PLAIN, 10));
-    lblScraperThresholdHint.setText(BUNDLE.getString("Settings.scraperTreshold.hint"));
+    lblScraperThresholdHint.setFont(lblScraperThresholdHint.getFont().deriveFont(10f));
+    lblScraperThresholdHint.setText(BUNDLE.getString("Settings.scraperTreshold.hint")); //$NON-NLS-1$
 
     initDataBindings();
 

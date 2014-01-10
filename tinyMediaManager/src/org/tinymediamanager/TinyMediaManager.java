@@ -19,6 +19,7 @@ package org.tinymediamanager;
 import java.awt.AWTEvent;
 import java.awt.AlphaComposite;
 import java.awt.Color;
+import java.awt.Dialog.ModalityType;
 import java.awt.EventQueue;
 import java.awt.Font;
 import java.awt.Graphics2D;
@@ -77,6 +78,7 @@ import org.tinymediamanager.ui.TmmSwingWorker;
 import org.tinymediamanager.ui.TmmUIHelper;
 import org.tinymediamanager.ui.TmmUILogCollector;
 import org.tinymediamanager.ui.TmmWindowSaver;
+import org.tinymediamanager.ui.dialogs.WhatsNewDialog;
 
 import chrriis.dj.nativeswing.swtimpl.NativeInterface;
 
@@ -211,8 +213,8 @@ public class TinyMediaManager {
     LOGGER.info("=== tinyMediaManager (c) 2012-2013 Manuel Laggner ===");
     LOGGER.info("=====================================================");
     LOGGER.info("tmm.version      : " + ReleaseInfo.getRealVersion());
-    Globals.settings.getFeatureSettings().setFeatures();
-    if (Globals.settings.getFeatureSettings().isDonator()) {
+
+    if (Globals.isDonator()) {
       LOGGER.info("tmm.supporter    : THANKS FOR DONATING - ALL FEATURES UNLOCKED :)");
     }
 
@@ -249,7 +251,7 @@ public class TinyMediaManager {
 
     // set GUI default language
     Locale.setDefault(Utils.getLocaleFromLanguage(Globals.settings.getLanguage()));
-    LOGGER.info("System language  : " + System.getProperty("user.language") + "_" + System.getProperty("user.language"));
+    LOGGER.info("System language  : " + System.getProperty("user.language") + "_" + System.getProperty("user.country"));
     LOGGER.info("GUI language     : " + Locale.getDefault().getLanguage() + "_" + Locale.getDefault().getCountry());
     LOGGER.info("Scraper language : " + Globals.settings.getMovieSettings().getScraperLanguage());
     LOGGER.info("TV Scraper lang  : " + Globals.settings.getTvShowSettings().getScraperLanguage());
@@ -257,6 +259,7 @@ public class TinyMediaManager {
     // start EDT
     EventQueue.invokeLater(new Runnable() {
       public void run() {
+        boolean newVersion = !Globals.settings.isCurrentVersion();
         try {
           Thread.setDefaultUncaughtExceptionHandler(new Log4jBackstop());
           if (!GraphicsEnvironment.isHeadless()) {
@@ -283,12 +286,8 @@ public class TinyMediaManager {
           TmmUILogCollector.init();
 
           // upgrade check
-          if (!Globals.settings.isCurrentVersion()) {
-            if (!GraphicsEnvironment.isHeadless()) {
-              JOptionPane.showMessageDialog(null, "The configuration format changed in this update.\nPlease check your settings!");
-            }
+          if (newVersion) {
             doUpgradeTasks(Globals.settings.getVersion()); // do the upgrade tasks for the old version
-            Globals.settings.writeDefaultSettings(); // write current default
           }
 
           // init splash
@@ -344,6 +343,18 @@ public class TinyMediaManager {
 
           MovieList movieList = MovieList.getInstance();
           movieList.loadMoviesFromDatabase();
+
+          // upgrade tasks for movies; added with 2.5;
+          if (newVersion) {
+            for (Movie movie : movieList.getMovies()) {
+              movie.findActorImages();
+            }
+          }
+
+          if (g2 != null) {
+            updateProgress(g2, "loading TV shows", 40);
+            splash.update();
+          }
 
           TvShowList tvShowList = TvShowList.getInstance();
           tvShowList.loadTvShowsFromDatabase();
@@ -424,6 +435,11 @@ public class TinyMediaManager {
 
             TmmWindowSaver.loadSettings(window);
             window.setVisible(true);
+
+            // show changelog
+            if (newVersion) {
+              showChangelog();
+            }
           }
           else {
             startCommandLineTasks();
@@ -523,10 +539,15 @@ public class TinyMediaManager {
 
       /**
        * does upgrade tasks, such as deleting old libs
+       * 
+       * @param version
+       *          application version string like 2.4.3
        */
       private void doUpgradeTasks(String version) {
+        String v = "" + version;
 
-        if (version.isEmpty()) {
+        if (v.isEmpty()) {
+          LOGGER.info("Performing upgrade tasks to version 2.0");
           // upgrade from alpha/beta to "TV Show" 2.0 format
           // happens only once
           JOptionPane
@@ -543,10 +564,22 @@ public class TinyMediaManager {
           // check really old alpha version
           FileUtils.deleteQuietly(new File("lib/beansbinding-1.2.1.jar"));
           FileUtils.deleteQuietly(new File("lib/beansbinding.jar"));
+          v = "2.0"; // set version for other updates
         }
-        else if (version.equals("2.0")) {
-          // do something to upgrade to 2.1/3.0
+
+        if (v.equals("2.0")) {
+          LOGGER.info("Performing upgrade tasks to version 2.1");
+          v = "2.1";
         }
+
+        if (v.equals("2.1")) {
+          LOGGER.info("Performing upgrade tasks to version 2.5");
+          v = "2.5";
+        }
+
+        // last one: set current version and write default settings file
+        Globals.settings.setCurrentVersion();
+        Globals.settings.writeDefaultSettings();
       }
 
       /**
@@ -611,6 +644,29 @@ public class TinyMediaManager {
         File db = new File(Constants.DB);
         Utils.createBackupFile(db);
         Utils.deleteOldBackupFile(db, 15);
+      }
+
+      private void showChangelog() {
+        // read the changelog
+        try {
+          final String changelog = FileUtils.readFileToString(new File("changelog.txt"));
+          if (StringUtils.isNotBlank(changelog)) {
+            EventQueue.invokeLater(new Runnable() {
+              @Override
+              public void run() {
+                WhatsNewDialog dialog = new WhatsNewDialog(changelog);
+                dialog.pack();
+                dialog.setLocationRelativeTo(MainWindow.getActiveInstance());
+                dialog.setModalityType(ModalityType.APPLICATION_MODAL);
+                dialog.setVisible(true);
+              }
+            });
+          }
+        }
+        catch (IOException e) {
+          // no file found
+          LOGGER.warn(e.getMessage());
+        }
       }
     });
 

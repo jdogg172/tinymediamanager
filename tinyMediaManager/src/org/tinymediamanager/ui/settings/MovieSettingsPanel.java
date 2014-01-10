@@ -35,6 +35,7 @@ import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -54,6 +55,7 @@ import org.jdesktop.beansbinding.AutoBinding.UpdateStrategy;
 import org.jdesktop.beansbinding.BeanProperty;
 import org.jdesktop.beansbinding.Bindings;
 import org.jdesktop.beansbinding.ObjectProperty;
+import org.jdesktop.swingbinding.JListBinding;
 import org.jdesktop.swingbinding.JTableBinding;
 import org.jdesktop.swingbinding.SwingBindings;
 import org.tinymediamanager.Globals;
@@ -109,28 +111,80 @@ public class MovieSettingsPanel extends JPanel implements HierarchyListener {
                                                                      createRenamerExample();
                                                                    }
                                                                  };
+  private JTextField                  tfAddBadword;
+  private JList                       listBadWords;
+  private JCheckBox                   chckbxAsciiReplacement;
+  private JCheckBox                   chckbxRuntimeFromMf;
+  private JCheckBox                   chckbxYear;
+  private JCheckBox                   chckbxTrailer;
+  private JCheckBox                   chckbxSubtitles;
+  private JCheckBox                   chckbxImages;
+  private JCheckBox                   chckbxNfo;
 
   /**
    * Instantiates a new movie settings panel.
    */
   public MovieSettingsPanel() {
-    setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC, FormFactory.RELATED_GAP_COLSPEC,
-        FormFactory.DEFAULT_COLSPEC, }, new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("fill:default"),
-        FormFactory.LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
+    setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), FormFactory.RELATED_GAP_COLSPEC,
+        ColumnSpec.decode("default:grow"), }, new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("default:grow"),
+        FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("fill:default:grow"), FormFactory.LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
+
+    JPanel panelGeneral = new JPanel();
+    panelGeneral.setBorder(new TitledBorder(null, BUNDLE.getString("Settings.general"), TitledBorder.LEADING, TitledBorder.TOP, null, null)); //$NON-NLS-1$
+    add(panelGeneral, "2, 2, fill, fill");
+    panelGeneral.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
+        FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC, FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
+        FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), FormFactory.RELATED_GAP_COLSPEC, }, new RowSpec[] {
+        FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
+        FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
+        FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
+
+    JLabel lblVisiblecolumns = new JLabel(BUNDLE.getString("Settings.movie.visiblecolumns")); //$NON-NLS-1$
+    panelGeneral.add(lblVisiblecolumns, "2, 2, right, default");
+
+    chckbxYear = new JCheckBox(BUNDLE.getString("metatag.year")); //$NON-NLS-1$
+    panelGeneral.add(chckbxYear, "4, 2");
+
+    chckbxNfo = new JCheckBox(BUNDLE.getString("metatag.nfo")); //$NON-NLS-1$
+    panelGeneral.add(chckbxNfo, "6, 2");
+
+    chckbxImages = new JCheckBox(BUNDLE.getString("metatag.images")); //$NON-NLS-1$
+    panelGeneral.add(chckbxImages, "8, 2");
+
+    chckbxTrailer = new JCheckBox(BUNDLE.getString("metatag.trailer")); //$NON-NLS-1$
+    panelGeneral.add(chckbxTrailer, "4, 4");
+
+    chckbxSubtitles = new JCheckBox(BUNDLE.getString("metatag.subtitles")); //$NON-NLS-1$
+    panelGeneral.add(chckbxSubtitles, "6, 4");
+
+    JSeparator separator_4 = new JSeparator();
+    panelGeneral.add(separator_4, "2, 6, 7, 1");
+
+    JLabel lblImageCache = new JLabel(BUNDLE.getString("Settings.imagecacheimport"));
+    panelGeneral.add(lblImageCache, "2, 8, right, default");
+
+    chckbxImageCache = new JCheckBox(BUNDLE.getString("Settings.imagecacheimporthint")); //$NON-NLS-1$
+    chckbxImageCache.setFont(new Font("Dialog", Font.PLAIN, 10));
+    panelGeneral.add(chckbxImageCache, "4, 8, 5, 1");
+
+    JLabel lblRuntimeFromMedia = new JLabel(BUNDLE.getString("Settings.runtimefrommediafile"));
+    panelGeneral.add(lblRuntimeFromMedia, "2, 10, right, default");
+
+    chckbxRuntimeFromMf = new JCheckBox("");
+    panelGeneral.add(chckbxRuntimeFromMf, "4, 10");
 
     JPanel panelMovieDataSources = new JPanel();
 
     panelMovieDataSources.setBorder(new TitledBorder(null,
         BUNDLE.getString("Settings.movie.datasource"), TitledBorder.LEADING, TitledBorder.TOP, null, null)); //$NON-NLS-1$
-    add(panelMovieDataSources, "2, 2, fill, fill");
+    add(panelMovieDataSources, "2, 4, fill, fill");
     panelMovieDataSources.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
-        FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("max(66dlu;default)"), FormFactory.RELATED_GAP_COLSPEC,
-        ColumnSpec.decode("max(72dlu;default):grow"), FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("100px"), FormFactory.RELATED_GAP_COLSPEC,
-        ColumnSpec.decode("default:grow"), FormFactory.RELATED_GAP_COLSPEC, }, new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC,
-        RowSpec.decode("100px:grow"), FormFactory.NARROW_LINE_GAP_ROWSPEC, RowSpec.decode("default:grow"), FormFactory.RELATED_GAP_ROWSPEC,
-        FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC,
-        FormFactory.DEFAULT_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
-        FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
+        FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC, FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("max(72dlu;default):grow"),
+        FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("100px"), FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"),
+        FormFactory.RELATED_GAP_COLSPEC, }, new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("100px:grow"),
+        FormFactory.NARROW_LINE_GAP_ROWSPEC, RowSpec.decode("default:grow"), FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
+        FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
+        FormFactory.DEFAULT_ROWSPEC, }));
 
     JScrollPane scrollPane = new JScrollPane();
     panelMovieDataSources.add(scrollPane, "2, 2, 5, 1, fill, fill");
@@ -195,39 +249,76 @@ public class MovieSettingsPanel extends JPanel implements HierarchyListener {
     panelMovieDataSources.add(lblNfoFormat, "2, 8, right, default");
 
     cbNfoFormat = new JComboBox(MovieConnectors.values());
-    panelMovieDataSources.add(cbNfoFormat, "4, 8, fill, default");
+    panelMovieDataSources.add(cbNfoFormat, "4, 8, 3, 1, fill, default");
 
     JLabel lblNfoFileNaming = new JLabel(BUNDLE.getString("Settings.nofFileNaming")); //$NON-NLS-1$
     panelMovieDataSources.add(lblNfoFileNaming, "2, 10, right, default");
 
     cbMovieNfoFilename1 = new JCheckBox(BUNDLE.getString("Settings.moviefilename") + ".nfo"); //$NON-NLS-1$
-    panelMovieDataSources.add(cbMovieNfoFilename1, "4, 10");
+    panelMovieDataSources.add(cbMovieNfoFilename1, "4, 10, 3, 1");
 
     cbMovieNfoFilename2 = new JCheckBox("movie.nfo");
-    panelMovieDataSources.add(cbMovieNfoFilename2, "4, 11");
+    panelMovieDataSources.add(cbMovieNfoFilename2, "4, 11, 3, 1");
 
-    JSeparator separator_2 = new JSeparator();
-    panelMovieDataSources.add(separator_2, "2, 13, 9, 1");
+    JPanel panelBadWords = new JPanel();
+    panelBadWords.setBorder(new TitledBorder(null, BUNDLE.getString("Settings.movie.badwords"), TitledBorder.LEADING, TitledBorder.TOP, null, null)); //$NON-NLS-1$
+    add(panelBadWords, "4, 2, 1, 3, fill, fill");
+    panelBadWords.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("50px:grow"),
+        FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC, }, new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC,
+        FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("default:grow"), FormFactory.RELATED_GAP_ROWSPEC,
+        FormFactory.DEFAULT_ROWSPEC, }));
 
-    JLabel lblImageCache = new JLabel(BUNDLE.getString("Settings.imagecacheimport")); //$NON-NLS-1$
-    panelMovieDataSources.add(lblImageCache, "2, 15");
+    JTextPane txtpntBadWordsHint = new JTextPane();
+    txtpntBadWordsHint.setBackground(UIManager.getColor("Panel.background"));
+    txtpntBadWordsHint.setText(BUNDLE.getString("Settings.movie.badwords.hint")); //$NON-NLS-1$
+    txtpntBadWordsHint.setFont(new Font("Dialog", Font.PLAIN, 10));
+    panelBadWords.add(txtpntBadWordsHint, "2, 2, 3, 1, fill, default");
 
-    chckbxImageCache = new JCheckBox("");
-    panelMovieDataSources.add(chckbxImageCache, "4, 15");
+    JScrollPane scpBadWords = new JScrollPane();
+    panelBadWords.add(scpBadWords, "2, 4, fill, fill");
 
-    JLabel lblImageCacheHint = new JLabel(BUNDLE.getString("Settings.imagecacheimporthint")); //$NON-NLS-1$
-    lblImageCacheHint.setFont(new Font("Dialog", Font.PLAIN, 10));
-    panelMovieDataSources.add(lblImageCacheHint, "6, 15, 5, 1");
+    listBadWords = new JList();
+    scpBadWords.setViewportView(listBadWords);
+
+    JButton btnRemoveBadWord = new JButton(BUNDLE.getString("Button.remove")); //$NON-NLS-1$
+    btnRemoveBadWord.addActionListener(new ActionListener() {
+      @Override
+      public void actionPerformed(ActionEvent arg0) {
+        int row = listBadWords.getSelectedIndex();
+        if (row != -1) {
+          String badWord = Globals.settings.getMovieSettings().getBadWords().get(row);
+          Globals.settings.getMovieSettings().removeBadWord(badWord);
+        }
+      }
+    });
+    panelBadWords.add(btnRemoveBadWord, "4, 4, default, bottom");
+
+    tfAddBadword = new JTextField();
+    tfAddBadword.setColumns(10);
+    panelBadWords.add(tfAddBadword, "2, 6, fill, default");
+
+    JButton btnAddBadWord = new JButton(BUNDLE.getString("Button.add")); //$NON-NLS-1$
+    btnAddBadWord.addActionListener(new ActionListener() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        if (StringUtils.isNotEmpty(tfAddBadword.getText())) {
+          Globals.settings.getMovieSettings().addBadWord(tfAddBadword.getText());
+          tfAddBadword.setText("");
+        }
+      }
+    });
+    panelBadWords.add(btnAddBadWord, "4, 6");
 
     // the panel renamer
     JPanel panelRenamer = new JPanel();
     panelRenamer.setBorder(new TitledBorder(null, BUNDLE.getString("Settings.renamer"), TitledBorder.LEADING, TitledBorder.TOP, null, null)); //$NON-NLS-1$
-    add(panelRenamer, "2, 4, fill, fill");
+    add(panelRenamer, "2, 6, 3, 1, fill, fill");
     panelRenamer.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
         FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("50px"),
         FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC, },
         new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
-            FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
+            FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
+            FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.NARROW_LINE_GAP_ROWSPEC, RowSpec.decode("default:grow"),
             FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("fill:default:grow"), FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
             FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
             FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
@@ -260,7 +351,7 @@ public class MovieSettingsPanel extends JPanel implements HierarchyListener {
     txtpntTitle.setBackground(UIManager.getColor("Panel.background"));
     txtpntTitle.setText(BUNDLE.getString("Settings.movie.renamer.info")); //$NON-NLS-1$
     txtpntTitle.setEditable(false);
-    panelRenamer.add(txtpntTitle, "10, 2, 1, 12, fill, fill");
+    panelRenamer.add(txtpntTitle, "10, 2, 1, 16, fill, fill");
 
     JLabel lblMovieFilename = new JLabel(BUNDLE.getString("Settings.renamer.file")); //$NON-NLS-1$
     panelRenamer.add(lblMovieFilename, "2, 4, right, fill");
@@ -304,34 +395,41 @@ public class MovieSettingsPanel extends JPanel implements HierarchyListener {
     chckbxMoviesetSingleMovie.addActionListener(actionCreateRenamerExample);
     panelRenamer.add(chckbxMoviesetSingleMovie, "4, 8, 5, 1, fill, default");
 
+    chckbxAsciiReplacement = new JCheckBox(BUNDLE.getString("Settings.renamer.asciireplacement")); //$NON-NLS-1$
+    chckbxAsciiReplacement.addActionListener(actionCreateRenamerExample);
+    panelRenamer.add(chckbxAsciiReplacement, "4, 10, 5, 1");
+
+    JTextPane txtpntAsciiHint = new JTextPane();
+    txtpntAsciiHint.setText(BUNDLE.getString("Settings.renamer.asciireplacement.hint")); //$NON-NLS-1$
+    txtpntAsciiHint.setFont(new Font("Dialog", Font.PLAIN, 10));
+    txtpntAsciiHint.setBackground(UIManager.getColor("Panel.background"));
+    panelRenamer.add(txtpntAsciiHint, "4, 12, 5, 1, fill, fill");
+
     JTextPane txtrChooseAFolder = new JTextPane();
     txtrChooseAFolder.setFont(new Font("Dialog", Font.PLAIN, 10));
     txtrChooseAFolder.setText(BUNDLE.getString("Settings.movie.renamer.example")); //$NON-NLS-1$
     txtrChooseAFolder.setBackground(UIManager.getColor("Panel.background"));
-    panelRenamer.add(txtrChooseAFolder, "2, 10, 3, 1, fill, bottom");
+    panelRenamer.add(txtrChooseAFolder, "2, 14, 3, 1, fill, bottom");
 
     JLabel lblExampleT = new JLabel(BUNDLE.getString("Settings.example")); //$NON-NLS-1$
-    panelRenamer.add(lblExampleT, "2, 12");
+    panelRenamer.add(lblExampleT, "2, 16");
 
     cbMovieForPreview = new JComboBox();
     cbMovieForPreview.addActionListener(actionCreateRenamerExample);
-    panelRenamer.add(cbMovieForPreview, "4, 12, 5, 1, fill, default");
+    panelRenamer.add(cbMovieForPreview, "4, 16, 5, 1, fill, default");
 
     lblExample = new JLabel("");
     lblExample.setFont(lblExample.getFont().deriveFont(11f));
-    panelRenamer.add(lblExample, "2, 14, 9, 1");
+    panelRenamer.add(lblExample, "2, 18, 9, 1");
 
     JSeparator separator = new JSeparator();
-    panelRenamer.add(separator, "1, 16, 10, 1");
+    panelRenamer.add(separator, "1, 20, 10, 1");
 
     JLabel lblCleanupOptions = new JLabel(BUNDLE.getString("Settings.cleanupoptions")); //$NON-NLS-1$
-    panelRenamer.add(lblCleanupOptions, "2, 18, 3, 1");
+    panelRenamer.add(lblCleanupOptions, "2, 22, 3, 1");
 
-    chckbxRemoveOtherNfos = new JCheckBox("");
-    panelRenamer.add(chckbxRemoveOtherNfos, "2, 20, right, default");
-
-    JLabel lblRemoveAllNon = new JLabel(BUNDLE.getString("Settings.renamer.removenfo")); //$NON-NLS-1$
-    panelRenamer.add(lblRemoveAllNon, "4, 20, 5, 1");
+    chckbxRemoveOtherNfos = new JCheckBox(BUNDLE.getString("Settings.renamer.removenfo")); //$NON-NLS-1$
+    panelRenamer.add(chckbxRemoveOtherNfos, "4, 24, 5, 1");
 
     initDataBindings();
 
@@ -363,6 +461,9 @@ public class MovieSettingsPanel extends JPanel implements HierarchyListener {
     if (index >= 0) {
       cbSeparator.setSelectedIndex(index);
     }
+
+    // column headings
+    tableMovieSources.getColumnModel().getColumn(0).setHeaderValue(BUNDLE.getString("Settings.source")); //$NON-NLS-1$
   }
 
   private void createRenamerExample() {
@@ -468,7 +569,7 @@ public class MovieSettingsPanel extends JPanel implements HierarchyListener {
         tableMovieSources);
     //
     ObjectProperty<String> stringObjectProperty = ObjectProperty.create();
-    jTableBinding.addColumnBinding(stringObjectProperty).setColumnName("Source");
+    jTableBinding.addColumnBinding(stringObjectProperty);
     //
     jTableBinding.bind();
     //
@@ -515,5 +616,45 @@ public class MovieSettingsPanel extends JPanel implements HierarchyListener {
     AutoBinding<Settings, Boolean, JCheckBox, Boolean> autoBinding_4 = Bindings.createAutoBinding(UpdateStrategy.READ_WRITE, settings,
         settingsBeanProperty_5, chckbxMoviesetSingleMovie, jCheckBoxBeanProperty);
     autoBinding_4.bind();
+    //
+    BeanProperty<Settings, List<String>> settingsBeanProperty_6 = BeanProperty.create("movieSettings.badWords");
+    JListBinding<String, Settings, JList> jListBinding = SwingBindings.createJListBinding(UpdateStrategy.READ_WRITE, settings,
+        settingsBeanProperty_6, listBadWords);
+    jListBinding.bind();
+    //
+    BeanProperty<Settings, Boolean> settingsBeanProperty_7 = BeanProperty.create("movieSettings.asciiReplacement");
+    AutoBinding<Settings, Boolean, JCheckBox, Boolean> autoBinding_5 = Bindings.createAutoBinding(UpdateStrategy.READ_WRITE, settings,
+        settingsBeanProperty_7, chckbxAsciiReplacement, jCheckBoxBeanProperty);
+    autoBinding_5.bind();
+    //
+    BeanProperty<Settings, Boolean> settingsBeanProperty_8 = BeanProperty.create("movieSettings.runtimeFromMediaInfo");
+    AutoBinding<Settings, Boolean, JCheckBox, Boolean> autoBinding_6 = Bindings.createAutoBinding(UpdateStrategy.READ_WRITE, settings,
+        settingsBeanProperty_8, chckbxRuntimeFromMf, jCheckBoxBeanProperty);
+    autoBinding_6.bind();
+    //
+    BeanProperty<Settings, Boolean> settingsBeanProperty_9 = BeanProperty.create("movieSettings.yearColumnVisible");
+    AutoBinding<Settings, Boolean, JCheckBox, Boolean> autoBinding_7 = Bindings.createAutoBinding(UpdateStrategy.READ_WRITE, settings,
+        settingsBeanProperty_9, chckbxYear, jCheckBoxBeanProperty);
+    autoBinding_7.bind();
+    //
+    BeanProperty<Settings, Boolean> settingsBeanProperty_13 = BeanProperty.create("movieSettings.trailerColumnVisible");
+    AutoBinding<Settings, Boolean, JCheckBox, Boolean> autoBinding_8 = Bindings.createAutoBinding(UpdateStrategy.READ_WRITE, settings,
+        settingsBeanProperty_13, chckbxTrailer, jCheckBoxBeanProperty);
+    autoBinding_8.bind();
+    //
+    BeanProperty<Settings, Boolean> settingsBeanProperty_14 = BeanProperty.create("movieSettings.subtitleColumnVisible");
+    AutoBinding<Settings, Boolean, JCheckBox, Boolean> autoBinding_12 = Bindings.createAutoBinding(UpdateStrategy.READ_WRITE, settings,
+        settingsBeanProperty_14, chckbxSubtitles, jCheckBoxBeanProperty);
+    autoBinding_12.bind();
+    //
+    BeanProperty<Settings, Boolean> settingsBeanProperty_15 = BeanProperty.create("movieSettings.imageColumnVisible");
+    AutoBinding<Settings, Boolean, JCheckBox, Boolean> autoBinding_13 = Bindings.createAutoBinding(UpdateStrategy.READ_WRITE, settings,
+        settingsBeanProperty_15, chckbxImages, jCheckBoxBeanProperty);
+    autoBinding_13.bind();
+    //
+    BeanProperty<Settings, Boolean> settingsBeanProperty_16 = BeanProperty.create("movieSettings.nfoColumnVisible");
+    AutoBinding<Settings, Boolean, JCheckBox, Boolean> autoBinding_14 = Bindings.createAutoBinding(UpdateStrategy.READ_WRITE, settings,
+        settingsBeanProperty_16, chckbxNfo, jCheckBoxBeanProperty);
+    autoBinding_14.bind();
   }
 }

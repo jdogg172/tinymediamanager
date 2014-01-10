@@ -15,6 +15,8 @@
  */
 package org.tinymediamanager.core.movie;
 
+import static org.tinymediamanager.core.Constants.*;
+
 import javax.persistence.Embeddable;
 
 import org.apache.commons.lang3.StringUtils;
@@ -30,133 +32,63 @@ import org.tinymediamanager.core.AbstractModelObject;
  */
 @Embeddable
 public class MovieActor extends AbstractModelObject {
-
-  /** The Constant ACTOR_DIR. */
   public static final String ACTOR_DIR = ".actors";
 
-  /** The name. */
   private String             name      = "";
-
-  /** The character. */
   private String             character = "";
-
-  /** The thumbnail. */
-  private String             thumb     = "";
-
-  /** The thumb path. */
+  private String             thumbUrl  = "";
   private String             thumbPath = "";
 
-  /**
-   * Instantiates a new movie actor.
-   */
   public MovieActor() {
   }
 
-  /**
-   * Instantiates a new movie actor.
-   * 
-   * @param name
-   *          the name
-   */
   public MovieActor(String name) {
     this.name = name;
   }
 
-  /**
-   * Instantiates a new movie actor.
-   * 
-   * @param name
-   *          the name
-   * @param character
-   *          the character
-   */
   public MovieActor(String name, String character) {
     this.name = name;
     this.character = character;
   }
 
-  /**
-   * Sets the name.
-   * 
-   * @param newValue
-   *          the new name
-   */
   public void setName(String newValue) {
     String oldValue = name;
     name = newValue;
-    firePropertyChange("name", oldValue, newValue);
+    firePropertyChange(NAME, oldValue, newValue);
   }
 
-  /**
-   * Gets the name.
-   * 
-   * @return the name
-   */
   public String getName() {
     return name;
   }
 
-  /**
-   * Gets the character.
-   * 
-   * @return the character
-   */
   public String getCharacter() {
     return character;
   }
 
-  /**
-   * Sets the character.
-   * 
-   * @param newValue
-   *          the new character
-   */
   public void setCharacter(String newValue) {
     String oldValue = character;
     character = newValue;
-    firePropertyChange("name", oldValue, newValue);
+    firePropertyChange(CHARACTER, oldValue, newValue);
   }
 
-  /**
-   * Gets the thumb.
-   * 
-   * @return the thumb
-   */
-  public String getThumb() {
-    return thumb;
+  public String getThumbUrl() {
+    return thumbUrl;
   }
 
-  /**
-   * Sets the thumb.
-   * 
-   * @param newValue
-   *          the new thumb
-   */
-  public void setThumb(String newValue) {
-    String oldValue = this.thumb;
-    thumb = newValue;
-    firePropertyChange("thumb", oldValue, newValue);
+  public void setThumbUrl(String newValue) {
+    String oldValue = this.thumbUrl;
+    thumbUrl = newValue;
+    firePropertyChange(THUMB, oldValue, newValue);
   }
 
-  /**
-   * Gets the thumb path.
-   * 
-   * @return the thumb path
-   */
   public String getThumbPath() {
     return thumbPath;
   }
 
-  /**
-   * Sets the thumb path.
-   * 
-   * @param newValue
-   *          the new thumb path
-   */
   public void setThumbPath(String newValue) {
     String oldValue = this.thumbPath;
     thumbPath = newValue;
-    firePropertyChange("thumbPath", oldValue, newValue);
+    firePropertyChange(THUMB_PATH, oldValue, newValue);
   }
 
   /**
@@ -172,11 +104,7 @@ public class MovieActor extends AbstractModelObject {
     return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see java.lang.Object#equals(java.lang.Object)
-   */
+  @Override
   public boolean equals(Object obj) {
     if (!(obj instanceof MovieActor)) {
       return false;
@@ -185,7 +113,7 @@ public class MovieActor extends AbstractModelObject {
     MovieActor cast = (MovieActor) obj;
 
     // checks of equality
-    if (StringUtils.equals(name, cast.name) && StringUtils.equals(character, cast.character) && StringUtils.equals(thumb, cast.thumb)) {
+    if (StringUtils.equals(name, cast.name) && StringUtils.equals(character, cast.character) && StringUtils.equals(thumbUrl, cast.thumbUrl)) {
       return true;
     }
 

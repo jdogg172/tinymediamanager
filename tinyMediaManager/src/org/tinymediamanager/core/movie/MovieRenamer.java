@@ -41,6 +41,7 @@ import org.tinymediamanager.core.MessageManager;
 import org.tinymediamanager.core.Utils;
 import org.tinymediamanager.core.movie.connector.MovieConnectors;
 import org.tinymediamanager.scraper.Certification;
+import org.tinymediamanager.scraper.util.StrgUtils;
 
 /**
  * The Class MovieRenamer.
@@ -175,6 +176,8 @@ public class MovieRenamer {
     LOGGER.info("Renaming movie: " + movie.getTitle());
     LOGGER.debug("movie year: " + movie.getYear());
     LOGGER.debug("movie path: " + movie.getPath());
+    LOGGER.debug("movie isDisc?: " + movie.isDisc());
+    LOGGER.debug("movie isMulti?: " + movie.isMultiMovieDir());
     if (movie.getMovieSet() != null) {
       LOGGER.debug("movieset: " + movie.getMovieSet().getTitle());
     }
@@ -262,6 +265,13 @@ public class MovieRenamer {
           break; // ok it worked, step out
         }
         try {
+          if (!f.exists()) {
+            LOGGER.debug("Hmmm... file " + f + " does not even exists; delete from DB");
+            // delete from MF or ignore for later cleanup (but better now!)
+            movie.removeFromMediaFiles(vid);
+            testRenameOk = true; // we "tested" this ok
+            break;
+          }
           LOGGER.debug("rename did not work - sleep a while and try again...");
           Thread.sleep(1000);
         }
@@ -550,6 +560,13 @@ public class MovieRenamer {
     }
 
     // ######################################################################
+    // ## rename SAMPLE
+    // ######################################################################
+    for (MediaFile samp : movie.getMediaFiles(MediaFileType.SAMPLE)) {
+      needed.add(samp); // keep all samples
+    }
+
+    // ######################################################################
     // ## rename THUMBNAILS
     // ######################################################################
     for (MediaFile unk : movie.getMediaFiles(MediaFileType.THUMB)) {
@@ -613,14 +630,20 @@ public class MovieRenamer {
       // cleanup files which are not needed
       if (!needed.contains(cleanup.get(i))) {
         MediaFile cl = cleanup.get(i);
-        if (cl.getFile().exists()) { // unneded, but for not diplaying wrong deletes in logger...
-          LOGGER.debug("Deleting " + cl.getFilename());
+        if (cl.getFile().equals(new File(movie.getDataSource())) || cl.getFile().equals(new File(movie.getPath()))
+            || cl.getFile().equals(new File(oldPathname))) {
+          LOGGER.error("Wohoo! We tried to remove complete datasource / movie folder. Nooo way...!"); // FIXME: check how this could happen
+          MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, cl.getFile(), "message.renamer.failedrename"));
+          return; // rename failed
+        }
+        if (cl.getFile().exists()) { // unneeded, but for not displaying wrong deletes in logger...
+          LOGGER.debug("Deleting " + cl.getFile());
           FileUtils.deleteQuietly(cl.getFile()); // delete cleanup file
         }
         File[] list = cl.getFile().getParentFile().listFiles();
         if (list != null && list.length == 0) {
           // if directory is empty, delete it as well
-          LOGGER.debug("Deleting empty Directory" + cl.getFile().getParentFile().getAbsolutePath());
+          LOGGER.debug("Deleting empty Directory " + cl.getFile().getParentFile().getAbsolutePath());
           FileUtils.deleteQuietly(cl.getFile().getParentFile());
         }
       }
@@ -639,7 +662,7 @@ public class MovieRenamer {
             }
           }
           if (!supported) {
-            LOGGER.debug("Deleting " + file.getName());
+            LOGGER.debug("Deleting " + file);
             FileUtils.deleteQuietly(file);
           }
         }
@@ -699,7 +722,7 @@ public class MovieRenamer {
     Pattern regex = Pattern.compile("\\$.{1}");
     Matcher mat = regex.matcher(s);
     if (mat.find()) {
-      String rep = createDestination(mat.group(), movie, true);
+      String rep = createDestination(mat.group(), movie, forFilename);
       if (rep.isEmpty()) {
         return "";
       }
@@ -720,7 +743,8 @@ public class MovieRenamer {
    * @param movie
    *          the movie
    * @param forFilename
-   *          replace for filename (=true)? or for a foldername (=false)
+   *          replace for filename (=true)? or for a foldername (=false)<br>
+   *          Former does replace ALL directory separators
    * @return the string
    */
   private static String createDestination(String template, Movie movie, boolean forFilename) {
@@ -870,6 +894,11 @@ public class MovieRenamer {
       // example:
       // Abraham Lincoln - Vapire Hunter -> Abraham-Lincoln---Vampire-Hunter
       newDestination = newDestination.replaceAll(Pattern.quote(replacement) + "+", replacement);
+    }
+
+    // ASCII replacement
+    if (Globals.settings.getMovieSettings().isAsciiReplacement()) {
+      newDestination = StrgUtils.convertToAscii(newDestination, false);
     }
 
     return newDestination.trim();

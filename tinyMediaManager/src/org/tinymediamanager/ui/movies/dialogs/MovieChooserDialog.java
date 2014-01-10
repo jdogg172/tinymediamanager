@@ -69,6 +69,7 @@ import org.tinymediamanager.scraper.MediaArtwork;
 import org.tinymediamanager.scraper.MediaMetadata;
 import org.tinymediamanager.scraper.MediaSearchResult;
 import org.tinymediamanager.scraper.MediaTrailer;
+import org.tinymediamanager.scraper.MediaType;
 import org.tinymediamanager.ui.EqualsLayout;
 import org.tinymediamanager.ui.MainWindow;
 import org.tinymediamanager.ui.TmmWindowSaver;
@@ -158,8 +159,8 @@ public class MovieChooserDialog extends JDialog implements ActionListener {
     getContentPane().add(contentPanel, BorderLayout.CENTER);
     contentPanel.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("800px:grow"),
         FormFactory.RELATED_GAP_COLSPEC, }, new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
-        FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.NARROW_LINE_GAP_ROWSPEC, RowSpec.decode("fill:300px:grow"),
-        FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, RowSpec.decode("default:grow"), FormFactory.RELATED_GAP_ROWSPEC,
+        FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.NARROW_LINE_GAP_ROWSPEC, RowSpec.decode("fill:default:grow"),
+        FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC,
         FormFactory.DEFAULT_ROWSPEC, }));
     {
       lblPath = new JLabel("");
@@ -249,7 +250,7 @@ public class MovieChooserDialog extends JDialog implements ActionListener {
         splitPane.setRightComponent(panelSearchDetail);
         panelSearchDetail.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("350px:grow"),
             FormFactory.RELATED_GAP_COLSPEC, }, new RowSpec[] { FormFactory.DEFAULT_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
-            FormFactory.PARAGRAPH_GAP_ROWSPEC, RowSpec.decode("fill:150px:grow"), }));
+            FormFactory.PARAGRAPH_GAP_ROWSPEC, RowSpec.decode("fill:default:grow"), }));
         {
           lblMovieName = new JTextArea("");
           lblMovieName.setLineWrap(true);
@@ -270,7 +271,7 @@ public class MovieChooserDialog extends JDialog implements ActionListener {
           JPanel panel = new JPanel();
           panelSearchDetail.add(panel, "2, 4, fill, fill");
           panel.setLayout(new FormLayout(new ColumnSpec[] { ColumnSpec.decode("150px"), FormFactory.RELATED_GAP_COLSPEC,
-              ColumnSpec.decode("200px:grow"), }, new RowSpec[] { RowSpec.decode("239px"), }));
+              ColumnSpec.decode("200px:grow"), }, new RowSpec[] { RowSpec.decode("240px"), }));
           {
             lblMoviePoster = new ImageLabel(false);
             panel.add(lblMoviePoster, "1, 1, fill, fill");
@@ -389,7 +390,8 @@ public class MovieChooserDialog extends JDialog implements ActionListener {
               // poster
               {
                 ImageLabel lblImage = new ImageLabel();
-                ImageChooserDialog dialog = new ImageChooserDialog(movieToScrape.getIds(), ImageType.POSTER, artworkProviders, lblImage, null, null);
+                ImageChooserDialog dialog = new ImageChooserDialog(movieToScrape.getIds(), ImageType.POSTER, artworkProviders, lblImage, null, null,
+                    MediaType.MOVIE);
                 dialog.setLocationRelativeTo(MainWindow.getActiveInstance());
                 dialog.setVisible(true);
                 movieToScrape.setPosterUrl(lblImage.getImageUrl());
@@ -402,7 +404,7 @@ public class MovieChooserDialog extends JDialog implements ActionListener {
                 List<String> extrathumbs = new ArrayList<String>();
                 List<String> extrafanarts = new ArrayList<String>();
                 ImageChooserDialog dialog = new ImageChooserDialog(movieToScrape.getIds(), ImageType.FANART, artworkProviders, lblImage, extrathumbs,
-                    extrafanarts);
+                    extrafanarts, MediaType.MOVIE);
                 dialog.setVisible(true);
                 movieToScrape.setFanartUrl(lblImage.getImageUrl());
                 movieToScrape.writeImages(false, true);
@@ -509,27 +511,10 @@ public class MovieChooserDialog extends JDialog implements ActionListener {
     });
   }
 
-  /**
-   * The Class SearchTask.
-   * 
-   * @author Manuel Laggner
-   */
   private class SearchTask extends SwingWorker<Void, Void> {
-
-    /** The search term. */
     private String searchTerm;
-
-    /** The movie. */
     private Movie  movie;
 
-    /**
-     * Instantiates a new search task.
-     * 
-     * @param searchTerm
-     *          the search term
-     * @param movie
-     *          the movie
-     */
     public SearchTask(String searchTerm, Movie movie) {
       this.searchTerm = searchTerm;
       this.movie = movie;
@@ -575,22 +560,9 @@ public class MovieChooserDialog extends JDialog implements ActionListener {
     }
   }
 
-  /**
-   * The Class ScrapeTask.
-   * 
-   * @author Manuel Laggner
-   */
   private class ScrapeTask extends SwingWorker<Void, Void> {
-
-    /** The model. */
     private MovieChooserModel model;
 
-    /**
-     * Instantiates a new scrape task.
-     * 
-     * @param model
-     *          the model
-     */
     public ScrapeTask(MovieChooserModel model) {
       this.model = model;
     }
@@ -611,9 +583,6 @@ public class MovieChooserDialog extends JDialog implements ActionListener {
       return null;
     }
 
-    /*
-     * Executed in event dispatching thread
-     */
     /*
      * (non-Javadoc)
      * 
@@ -674,19 +643,9 @@ public class MovieChooserDialog extends JDialog implements ActionListener {
     return continueQueue;
   }
 
-  /**
-   * The Class ChangeScraperAction.
-   * 
-   * @author Manuel Laggner
-   */
   private class ChangeScraperAction extends AbstractAction {
-
-    /** The Constant serialVersionUID. */
     private static final long serialVersionUID = -4365761222995534769L;
 
-    /**
-     * Instantiates a new sort action.
-     */
     public ChangeScraperAction() {
     }
 
@@ -695,6 +654,7 @@ public class MovieChooserDialog extends JDialog implements ActionListener {
      * 
      * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
      */
+    @Override
     public void actionPerformed(ActionEvent e) {
       MovieScrapers selectedScraper = (MovieScrapers) cbScraper.getSelectedItem();
       metadataProvider = MovieList.getInstance().getMetadataProvider(selectedScraper);

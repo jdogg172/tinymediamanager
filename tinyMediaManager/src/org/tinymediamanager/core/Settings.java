@@ -46,6 +46,7 @@ import org.apache.commons.lang3.SystemUtils;
 import org.jdesktop.observablecollections.ObservableCollections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tinymediamanager.ReleaseInfo;
 import org.tinymediamanager.core.ImageCache.CacheType;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.movie.MovieFanartNaming;
@@ -67,14 +68,6 @@ import ch.qos.logback.classic.Level;
 public class Settings extends AbstractModelObject {
   private static final Logger         LOGGER                      = LoggerFactory.getLogger(Settings.class);
   private static Settings             instance;
-
-  /**
-   * the current settings file version<br>
-   * change this when new (default) settings need to be written or on structural changes<br>
-   * 2.0 - initial TV show settings <br>
-   * 2.1 - added audioFileTypes for MediaFile detection
-   */
-  private static final String         SETTINGS_VERSION            = "2.1";
 
   /**
    * Constants mainly for events
@@ -132,7 +125,6 @@ public class Settings extends AbstractModelObject {
   private boolean                     clearCacheShutdown          = false;
   private MovieSettings               movieSettings               = null;
   private TvShowSettings              tvShowSettings              = null;
-  private FeatureSettings             featureSettings             = null;
   private MovieScraperMetadataConfig  movieScraperMetadataConfig  = null;
   private TvShowScraperMetadataConfig tvShowScraperMetadataConfig = null;
   private WindowConfig                windowConfig                = null;
@@ -158,8 +150,6 @@ public class Settings extends AbstractModelObject {
     movieSettings.addPropertyChangeListener(propertyChangeListener);
     tvShowSettings = new TvShowSettings();
     tvShowSettings.addPropertyChangeListener(propertyChangeListener);
-    featureSettings = new FeatureSettings();
-    featureSettings.addPropertyChangeListener(propertyChangeListener);
     movieScraperMetadataConfig = new MovieScraperMetadataConfig();
     movieScraperMetadataConfig.addPropertyChangeListener(propertyChangeListener);
     tvShowScraperMetadataConfig = new TvShowScraperMetadataConfig();
@@ -210,7 +200,7 @@ public class Settings extends AbstractModelObject {
    * is our settings file up2date?
    */
   public boolean isCurrentVersion() {
-    return SETTINGS_VERSION.equals(version);
+    return ReleaseInfo.getVersion().equals(version);
   }
 
   /**
@@ -218,6 +208,13 @@ public class Settings extends AbstractModelObject {
    */
   public String getVersion() {
     return version;
+  }
+
+  /**
+   * sets the current version into settings file
+   */
+  public void setCurrentVersion() {
+    version = ReleaseInfo.getVersion();
   }
 
   /**
@@ -423,7 +420,7 @@ public class Settings extends AbstractModelObject {
    * Write default settings.
    */
   public void writeDefaultSettings() {
-    version = SETTINGS_VERSION;
+    version = ReleaseInfo.getVersion();
 
     // default video file types derived from
     // http://wiki.xbmc.org/index.php?title=Advancedsettings.xml#.3Cvideoextensions.3E
@@ -761,26 +758,6 @@ public class Settings extends AbstractModelObject {
    */
   public TvShowSettings getTvShowSettings() {
     return this.tvShowSettings;
-  }
-
-  /**
-   * Sets the tv show settings.
-   * 
-   * @param tvShowSettings
-   *          the new tv show settings
-   */
-  public void setFeatureSettings(FeatureSettings featureSettings) {
-    this.featureSettings = featureSettings;
-    this.featureSettings.addPropertyChangeListener(propertyChangeListener);
-  }
-
-  /**
-   * Gets the tv show settings.
-   * 
-   * @return the tv show settings
-   */
-  public FeatureSettings getFeatureSettings() {
-    return this.featureSettings;
   }
 
   /**

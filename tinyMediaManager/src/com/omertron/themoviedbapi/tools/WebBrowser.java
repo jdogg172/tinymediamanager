@@ -26,12 +26,13 @@ import java.net.URL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
+import org.tinymediamanager.scraper.util.CachedUrl;
 import org.tinymediamanager.scraper.util.Url;
 
 import com.omertron.themoviedbapi.MovieDbException;
 
 /**
- * The Class WebBrowser - For use with TheMovieDB API including support for HTTPClient and Caching.
+ * The Class WebBrowser - For use with TheMovieDB API including support for HTTPClient.
  * 
  * @author Manuel Laggner
  */
@@ -67,6 +68,14 @@ public final class WebBrowser {
     }
   }
 
+  public static String request(URL url) throws MovieDbException {
+    return request(url, null, Boolean.FALSE);
+  }
+
+  public static String request(URL url, String jsonBody) throws MovieDbException {
+    return request(url, jsonBody, Boolean.FALSE);
+  }
+
   /**
    * Request.
    * 
@@ -76,7 +85,7 @@ public final class WebBrowser {
    * @throws MovieDbException
    *           the movie db exception
    */
-  public static String request(URL requestUrl) throws MovieDbException {
+  public static String request(URL requestUrl, String jsonBody, boolean isDeleteRequest) throws MovieDbException {
     StringWriter content = null;
     BufferedReader in = null;
 
@@ -84,7 +93,7 @@ public final class WebBrowser {
       content = new StringWriter();
 
       Url url = null;
-      url = new Url(requestUrl.toString());
+      url = new CachedUrl(requestUrl.toString());
       url.addHeader("Accept", "application/json");
       url.addHeader("Content-Type", "application/json");
 
@@ -142,8 +151,8 @@ public final class WebBrowser {
    * 
    * @return the proxy port
    */
-  public static String getProxyPort() {
-    return Globals.settings.getProxyPort();
+  public static int getProxyPort() {
+    return Integer.parseInt(Globals.settings.getProxyPort());
   }
 
   /**
@@ -152,7 +161,7 @@ public final class WebBrowser {
    * @param myProxyPort
    *          the new proxy port
    */
-  public static void setProxyPort(String myProxyPort) {
+  public static void setProxyPort(int myProxyPort) {
   }
 
   /**

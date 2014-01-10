@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tinymediamanager.Globals;
 import org.tinymediamanager.core.Utils;
 
 /**
@@ -51,7 +52,6 @@ public class ParserUtils {
    * @param filename
    *          the filename to get the title from
    * @return the (hopefully) correct parsed movie name
-   * @author Myron Boyle
    */
   public static String detectCleanMoviename(String filename) {
     return detectCleanMovienameAndYear(filename)[0];
@@ -67,11 +67,11 @@ public class ParserUtils {
    * @param filename
    *          the filename to get the title from
    * @return title/year string (year can be empty)
-   * @author Myron Boyle
    */
   public static String[] detectCleanMovienameAndYear(String filename) {
     String[] ret = { "", "" };
-    LOGGER.debug("Parse filename for movie title: \"" + filename + "\"");
+    // use trace to not remove logging completely (function called way to often on multi movie dir parsing)
+    LOGGER.trace("Parse filename for movie title: \"" + filename + "\"");
 
     if (filename == null || filename.isEmpty()) {
       LOGGER.warn("Filename empty?!");
@@ -106,23 +106,27 @@ public class ParserUtils {
     String year = "";
     for (int i = s.length - 1; i > 0; i--) {
       if (!s[i].isEmpty() && s[i].matches("\\d{4}")) {
-        LOGGER.debug("removed token '" + s[i] + "'- seems to be year");
+        LOGGER.trace("removed token '" + s[i] + "'- seems to be year");
         year = s[i];
         s[i] = "";
         break;
       }
     }
 
-    // rebuild string
+    // rebuild string, respecting bad words
     String name = "";
     for (int i = 0; i < firstFoundStopwordPosition; i++) {
       if (!s[i].isEmpty()) {
-        name = name + s[i] + " ";
+        // check for bad words
+        if (!Globals.settings.getMovieSettings().getBadWords().contains(s[i])) {
+          name = name + s[i] + " ";
+        }
       }
     }
+
     ret[0] = name.trim();
     ret[1] = year.trim();
-    LOGGER.debug("Movie title should be: \"" + ret[0] + "\", from " + ret[1]);
+    LOGGER.trace("Movie title should be: \"" + ret[0] + "\", from " + ret[1]);
     return ret;
   }
 

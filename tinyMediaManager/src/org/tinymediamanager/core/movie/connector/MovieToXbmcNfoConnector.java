@@ -166,12 +166,12 @@ public class MovieToXbmcNfoConnector {
   @XmlElement(name = "tag")
   private List<String>        tags;
 
+  @XmlElement
+  private String              top250;
+
   /** not supported tags, but used to retrain in NFO. */
   @XmlElement
   private String              epbookmark;
-
-  @XmlElement
-  private String              top250;
 
   @XmlElement
   private String              lastplayed;
@@ -265,6 +265,12 @@ public class MovieToXbmcNfoConnector {
     xbmc.originaltitle = movie.getOriginalTitle();
     xbmc.rating = movie.getRating();
     xbmc.votes = movie.getVotes();
+    if (movie.getTop250() == 0) {
+      xbmc.top250 = "";
+    }
+    else {
+      xbmc.top250 = String.valueOf(movie.getTop250());
+    }
     xbmc.year = movie.getYear();
     xbmc.premiered = movie.getReleaseDateFormatted();
     xbmc.plot = movie.getPlot();
@@ -338,7 +344,7 @@ public class MovieToXbmcNfoConnector {
 
     xbmc.actors.clear();
     for (MovieActor cast : movie.getActors()) {
-      xbmc.addActor(cast.getName(), cast.getCharacter(), cast.getThumb());
+      xbmc.addActor(cast.getName(), cast.getCharacter(), cast.getThumbUrl());
     }
 
     xbmc.genres.clear();
@@ -469,6 +475,17 @@ public class MovieToXbmcNfoConnector {
       movie.setRating(xbmc.rating);
       movie.setVotes(xbmc.votes);
       movie.setYear(xbmc.year);
+      if (StringUtils.isNotBlank(xbmc.top250)) {
+        try {
+          movie.setTop250(Integer.parseInt(xbmc.top250));
+        }
+        catch (NumberFormatException e) {
+          movie.setTop250(0);
+        }
+      }
+      else {
+        movie.setTop250(0);
+      }
       try {
         movie.setReleaseDate(xbmc.premiered);
       }
@@ -552,7 +569,7 @@ public class MovieToXbmcNfoConnector {
 
       for (Actor actor : xbmc.getActors()) {
         MovieActor cast = new MovieActor(actor.name, actor.role);
-        cast.setThumb(actor.thumb);
+        cast.setThumbUrl(actor.thumb);
         movie.addActor(cast);
       }
 
@@ -667,13 +684,13 @@ public class MovieToXbmcNfoConnector {
 
   private static String parseTrailerUrl(String nfoTrailerUrl) {
     // try to parse out youtube trailer plugin
-    Pattern pattern = Pattern.compile("plugin://plugin.video.youtube/?action=play_video&videoid=(.*)$");
+    Pattern pattern = Pattern.compile("plugin://plugin.video.youtube/\\?action=play_video&videoid=(.*)$");
     Matcher matcher = pattern.matcher(nfoTrailerUrl);
     if (matcher.matches()) {
       return "http://www.youtube.com/watch?v=" + matcher.group(1);
     }
 
-    pattern = Pattern.compile("plugin://plugin.video.hdtrailers_net/video/.*?/(.*)$");
+    pattern = Pattern.compile("plugin://plugin.video.hdtrailers_net/video/.*\\?/(.*)$");
     matcher = pattern.matcher(nfoTrailerUrl);
     if (matcher.matches()) {
       try {
