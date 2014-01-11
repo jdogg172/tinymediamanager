@@ -10,10 +10,12 @@ feature: added producers
 feature: added an ASCII cleaner for the renamer
 feature: added "bad words" to the movie importer
 feature: possibility to get the runtime from media files rather than scraper
+feature: added some settings for the TV show renamer 
 feature/fix: reworked tagging of TV shows and episodes
 fix: many enhancements to the "update datasources" and database engine -> tmm is much faster now with large databases
 fix: some fixes and preventions to the "update datasources" engine
 fix: many memory optimizations (tmm now uses less memory) 
+fix: when renaming an actor, the actor thumb also gets renamed
 fix: several issues/problems with the renamer
 fix: artwork naming for DVD/BR images
 fix: adapted scaling factor of the tmm window - now it should fit on lower screens nicely
@@ -21,3 +23,4 @@ fix: crash at startup with invalid locales
 fix: crash when searching for a movie set is fixed with themoviedbapi 3.9  
 fix: NFO parsing of xbmc-youtube plugin urls
 fix: externalized some more string (better translations)
+fix: several fixes to the TV show renamer
