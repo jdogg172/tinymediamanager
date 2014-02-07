@@ -22,8 +22,11 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.text.Format;
 import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import javax.xml.bind.JAXBContext;
@@ -56,9 +59,11 @@ import org.tinymediamanager.core.movie.Movie;
 import org.tinymediamanager.core.movie.MovieActor;
 import org.tinymediamanager.core.movie.MovieList;
 import org.tinymediamanager.core.movie.MovieNfoNaming;
+import org.tinymediamanager.core.movie.MovieProducer;
 import org.tinymediamanager.core.movie.MovieSet;
 import org.tinymediamanager.core.movie.connector.MovieToMpNfoConnector.Actor;
 import org.tinymediamanager.core.movie.connector.MovieToMpNfoConnector.MovieSets;
+import org.tinymediamanager.core.movie.connector.MovieToMpNfoConnector.Producer;
 import org.tinymediamanager.scraper.Certification;
 import org.tinymediamanager.scraper.MediaGenres;
 
@@ -68,9 +73,9 @@ import org.tinymediamanager.scraper.MediaGenres;
  * @author Manuel Laggner
  */
 @XmlRootElement(name = "movie")
-@XmlSeeAlso({ Actor.class, MovieSets.class })
+@XmlSeeAlso({ Actor.class, MovieSets.class, Producer.class })
 @XmlType(propOrder = { "title", "originaltitle", "sorttitle", "sets", "rating", "year", "votes", "outline", "plot", "tagline", "runtime", "thumb",
-    "fanart", "mpaa", "id", "genres", "studio", "country", "premiered", "credits", "director", "actors" })
+    "fanart", "mpaa", "id", "genres", "studio", "country", "premiered", "credits", "director", "actors", "producers" })
 public class MovieToMpNfoConnector {
 
   private static final Logger LOGGER        = LoggerFactory.getLogger(MovieToMpNfoConnector.class);
@@ -104,6 +109,9 @@ public class MovieToMpNfoConnector {
   @XmlAnyElement(lax = true)
   private List<Object>        actors;
 
+  @XmlAnyElement(lax = true)
+  private List<Object>        producers;
+
   @XmlElementWrapper(name = "genres")
   @XmlElement(name = "genre")
   private List<String>        genres;
@@ -126,6 +134,7 @@ public class MovieToMpNfoConnector {
   @SuppressWarnings({ "rawtypes", "unchecked" })
   public MovieToMpNfoConnector() {
     actors = new ArrayList();
+    producers = new ArrayList();
     genres = new ArrayList<String>();
     fanart = new ArrayList<String>();
     sets = new ArrayList<MovieSets>();
@@ -218,6 +227,10 @@ public class MovieToMpNfoConnector {
       mp.addActor(cast.getName(), cast.getCharacter(), cast.getThumbUrl());
     }
 
+    for (MovieProducer producer : movie.getProducers()) {
+      mp.addProducer(producer.getName(), producer.getRole(), producer.getThumbUrl());
+    }
+
     for (MediaGenres genre : movie.getGenres()) {
       mp.addGenre(genre.toString());
     }
@@ -249,6 +262,12 @@ public class MovieToMpNfoConnector {
         Marshaller m = context.createMarshaller();
         m.setProperty(Marshaller.JAXB_ENCODING, "UTF-8");
         m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+
+        Format formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        String dat = formatter.format(new Date());
+        String comment = "<!-- created on " + dat + " - tinyMediaManager " + Globals.settings.getVersion() + " -->\n";
+        m.setProperty("com.sun.xml.internal.bind.xmlHeaders", comment);
+
         // w = new FileWriter(nfoFilename);
         Writer w = new StringWriter();
         m.marshal(mp, w);
@@ -342,6 +361,12 @@ public class MovieToMpNfoConnector {
         MovieActor cast = new MovieActor(actor.getName(), actor.getRole());
         cast.setThumbUrl(actor.getThumb());
         movie.addActor(cast);
+      }
+
+      for (Producer producer : mp.getProducers()) {
+        MovieProducer cast = new MovieProducer(producer.name, producer.role);
+        cast.setThumbUrl(producer.thumb);
+        movie.addProducer(cast);
       }
 
       for (String genre : mp.getGenres()) {
@@ -445,6 +470,25 @@ public class MovieToMpNfoConnector {
       }
     }
     return pureActors;
+  }
+
+  private void addProducer(String name, String role, String thumb) {
+    Producer producer = new Producer(name, role, thumb);
+    producers.add(producer);
+  }
+
+  public List<Producer> getProducers() {
+    // @XmlAnyElement(lax = true) causes all unsupported tags to be in producers;
+    // filter producers out
+    List<Producer> pureProducers = new ArrayList<Producer>();
+    // for (Object obj : producers) {
+    for (Object obj : actors) { // ugly hack for invalid xml structure
+      if (obj instanceof Producer) {
+        Producer producer = (Producer) obj;
+        pureProducers.add(producer);
+      }
+    }
+    return pureProducers;
   }
 
   /**
@@ -892,7 +936,30 @@ public class MovieToMpNfoConnector {
     public void setThumb(String thumb) {
       this.thumb = thumb;
     }
+  }
 
+  /*
+   * inner class to represent producers
+   */
+  @XmlRootElement(name = "producer")
+  public static class Producer {
+    @XmlElement
+    private String name;
+
+    @XmlElement
+    private String role;
+
+    @XmlElement
+    private String thumb;
+
+    public Producer() {
+    }
+
+    public Producer(String name, String role, String thumb) {
+      this.name = name;
+      this.role = role;
+      this.thumb = thumb;
+    }
   }
 
   // inner class actor to represent movie sets

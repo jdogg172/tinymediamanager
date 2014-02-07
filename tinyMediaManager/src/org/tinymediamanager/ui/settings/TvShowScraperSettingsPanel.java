@@ -26,6 +26,7 @@ import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSeparator;
+import javax.swing.JTextPane;
 import javax.swing.UIManager;
 import javax.swing.border.TitledBorder;
 
@@ -68,6 +69,7 @@ public class TvShowScraperSettingsPanel extends JPanel {
   private JPanel                      panelArtworkScrapers;
   private JCheckBox                   chckbxImagesFanartTv;
   private JCheckBox                   chckbxImagesTvDB;
+  private JTextPane                   lblTvShowScraperCountryHint;
 
   /**
    * Instantiates a new movie scraper settings panel.
@@ -83,7 +85,8 @@ public class TvShowScraperSettingsPanel extends JPanel {
     panelTvShowScrapers.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.DEFAULT_COLSPEC, FormFactory.RELATED_GAP_COLSPEC,
         ColumnSpec.decode("default:grow"), }, new RowSpec[] { FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
         FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
-        FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
+        FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
+        FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
 
     cbScraperTvdb = new JCheckBox("The TV Database");
     buttonGroupScraper = new ButtonGroup();
@@ -108,6 +111,12 @@ public class TvShowScraperSettingsPanel extends JPanel {
 
     cbCountry = new JComboBox(CountryCode.values());
     panelTvShowScrapers.add(cbCountry, "3, 10, fill, default");
+
+    lblTvShowScraperCountryHint = new JTextPane();
+    lblTvShowScraperCountryHint.setEditable(false);
+    lblTvShowScraperCountryHint.setOpaque(false);
+    lblTvShowScraperCountryHint.setText(BUNDLE.getString("Settings.tvshow.certifactioncountry.hint")); //$NON-NLS-1$
+    panelTvShowScrapers.add(lblTvShowScraperCountryHint, "3, 12");
 
     panelArtworkScrapers = new JPanel();
     panelArtworkScrapers.setBorder(new TitledBorder(null, BUNDLE.getString("Settings.images"), TitledBorder.LEADING, TitledBorder.TOP, null, null));//$NON-NLS-1$

@@ -288,7 +288,9 @@ public class TinyMediaManager {
           // upgrade check
           String oldVersion = Globals.settings.getVersion();
           if (newVersion) {
-            doUpgradeTasks(oldVersion); // do the upgrade tasks for the old version
+            UpgradeTasks.performUpgradeTasksBeforeDatabaseLoading(oldVersion); // do the upgrade tasks for the old version
+            Globals.settings.setCurrentVersion();
+            Globals.settings.writeDefaultSettings();
           }
 
           // init splash
@@ -320,9 +322,38 @@ public class TinyMediaManager {
           LOGGER.info("=====================================================");
           LOGGER.info("starting tinyMediaManager");
 
+          // set native dir (needs to be absolute)
+          // String nativepath = TinyMediaManager.class.getClassLoader().getResource(".").getPath() + "native/";
+          String nativepath = "native/";
+          if (Platform.isWindows()) {
+            nativepath += "windows-";
+          }
+          else if (Platform.isLinux()) {
+            nativepath += "linux-";
+          }
+          else if (Platform.isMac()) {
+            nativepath += "mac-";
+          }
+          nativepath += System.getProperty("os.arch");
+          System.setProperty("jna.library.path", nativepath);
+          // MediaInfo /////////////////////////////////////////////////////
+          if (g2 != null) {
+            updateProgress(g2, "loading MediaInfo libs", 20);
+            splash.update();
+          }
+          LOGGER.debug("Loading native mediainfo lib from: " + nativepath);
+          // load libMediainfo
+          String miv = MediaInfo.version();
+          if (!StringUtils.isEmpty(miv)) {
+            LOGGER.info("Using " + miv);
+          }
+          else {
+            LOGGER.error("could not load MediaInfo!");
+          }
+
           // initialize database //////////////////////////////////////////////
           if (g2 != null) {
-            updateProgress(g2, "initialize database", 20);
+            updateProgress(g2, "initialize database", 30);
             splash.update();
           }
 
@@ -338,7 +369,7 @@ public class TinyMediaManager {
 
           // load database //////////////////////////////////////////////////
           if (g2 != null) {
-            updateProgress(g2, "loading movies", 30);
+            updateProgress(g2, "loading movies", 40);
             splash.update();
           }
 
@@ -346,44 +377,12 @@ public class TinyMediaManager {
           movieList.loadMoviesFromDatabase();
 
           if (g2 != null) {
-            updateProgress(g2, "loading TV shows", 40);
+            updateProgress(g2, "loading TV shows", 50);
             splash.update();
           }
 
           TvShowList tvShowList = TvShowList.getInstance();
           tvShowList.loadTvShowsFromDatabase();
-
-          // set native dir (needs to be absolute)
-          // String nativepath =
-          // TinyMediaManager.class.getClassLoader().getResource(".").getPath()
-          // + "native/";
-          String nativepath = "native/";
-          if (Platform.isWindows()) {
-            nativepath += "windows-";
-          }
-          else if (Platform.isLinux()) {
-            nativepath += "linux-";
-          }
-          else if (Platform.isMac()) {
-            nativepath += "mac-";
-          }
-          nativepath += System.getProperty("os.arch");
-          System.setProperty("jna.library.path", nativepath);
-
-          // MediaInfo /////////////////////////////////////////////////////
-          if (g2 != null) {
-            updateProgress(g2, "loading MediaInfo libs", 50);
-            splash.update();
-          }
-          LOGGER.debug("Loading native mediainfo lib from: " + nativepath);
-          // load libMediainfo
-          String miv = MediaInfo.version();
-          if (!StringUtils.isEmpty(miv)) {
-            LOGGER.info("Using " + miv);
-          }
-          else {
-            LOGGER.error("could not load MediaInfo!");
-          }
 
           // VLC /////////////////////////////////////////////////////////
           // // try to initialize VLC native libs
@@ -402,9 +401,9 @@ public class TinyMediaManager {
           // LOGGER.warn("VLC: " + ule.getMessage().trim());
           // }
 
-          // do upgrade tasks after database loading - starting at 70%
+          // do upgrade tasks after database loading
           if (newVersion) {
-            doUpgradeTasksAfterDatabaseLoading(oldVersion, g2, splash);
+            UpgradeTasks.performUpgradeTasksAfterDatabaseLoading(oldVersion);
           }
 
           // clean cache ////////////////////////////////////////////////////
@@ -480,29 +479,6 @@ public class TinyMediaManager {
         }
       }
 
-      private void doUpgradeTasksAfterDatabaseLoading(String version, Graphics2D g2, SplashScreen splash) {
-        MovieList movieList = MovieList.getInstance();
-        List<Movie> movies = movieList.getMovies();
-
-        int updateInterval = movies.size() / 10;
-        int counter = 0;
-        int percentage = 70;
-
-        // upgrade tasks for movies; added with 2.5;
-        if ("2.1".equals(version)) {
-          for (Movie movie : movieList.getMovies()) {
-            movie.findActorImages();
-            counter++;
-            if (counter >= updateInterval) {
-              counter = 0;
-              percentage++;
-              updateProgress(g2, "Performing update tasks", percentage);
-              splash.update();
-            }
-          }
-        }
-      }
-
       /**
        * Update progress on splash screen.
        * 
@@ -560,51 +536,6 @@ public class TinyMediaManager {
       }
 
       /**
-       * does upgrade tasks, such as deleting old libs
-       * 
-       * @param version
-       *          application version string like 2.4.3
-       */
-      private void doUpgradeTasks(String version) {
-        String v = "" + version;
-
-        if (v.isEmpty()) {
-          LOGGER.info("Performing upgrade tasks to version 2.0");
-          // upgrade from alpha/beta to "TV Show" 2.0 format
-          // happens only once
-          JOptionPane
-              .showMessageDialog(null,
-                  "And since you are upgrading to a complete new version, we need to cleanup/delete the complete database this time.\nWe're sorry for that.");
-          FileUtils.deleteQuietly(new File(Constants.DB));
-
-          // upgrade from alpha - delete unneeded files
-          FileUtils.deleteQuietly(new File("lib/jackson-core-lgpl.jar"));
-          FileUtils.deleteQuietly(new File("lib/jackson-core-lgpl.jarv"));
-          FileUtils.deleteQuietly(new File("lib/jackson-mapper-lgpl.jar"));
-          FileUtils.deleteQuietly(new File("lib/jackson-mapper-lgpl.jarv"));
-
-          // check really old alpha version
-          FileUtils.deleteQuietly(new File("lib/beansbinding-1.2.1.jar"));
-          FileUtils.deleteQuietly(new File("lib/beansbinding.jar"));
-          v = "2.0"; // set version for other updates
-        }
-
-        if (v.equals("2.0")) {
-          LOGGER.info("Performing upgrade tasks to version 2.1");
-          v = "2.1";
-        }
-
-        if (v.equals("2.1")) {
-          LOGGER.info("Performing upgrade tasks to version 2.5");
-          v = "2.5";
-        }
-
-        // last one: set current version and write default settings file
-        Globals.settings.setCurrentVersion();
-        Globals.settings.writeDefaultSettings();
-      }
-
-      /**
        * Does some tasks at startup
        */
       private void doStartupTasks() {
@@ -618,6 +549,20 @@ public class TinyMediaManager {
             }
             catch (IOException e) {
               LOGGER.error("Could not update the updater!");
+            }
+          }
+        }
+        if (Platform.isWindows()) {
+          file = new File("tinyMediaManager.exe.new");
+          if (file.exists() && file.length() > 10000 && file.length() < 50000) {
+            File cur = new File("tinyMediaManager.exe");
+            if (file.length() != cur.length() || !cur.exists()) {
+              try {
+                FileUtils.copyFile(file, cur);
+              }
+              catch (IOException e) {
+                LOGGER.error("Could not update the updater!");
+              }
             }
           }
         }

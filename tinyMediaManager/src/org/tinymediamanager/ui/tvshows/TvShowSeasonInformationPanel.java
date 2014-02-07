@@ -125,6 +125,7 @@ public class TvShowSeasonInformationPanel extends JPanel {
     };
     panelLeft.add(lblTvShowPoster);
     lblTvShowPoster.setAlternativeText(BUNDLE.getString("image.notfound.poster")); //$NON-NLS-1$
+    lblTvShowPoster.enableLightbox();
     lblPosterSize = new JLabel(BUNDLE.getString("mediafiletype.poster")); //$NON-NLS-1$
     panelLeft.add(lblPosterSize);
 
@@ -194,9 +195,16 @@ public class TvShowSeasonInformationPanel extends JPanel {
         String property = propertyChangeEvent.getPropertyName();
         Object source = propertyChangeEvent.getSource();
         // react on selection of a movie and change of a tv show
-        if (source instanceof TvShowSeasonSelectionModel) {
-          TvShowSeasonSelectionModel model = (TvShowSeasonSelectionModel) source;
-          TvShowSeason selectedSeason = model.getSelectedTvShowSeason();
+        if (source instanceof TvShowSeasonSelectionModel
+            || (source instanceof TvShowSeason && MEDIA_FILES.equals(propertyChangeEvent.getPropertyName()))) {
+          TvShowSeason selectedSeason;
+          if (source instanceof TvShowSeasonSelectionModel) {
+            TvShowSeasonSelectionModel model = (TvShowSeasonSelectionModel) source;
+            selectedSeason = model.getSelectedTvShowSeason();
+          }
+          else {
+            selectedSeason = (TvShowSeason) source;
+          }
           setPoster(selectedSeason);
 
           try {

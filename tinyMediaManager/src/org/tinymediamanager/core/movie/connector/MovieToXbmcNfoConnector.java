@@ -25,8 +25,11 @@ import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.text.Format;
 import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -58,8 +61,10 @@ import org.tinymediamanager.core.movie.Movie;
 import org.tinymediamanager.core.movie.MovieActor;
 import org.tinymediamanager.core.movie.MovieList;
 import org.tinymediamanager.core.movie.MovieNfoNaming;
+import org.tinymediamanager.core.movie.MovieProducer;
 import org.tinymediamanager.core.movie.MovieSet;
 import org.tinymediamanager.core.movie.connector.MovieToXbmcNfoConnector.Actor;
+import org.tinymediamanager.core.movie.connector.MovieToXbmcNfoConnector.Producer;
 import org.tinymediamanager.scraper.Certification;
 import org.tinymediamanager.scraper.MediaGenres;
 import org.tinymediamanager.scraper.MediaTrailer;
@@ -70,11 +75,11 @@ import org.tinymediamanager.scraper.MediaTrailer;
  * @author Manuel Laggner
  */
 @XmlRootElement(name = "movie")
-@XmlSeeAlso(Actor.class)
+@XmlSeeAlso({ Actor.class, Producer.class })
 @XmlType(propOrder = { "title", "originaltitle", "set", "sorttitle", "rating", "epbookmark", "year", "top250", "votes", "outline", "plot", "tagline",
     "runtime", "thumb", "fanart", "mpaa", "certifications", "id", "tmdbId", "trailer", "country", "premiered", "status", "code", "aired", "fileinfo",
-    "watched", "playcount", "genres", "studio", "credits", "director", "tags", "actors", "resume", "lastplayed", "dateadded", "keywords", "poster",
-    "url" })
+    "watched", "playcount", "genres", "studio", "credits", "director", "tags", "actors", "producers", "resume", "lastplayed", "dateadded",
+    "keywords", "poster", "url", "languages" })
 public class MovieToXbmcNfoConnector {
   private static final Logger LOGGER         = LoggerFactory.getLogger(MovieToXbmcNfoConnector.class);
   private static JAXBContext  context        = initContext();
@@ -157,6 +162,9 @@ public class MovieToXbmcNfoConnector {
   @XmlAnyElement(lax = true)
   private List<Object>        actors;
 
+  @XmlAnyElement(lax = true)
+  private List<Object>        producers;
+
   @XmlElement(name = "genre")
   private List<String>        genres;
 
@@ -168,6 +176,9 @@ public class MovieToXbmcNfoConnector {
 
   @XmlElement
   private String              top250;
+
+  @XmlElement
+  private String              languages;
 
   /** not supported tags, but used to retrain in NFO. */
   @XmlElement
@@ -223,6 +234,7 @@ public class MovieToXbmcNfoConnector {
     tags = new ArrayList<String>();
     director = new ArrayList<String>();
     credits = new ArrayList<String>();
+    producers = new ArrayList();
   }
 
   /**
@@ -312,6 +324,8 @@ public class MovieToXbmcNfoConnector {
       xbmc.playcount = 1;
     }
 
+    xbmc.languages = movie.getSpokenLanguages();
+
     // certifications
     if (movie.getCertification() != null) {
       xbmc.mpaa = Certification.generateCertificationStringWithAlternateNames(movie.getCertification());
@@ -345,6 +359,11 @@ public class MovieToXbmcNfoConnector {
     xbmc.actors.clear();
     for (MovieActor cast : movie.getActors()) {
       xbmc.addActor(cast.getName(), cast.getCharacter(), cast.getThumbUrl());
+    }
+
+    xbmc.producers.clear();
+    for (MovieProducer producer : movie.getProducers()) {
+      xbmc.addProducer(producer.getName(), producer.getRole(), producer.getThumbUrl());
     }
 
     xbmc.genres.clear();
@@ -425,6 +444,12 @@ public class MovieToXbmcNfoConnector {
         Marshaller m = context.createMarshaller();
         m.setProperty(Marshaller.JAXB_ENCODING, "UTF-8");
         m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+
+        Format formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        String dat = formatter.format(new Date());
+        String comment = "<!-- created on " + dat + " - tinyMediaManager " + Globals.settings.getVersion() + " -->\n";
+        m.setProperty("com.sun.xml.internal.bind.xmlHeaders", comment);
+
         // w = new FileWriter(nfoFilename);
         Writer w = new StringWriter();
         m.marshal(xbmc, w);
@@ -545,6 +570,7 @@ public class MovieToXbmcNfoConnector {
         movie.setCertification(Certification.parseCertificationStringForMovieSetupCountry(xbmc.mpaa));
       }
       movie.setWatched(xbmc.watched);
+      movie.setSpokenLanguages(xbmc.languages);
 
       // movieset
       if (StringUtils.isNotEmpty(xbmc.set)) {
@@ -571,6 +597,12 @@ public class MovieToXbmcNfoConnector {
         MovieActor cast = new MovieActor(actor.name, actor.role);
         cast.setThumbUrl(actor.thumb);
         movie.addActor(cast);
+      }
+
+      for (Producer producer : xbmc.getProducers()) {
+        MovieProducer cast = new MovieProducer(producer.name, producer.role);
+        cast.setThumbUrl(producer.thumb);
+        movie.addProducer(cast);
       }
 
       for (String genre : xbmc.genres) {
@@ -658,6 +690,25 @@ public class MovieToXbmcNfoConnector {
     return pureActors;
   }
 
+  private void addProducer(String name, String role, String thumb) {
+    Producer producer = new Producer(name, role, thumb);
+    producers.add(producer);
+  }
+
+  public List<Producer> getProducers() {
+    // @XmlAnyElement(lax = true) causes all unsupported tags to be in producers;
+    // filter producers out
+    List<Producer> pureProducers = new ArrayList<Producer>();
+    // for (Object obj : producers) {
+    for (Object obj : actors) { // ugly hack for invalid xml structure
+      if (obj instanceof Producer) {
+        Producer producer = (Producer) obj;
+        pureProducers.add(producer);
+      }
+    }
+    return pureProducers;
+  }
+
   private static String prepareTrailerForXbmc(MediaTrailer trailer) {
     // youtube trailer are stored in a special notation: plugin://plugin.video.youtube/?action=play_video&videoid=<ID>
     // parse out the ID from the url and store it in the right notation
@@ -709,7 +760,6 @@ public class MovieToXbmcNfoConnector {
    */
   @XmlRootElement(name = "actor")
   public static class Actor {
-
     @XmlElement
     private String name;
 
@@ -723,6 +773,30 @@ public class MovieToXbmcNfoConnector {
     }
 
     public Actor(String name, String role, String thumb) {
+      this.name = name;
+      this.role = role;
+      this.thumb = thumb;
+    }
+  }
+
+  /*
+   * inner class to represent producers
+   */
+  @XmlRootElement(name = "producer")
+  public static class Producer {
+    @XmlElement
+    private String name;
+
+    @XmlElement
+    private String role;
+
+    @XmlElement
+    private String thumb;
+
+    public Producer() {
+    }
+
+    public Producer(String name, String role, String thumb) {
       this.name = name;
       this.role = role;
       this.thumb = thumb;

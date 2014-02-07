@@ -347,6 +347,9 @@ public class MoviePanel extends JPanel {
         if (selectionModel.isSelectionEmpty() && movieTableModel.getRowCount() > 0) {
           selectionModel.setSelectionInterval(0, 0);
         }
+        if (selectionModel.isSelectionEmpty() && movieTableModel.getRowCount() == 0) {
+          movieSelectionModel.setSelectedMovie(null);
+        }
       }
     });
 
@@ -501,8 +504,8 @@ public class MoviePanel extends JPanel {
     popupMenu.addSeparator();
     popupMenu.add(actionRemove2);
 
-    MouseListener popupListener = new MovieTablePopupListener(popupMenu, table);
-    table.addMouseListener(popupListener);
+    MouseListener mouseListener = new MovieTableMouseListener(popupMenu, table);
+    table.addMouseListener(mouseListener);
   }
 
   /**

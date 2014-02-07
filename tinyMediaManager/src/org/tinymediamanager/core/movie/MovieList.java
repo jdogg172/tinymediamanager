@@ -24,8 +24,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.persistence.TypedQuery;
 
@@ -42,6 +44,7 @@ import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
 import org.tinymediamanager.core.Utils;
+import org.tinymediamanager.scraper.Certification;
 import org.tinymediamanager.scraper.IMediaArtworkProvider;
 import org.tinymediamanager.scraper.IMediaMetadataProvider;
 import org.tinymediamanager.scraper.IMediaTrailerProvider;
@@ -67,19 +70,20 @@ import ca.odell.glazedlists.ObservableElementList;
  * @author Manuel Laggner
  */
 public class MovieList extends AbstractModelObject {
-  private static final Logger          LOGGER                = LoggerFactory.getLogger(MovieList.class);
+  private static final Logger          LOGGER                   = LoggerFactory.getLogger(MovieList.class);
   private static MovieList             instance;
 
   private ObservableElementList<Movie> movieList;
   private List<MovieSet>               movieSetList;
   private PropertyChangeListener       tagListener;
-  private List<String>                 tagsObservable        = ObservableCollections.observableList(Collections
-                                                                 .synchronizedList(new ArrayList<String>()));
-  private List<String>                 videoCodecsObservable = ObservableCollections.observableList(Collections
-                                                                 .synchronizedList(new ArrayList<String>()));
-
-  private List<String>                 audioCodecsObservable = ObservableCollections.observableList(Collections
-                                                                 .synchronizedList(new ArrayList<String>()));
+  private List<String>                 tagsObservable           = ObservableCollections.observableList(Collections
+                                                                    .synchronizedList(new ArrayList<String>()));
+  private List<String>                 videoCodecsObservable    = ObservableCollections.observableList(Collections
+                                                                    .synchronizedList(new ArrayList<String>()));
+  private List<String>                 audioCodecsObservable    = ObservableCollections.observableList(Collections
+                                                                    .synchronizedList(new ArrayList<String>()));
+  private List<Certification>          certificationsObservable = ObservableCollections.observableList(Collections
+                                                                    .synchronizedList(new ArrayList<Certification>()));
 
   /**
    * Instantiates a new movie list.
@@ -97,6 +101,10 @@ public class MovieList extends AbstractModelObject {
         if (MEDIA_FILES.equals(evt.getPropertyName()) || MEDIA_INFORMATION.equals(evt.getPropertyName())) {
           Movie movie = (Movie) evt.getSource();
           updateMediaInformationLists(movie);
+        }
+        if (CERTIFICATION.equals(evt.getPropertyName())) {
+          Movie movie = (Movie) evt.getSource();
+          updateCertifications(movie);
         }
       }
     };
@@ -217,20 +225,31 @@ public class MovieList extends AbstractModelObject {
     if (movies == null || movies.size() == 0) {
       return;
     }
+    Set<MovieSet> modifiedMovieSets = new HashSet<MovieSet>();
     int oldValue = movieList.size();
 
     Globals.entityManager.getTransaction().begin();
 
-    for (Movie movie : movies) {
+    // remove in inverse order => performance
+    for (int i = movies.size() - 1; i >= 0; i--) {
+      Movie movie = movies.get(i);
       movieList.remove(movie);
       if (movie.getMovieSet() != null) {
-        movie.getMovieSet().removeMovie(movie);
+        MovieSet movieSet = movie.getMovieSet();
+        movieSet.removeMovie(movie);
+        modifiedMovieSets.add(movieSet);
         movie.setMovieSet(null);
       }
       Globals.entityManager.remove(movie);
     }
 
     Globals.entityManager.getTransaction().commit();
+
+    // and now check if any of the modified moviesets are worth for deleting
+    for (MovieSet movieSet : modifiedMovieSets) {
+      removeMovieSet(movieSet);
+    }
+
     firePropertyChange("movies", null, movieList);
     firePropertyChange("movieCount", oldValue, movieList.size());
   }
@@ -274,6 +293,7 @@ public class MovieList extends AbstractModelObject {
               movieList.add(movie);
               updateTags(movie);
               updateMediaInformationLists(movie);
+              updateCertifications(movie);
               movie.addPropertyChangeListener(tagListener);
             }
             catch (Exception e) {
@@ -415,6 +435,21 @@ public class MovieList extends AbstractModelObject {
       }
 
       sr = provider.search(options);
+      // if result is empty, try all scrapers
+      if (sr.isEmpty() && Globals.settings.getMovieSettings().isScraperFallback()) {
+        LOGGER.debug("no result yet - trying alternate scrapers");
+
+        for (MovieScrapers ms : MovieScrapers.values()) {
+          IMediaMetadataProvider provider2 = getMetadataProvider(ms);
+          if (provider.getProviderInfo().equals(provider2.getProviderInfo())) {
+            continue;
+          }
+          sr = provider2.search(options);
+          if (!sr.isEmpty()) {
+            break;
+          }
+        }
+      }
     }
     catch (Exception e) {
       LOGGER.error("searchMovie", e);
@@ -587,6 +622,40 @@ public class MovieList extends AbstractModelObject {
     // }
 
     return metadataProvider;
+  }
+
+  /**
+   * Gets the metadata provider from a searchresult's providerId.
+   * 
+   * @param providerId
+   *          the scraper
+   * @return the metadata provider
+   */
+  public IMediaMetadataProvider getMetadataProvider(String providerId) {
+    // FIXME: rework scrapers/providerInfo to contain Movie(Tv)Scrapers enums
+    if (providerId == null || providerId.isEmpty()) {
+      // default
+      return getMetadataProvider(MovieScrapers.TMDB);
+    }
+    if (providerId.equals("tmdb")) {
+      return getMetadataProvider(MovieScrapers.TMDB);
+    }
+    else if (providerId.equals("imdb")) {
+      return getMetadataProvider(MovieScrapers.IMDB);
+    }
+    else if (providerId.equals("moviemeter")) {
+      return getMetadataProvider(MovieScrapers.MOVIEMETER);
+    }
+    else if (providerId.equals("ofdb")) {
+      return getMetadataProvider(MovieScrapers.OFDB);
+    }
+    else if (providerId.equals("zelluloid")) {
+      return getMetadataProvider(MovieScrapers.ZELLULOID);
+    }
+    else {
+      // default
+      return getMetadataProvider(MovieScrapers.TMDB);
+    }
   }
 
   /**
@@ -800,7 +869,12 @@ public class MovieList extends AbstractModelObject {
         }
       }
     }
+  }
 
+  private void updateCertifications(Movie movie) {
+    if (!certificationsObservable.contains(movie.getCertification())) {
+      addCertification(movie.getCertification());
+    }
   }
 
   public List<String> getVideoCodecsInMovies() {
@@ -809,6 +883,10 @@ public class MovieList extends AbstractModelObject {
 
   public List<String> getAudioCodecsInMovies() {
     return audioCodecsObservable;
+  }
+
+  public List<Certification> getCertificationsInMovies() {
+    return certificationsObservable;
   }
 
   /**
@@ -860,6 +938,17 @@ public class MovieList extends AbstractModelObject {
 
     audioCodecsObservable.add(newCodec);
     firePropertyChange("audioCodec", null, audioCodecsObservable);
+  }
+
+  private void addCertification(Certification newCert) {
+    if (newCert == null) {
+      return;
+    }
+
+    if (!certificationsObservable.contains(newCert)) {
+      certificationsObservable.add(newCert);
+      firePropertyChange("certification", null, certificationsObservable);
+    }
   }
 
   /**
@@ -1029,6 +1118,11 @@ public class MovieList extends AbstractModelObject {
           movieSet.saveToDb();
         }
       }
+    }
+
+    // second: check if there are some orphaned movies in moviesets
+    for (MovieSet movieSet : movieSetList) {
+      movieSet.cleanMovieSet();
     }
   }
 }

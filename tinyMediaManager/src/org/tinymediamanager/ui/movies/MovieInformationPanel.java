@@ -49,7 +49,7 @@ import org.tinymediamanager.ui.MediaInfoVideoCodecConverter;
 import org.tinymediamanager.ui.MediaInfoVideoFormatConverter;
 import org.tinymediamanager.ui.UTF8Control;
 import org.tinymediamanager.ui.VoteCountConverter;
-import org.tinymediamanager.ui.WatchedIconConverter;
+import org.tinymediamanager.ui.WatchedIconConverter2;
 import org.tinymediamanager.ui.components.ImageLabel;
 import org.tinymediamanager.ui.components.ImagePanel;
 import org.tinymediamanager.ui.components.StarRater;
@@ -76,9 +76,6 @@ public class MovieInformationPanel extends JPanel {
 
   /** The panel top. */
   private JPanel                      panelTop;
-
-  /** The panel watched image. */
-  private JPanel                      panelWatchedImage;
 
   /** The panel movie logos. */
   private JPanel                      panelMovieLogos;
@@ -207,12 +204,6 @@ public class MovieInformationPanel extends JPanel {
     panelMovieTitle.add(lblMovieName);
     lblMovieName.setFont(new Font("Dialog", Font.BOLD, 16));
 
-    panelWatchedImage = new JPanel();
-    panelMovieTitle.add(panelWatchedImage, BorderLayout.EAST);
-
-    lblWatchedImage = new JLabel("");
-    panelWatchedImage.add(lblWatchedImage);
-
     JPanel panelRatingTagline = new JPanel();
     panelMovieHeader.add(panelRatingTagline, BorderLayout.CENTER);
     panelRatingTagline.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.DEFAULT_COLSPEC, FormFactory.DEFAULT_COLSPEC,
@@ -249,12 +240,19 @@ public class MovieInformationPanel extends JPanel {
 
     lblMovieBackground = new ImageLabel(false, true);
     lblMovieBackground.setAlternativeText(BUNDLE.getString("image.notfound.fanart")); //$NON-NLS-1$
+    lblMovieBackground.enableLightbox();
     layeredPaneImages.add(lblMovieBackground, "1, 1, 3, 3, fill, fill");
 
     lblMoviePoster = new ImageLabel();
     lblMoviePoster.setAlternativeText(BUNDLE.getString("image.notfound.poster")); //$NON-NLS-1$
+    lblMoviePoster.enableLightbox();
     layeredPaneImages.setLayer(lblMoviePoster, 1);
     layeredPaneImages.add(lblMoviePoster, "2, 2, fill, fill");
+
+    lblWatchedImage = new JLabel();
+    lblWatchedImage.setOpaque(false);
+    layeredPaneImages.setLayer(lblWatchedImage, 2);
+    layeredPaneImages.add(lblWatchedImage, "2, 2, left, top");
 
     JPanel panelGenres = new MovieGenresPanel(movieSelectionModel);
     layeredPaneImages.setLayer(panelGenres, 2);
@@ -447,7 +445,7 @@ public class MovieInformationPanel extends JPanel {
     BeanProperty<MovieSelectionModel, Boolean> movieSelectionModelBeanProperty_7 = BeanProperty.create("selectedMovie.watched");
     AutoBinding<MovieSelectionModel, Boolean, JLabel, Icon> autoBinding_8 = Bindings.createAutoBinding(UpdateStrategy.READ, movieSelectionModel,
         movieSelectionModelBeanProperty_7, lblWatchedImage, jLabelBeanProperty_2);
-    autoBinding_8.setConverter(new WatchedIconConverter());
+    autoBinding_8.setConverter(new WatchedIconConverter2());
     autoBinding_8.bind();
     //
     BeanProperty<MovieSelectionModel, String> movieSelectionModelBeanProperty_9 = BeanProperty.create("selectedMovie.mediaInfoVideoFormat");

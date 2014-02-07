@@ -212,8 +212,8 @@ public class TvShowChooserModel extends AbstractModelObject {
 
       MediaScrapeOptions options = new MediaScrapeOptions();
       options.setResult(result);
-      options.setLanguage(Globals.settings.getMovieSettings().getScraperLanguage());
-      options.setCountry(Globals.settings.getMovieSettings().getCertificationCountry());
+      options.setLanguage(Globals.settings.getTvShowSettings().getScraperLanguage());
+      options.setCountry(Globals.settings.getTvShowSettings().getCertificationCountry());
       options.setType(MediaType.TV_SHOW);
       metadata = metadataProvider.getTvShowMetadata(options);
       setOverview(metadata.getStringValue(MediaMetadata.PLOT));
@@ -247,8 +247,8 @@ public class TvShowChooserModel extends AbstractModelObject {
     options.setArtworkType(MediaArtworkType.ALL);
     options.setMetadata(metadata);
     options.setId(MediaMetadata.IMDBID, String.valueOf(metadata.getId(MediaMetadata.IMDBID)));
-    options.setLanguage(Globals.settings.getMovieSettings().getScraperLanguage());
-    options.setCountry(Globals.settings.getMovieSettings().getCertificationCountry());
+    options.setLanguage(Globals.settings.getTvShowSettings().getScraperLanguage());
+    options.setCountry(Globals.settings.getTvShowSettings().getCertificationCountry());
 
     // scrape providers till one artwork has been found
     for (IMediaArtworkProvider artworkProvider : artworkProviders) {

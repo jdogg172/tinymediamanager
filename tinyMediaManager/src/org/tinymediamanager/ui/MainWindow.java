@@ -28,7 +28,10 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
@@ -53,6 +56,8 @@ import javax.swing.JPopupMenu;
 import javax.swing.JProgressBar;
 import javax.swing.JTabbedPane;
 import javax.swing.SwingWorker;
+import javax.swing.SwingWorker.StateValue;
+import javax.swing.Timer;
 import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
 import javax.swing.text.JTextComponent;
@@ -61,10 +66,12 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
+import org.tinymediamanager.LaunchUtil;
 import org.tinymediamanager.core.Constants;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
+import org.tinymediamanager.core.UpdaterTask;
 import org.tinymediamanager.core.Utils;
 import org.tinymediamanager.core.WolDevice;
 import org.tinymediamanager.ui.actions.AboutAction;
@@ -152,6 +159,7 @@ public class MainWindow extends JFrame {
   private List<String>                messagesList;
 
   private JPopupMenu                  taskPopup;
+  private LightBoxPanel               lightBoxPanel;
 
   /**
    * Create the application.
@@ -165,6 +173,7 @@ public class MainWindow extends JFrame {
     setMinimumSize(new Dimension(1000, 700));
 
     instance = this;
+    lightBoxPanel = new LightBoxPanel();
 
     JMenuBar menuBar = new JMenuBar();
     setJMenuBar(menuBar);
@@ -321,6 +330,53 @@ public class MainWindow extends JFrame {
     // Globals.executor.execute(new MyStatusbarThread());
     // use a Future to be able to cancel it
     statusTask.execute();
+    checkForUpdate();
+  }
+
+  private void checkForUpdate() {
+    try {
+      final SwingWorker<Boolean, Void> updateWorker = new UpdaterTask();
+
+      updateWorker.addPropertyChangeListener(new PropertyChangeListener() {
+        public void propertyChange(PropertyChangeEvent evt) {
+          if (StateValue.DONE == updateWorker.getState()) {
+            try {
+              boolean update = updateWorker.get();
+              LOGGER.debug("update result was: " + update);
+              if (update) {
+                int answer = JOptionPane.showConfirmDialog(null, BUNDLE.getString("tmm.update.message"), BUNDLE.getString("tmm.update.title"),
+                    JOptionPane.YES_NO_OPTION);
+                if (answer == JOptionPane.OK_OPTION) {
+                  LOGGER.info("Updating...");
+
+                  // spawn getdown and exit TMM
+                  ProcessBuilder pb = new ProcessBuilder(LaunchUtil.getJVMPath(), "-Djava.net.preferIPv4Stack=true", "-jar", "getdown.jar", ".");
+                  pb.directory(new File("").getAbsoluteFile()); // set working directory (current TMM dir)
+                  closeTmmAndStart(pb);
+
+                }
+              }
+            }
+            catch (Exception e) {
+              LOGGER.error("Update task failed!" + e.getMessage());
+            }
+          }
+        }
+      });
+
+      // update task start a few secs after GUI...
+      Timer timer = new Timer(5000, new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+          updateWorker.execute();
+        }
+      });
+      timer.setRepeats(false);
+      timer.start();
+    }
+    catch (Exception e) {
+      LOGGER.error("Update task failed!" + e.getMessage());
+    }
   }
 
   /**
@@ -433,6 +489,10 @@ public class MainWindow extends JFrame {
   }
 
   private void closeTmm() {
+    closeTmmAndStart(null);
+  }
+
+  private void closeTmmAndStart(ProcessBuilder pb) {
     int confirm = 0;
     // if there are some threads running, display exit confirmation
     if (Globals.poolRunning()) {
@@ -471,6 +531,18 @@ public class MainWindow extends JFrame {
       catch (InterruptedException e1) {
         LOGGER.debug("Global thread shutdown");
       }
+
+      // spawn our process
+      if (pb != null) {
+        try {
+          LOGGER.info("Going to execute: " + pb.command());
+          Process p = pb.start();
+        }
+        catch (IOException e) {
+          LOGGER.error("Cannot spawn process:", e);
+        }
+      }
+
       System.exit(0); // calling the method is a must
     }
   }
@@ -671,5 +743,10 @@ public class MainWindow extends JFrame {
     taskPopup.setLayout(new BorderLayout());
     taskPopup.add(panel, BorderLayout.CENTER);
     taskPopup.show(lblLoadingImg, x, y);
+  }
+
+  public void createLightbox(String pathToFile, String urlToFile) {
+    lightBoxPanel.setImageLocation(pathToFile, urlToFile);
+    lightBoxPanel.showLightBox(instance);
   }
 }
