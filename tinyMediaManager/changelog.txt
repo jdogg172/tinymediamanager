@@ -1,6 +1,6 @@
 Version 2.5.2
 =======================
-+ added a lightbox effect, when clicking on an artwork in the movie/movie set/tv show panel (see <a href="http://www.tinymediamanager.org/index.php/image-preview-lightbox/" title="Image preview (lightbox)">this post</a>)
++ added a lightbox effect, when clicking on an artwork in the movie/movie set/tv show panel (see http://www.tinymediamanager.org/index.php/image-preview-lightbox/)
 + updated mediainfo libs
 + (movie) when removing the last movie from a movie set, the movie set is also removed
 + (movie) added filter for certifications 
