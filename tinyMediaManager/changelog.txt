@@ -1,3 +1,12 @@
+Version 2.5.3
+=======================
+x ArtworkPanel: change ordering (highres before thumbs)
+x fix some artwork failures with movie sets
+x fix errors on metadata scraping
+x catch some errors from tmdb
+x houskeeping: correct tv episodes with wrong path
+x some other minor improvements and stabilization fixes
+
 Version 2.5.2
 =======================
 + added a lightbox effect, when clicking on an artwork in the movie/movie set/tv show panel (see http://www.tinymediamanager.org/index.php/image-preview-lightbox/)
