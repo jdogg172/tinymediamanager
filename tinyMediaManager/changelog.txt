@@ -1,10 +1,12 @@
 Version 2.5.3
 =======================
++ activated SWT loading for all platforms (put a proper swt.jar from the eclipse project in the lib folder to access native file dialogs)
++ translations: added russian (incomplete)
 x ArtworkPanel: change ordering (highres before thumbs)
 x fix some artwork failures with movie sets
 x fix errors on metadata scraping
 x catch some errors from tmdb
-x houskeeping: correct tv episodes with wrong path
+x houskeeping: correct tv episodes with wrong path (if you still have some weird behavior with TV shows, try to remove and readd the TV shows)
 x some other minor improvements and stabilization fixes
 
 Version 2.5.2
