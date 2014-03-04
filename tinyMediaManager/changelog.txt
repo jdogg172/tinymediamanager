@@ -1,16 +1,18 @@
 Version 2.5.4
 =======================
-/!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\
-! There was a nasty bug in an external library with version 2.5.3 which caused the database !
-! to become corrupted. We've added some recovery functions, but there could be data which   !
-! is lost. You can either                                                                   !
-! A) live with that (in some cases the lost data could be gathered with a scrape)           !
-! B) take a backup file from the backup folder inside tmm (the last one before 19.02.2014)  !
-! C) start over with a new database by deleting the old one (menu Tools -> initialize       !
-!    database and rescan all your data sources.                                             !
-!                                                                                           !
-! We are very sorry for the inconvenience caused by this bug!                               ! 
-\!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!/
+/!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\
+! There was a nasty bug in an external library with version 2.5.3 which caused !
+! the database to become corrupted. We've added some recovery functions, but   !
+! there could be data which is lost. You can either                            !
+! A) live with that (in some cases the lost data could be gathered with a      !
+!    scrape)                                                                   !
+! B) take a backup file from the backup folder inside tmm (the last one before !
+!    19.02.2014)                                                               !
+! C) start over with a new database by deleting the old one (menu              !
+!    Tools -> initialize database and rescan all your data sources.            !
+!                                                                              !
+! We are very sorry for the inconvenience caused by this bug!                  ! 
+\!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!/
 
 x improved the TVDB scraper: the scraper provides better results and is not searchable with the TVDB id
 x fixed correct loading of swt.jar on all platforms

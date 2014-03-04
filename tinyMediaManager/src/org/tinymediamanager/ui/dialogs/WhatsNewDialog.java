@@ -49,7 +49,7 @@ public class WhatsNewDialog extends JDialog {
   private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
 
   public WhatsNewDialog(String changelog) {
-    setSize(500, 250);
+    setSize(700, 250);
     setIconImage(Globals.logo);
     setTitle(BUNDLE.getString("whatsnew.title")); //$NON-NLS-1$
     {
