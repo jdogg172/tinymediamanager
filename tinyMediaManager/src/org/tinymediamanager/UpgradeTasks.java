@@ -139,6 +139,7 @@ public class UpgradeTasks {
     }
 
     if (compareVersion(v, "2.5.4") < 0) {
+      LOGGER.info("Performing upgrade tasks to version 2.5.4");
       // repair missing datasources
       Globals.entityManager.getTransaction().begin();
       for (Movie movie : movieList.getMovies()) {
