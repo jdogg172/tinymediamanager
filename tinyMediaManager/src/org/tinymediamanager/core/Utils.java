@@ -17,7 +17,9 @@ package org.tinymediamanager.core;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,11 +46,14 @@ import java.util.MissingResourceException;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import javax.net.ssl.SSLException;
 
 import org.apache.commons.io.FileExistsException;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.LocaleUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -400,16 +405,22 @@ public class Utils {
     schemeRegistry.register(new Scheme("https", 443, SSLSocketFactory.getSocketFactory()));
 
     PoolingClientConnectionManager cm = new PoolingClientConnectionManager(schemeRegistry);
-    // Increase max total connection to 20
-    cm.setMaxTotal(20);
-    // Increase default max connection per route to 5
-    cm.setDefaultMaxPerRoute(5);
+    // Increase max total connection to 10
+    cm.setMaxTotal(10);
+    // Increase default max connection per route to 4
+    cm.setDefaultMaxPerRoute(4);
 
     client = new DefaultHttpClient(cm);
 
     HttpParams params = client.getParams();
     HttpConnectionParams.setConnectionTimeout(params, 10000);
     HttpConnectionParams.setSoTimeout(params, 10000);
+
+    // set queue timeouts
+    params.setParameter("http.conn-manager.timeout", 120000L);
+    params.setParameter("http.protocol.wait-for-continue", 10000L);
+    params.setParameter("http.tcp.nodelay", true);
+
     String ua = generateUA();
     LOGGER.debug("setting HTTP user-agent to: " + ua);
     HttpProtocolParams.setUserAgent(params, ua);
@@ -859,7 +870,7 @@ public class Utils {
   }
 
   /**
-   * creates a backup of file in backup folder with yyyy-MM-dd timestamp<br>
+   * creates a zipped backup of file in backup folder with yyyy-MM-dd timestamp<br>
    * <b>does not overwrite already existing file from today!</b>
    * 
    * @param f
@@ -870,7 +881,7 @@ public class Utils {
   }
 
   /**
-   * creates a backup of file in backup folder with yyyy-MM-dd timestamp
+   * creates a zipped backup of file in backup folder with yyyy-MM-dd timestamp
    * 
    * @param f
    *          the file to backup
@@ -887,10 +898,20 @@ public class Utils {
     }
     DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
     String date = formatter.format(f.lastModified());
-    backup = new File("backup", f.getName() + "." + date);
+    backup = new File("backup", f.getName() + "." + date + ".zip");
     if (!backup.exists() || overwrite == true) {
       try {
-        FileUtils.copyFile(f, backup, true);
+        // FileUtils.copyFile(f, backup, true);
+
+        ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(backup));
+        zos.setComment("backup from " + date);
+        ZipEntry ze = new ZipEntry(f.getName());
+        zos.putNextEntry(ze);
+        FileInputStream in = new FileInputStream(f);
+        IOUtils.copy(in, zos);
+        in.close();
+        zos.closeEntry();
+        zos.close();
       }
       catch (IOException e) {
         LOGGER.error("Could not backup file " + backup);
@@ -913,7 +934,8 @@ public class Utils {
     }
     ArrayList<File> al = new ArrayList<File>();
     for (File s : files) {
-      if (s.getName().matches(f.getName() + "\\.\\d{4}\\-\\d{2}\\-\\d{2}")) { // name.yyyy-mm-dd
+      if (s.getName().matches(f.getName() + "\\.\\d{4}\\-\\d{2}\\-\\d{2}\\.zip") || // name.ext.yyyy-mm-dd.zip
+          s.getName().matches(f.getName() + "\\.\\d{4}\\-\\d{2}\\-\\d{2}")) { // old name.ext.yyyy-mm-dd
         al.add(s);
       }
     }

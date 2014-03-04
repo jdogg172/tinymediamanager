@@ -48,7 +48,7 @@ public class Globals {
   // see source of newFixedThreadPool
   // see weird logic: http://www.kimchy.org/juc-executorservice-gotcha/
   /** The Constant executor. */
-  public static final ThreadPoolExecutor executor = new ThreadPoolExecutor(10, 10, // max threads
+  public static final ThreadPoolExecutor executor = new ThreadPoolExecutor(5, 5, // max threads
                                                       2, TimeUnit.SECONDS, // time to wait before closing idle workers
                                                       new LinkedBlockingQueue<Runnable>(), // our queue
                                                       new TmmThreadFactory("global"));

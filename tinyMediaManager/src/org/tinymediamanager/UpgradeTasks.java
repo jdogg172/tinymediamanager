@@ -16,6 +16,7 @@
 package org.tinymediamanager;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -30,6 +31,7 @@ import org.tinymediamanager.core.MediaFile;
 import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.movie.Movie;
 import org.tinymediamanager.core.movie.MovieList;
+import org.tinymediamanager.core.movie.MovieSet;
 import org.tinymediamanager.core.tvshow.TvShow;
 import org.tinymediamanager.core.tvshow.TvShowEpisode;
 import org.tinymediamanager.core.tvshow.TvShowList;
@@ -130,6 +132,69 @@ public class UpgradeTasks {
               episode.setPath(mf.getPath());
               episode.saveToDb();
             }
+          }
+        }
+      }
+      Globals.entityManager.getTransaction().commit();
+    }
+
+    if (compareVersion(v, "2.5.4") < 0) {
+      // repair missing datasources
+      Globals.entityManager.getTransaction().begin();
+      for (Movie movie : movieList.getMovies()) {
+        if (StringUtils.isBlank(movie.getDataSource())) {
+          for (String ds : Globals.settings.getMovieSettings().getMovieDataSource()) {
+            if (movie.getPath().startsWith(ds)) {
+              movie.setDataSource(ds);
+              break;
+            }
+          }
+        }
+        // remove MacOS ignore MFs (borrowed from UDS)
+        List<MediaFile> mediaFiles = new ArrayList<MediaFile>(movie.getMediaFiles());
+        for (MediaFile mf : mediaFiles) {
+          if (mf.getFilename().startsWith("._")) { // remove MacOS ignore files
+            movie.removeFromMediaFiles(mf);
+          }
+        }
+        List<MediaFile> mfs = movie.getMediaFiles(MediaFileType.VIDEO);
+        if (mfs.isEmpty()) {
+          if (movie.getMovieSet() != null) {
+            MovieSet movieSet = movie.getMovieSet();
+            movieSet.removeMovie(movie);
+            movie.setMovieSet(null);
+          }
+          Globals.entityManager.remove(movie);
+        }
+      }
+      for (TvShow show : tvShowList.getTvShows()) {
+        if (StringUtils.isBlank(show.getDataSource())) {
+          for (String ds : Globals.settings.getTvShowSettings().getTvShowDataSource()) {
+            if (show.getPath().startsWith(ds)) {
+              show.setDataSource(ds);
+              break;
+            }
+          }
+        }
+        // remove MacOS ignore MFs (borrowed from UDS)
+        List<MediaFile> mediaFiles = new ArrayList<MediaFile>(show.getMediaFiles());
+        for (MediaFile mf : mediaFiles) {
+          if (mf.getFilename().startsWith("._")) { // remove MacOS ignore files
+            show.removeFromMediaFiles(mf);
+          }
+        }
+        List<TvShowEpisode> episodes = new ArrayList<TvShowEpisode>(show.getEpisodes());
+        for (TvShowEpisode episode : episodes) {
+          mediaFiles = new ArrayList<MediaFile>(episode.getMediaFiles());
+          for (MediaFile mf : mediaFiles) {
+            if (mf.getFilename().startsWith("._")) { // remove MacOS ignore files
+              episode.removeFromMediaFiles(mf);
+            }
+          }
+          // lets have a look if there is at least one video file for this episode
+          List<MediaFile> mfs = episode.getMediaFiles(MediaFileType.VIDEO);
+          if (mfs.isEmpty()) {
+            show.removeEpisode(episode);
           }
         }
       }

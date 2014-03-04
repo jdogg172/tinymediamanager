@@ -237,6 +237,11 @@ public class TvShow extends MediaEntity {
     season.addEpisode(episode);
   }
 
+  private void removeFromSeason(TvShowEpisode episode) {
+    TvShowSeason season = getSeasonForEpisode(episode);
+    season.removeEpisode(episode);
+  }
+
   /**
    * Gets the season for episode.
    * 
@@ -373,6 +378,7 @@ public class TvShow extends MediaEntity {
         Globals.entityManager.getTransaction().begin();
         episodes.remove(episode);
         episode.removePropertyChangeListener(propertyChangeListener);
+        removeFromSeason(episode);
         Globals.entityManager.remove(episode);
         Globals.entityManager.persist(this);
         Globals.entityManager.getTransaction().commit();
@@ -1307,7 +1313,7 @@ public class TvShow extends MediaEntity {
       File[] files = new File(path).listFiles();
       for (File file : files) {
         Matcher matcher = pattern.matcher(file.getName());
-        if (matcher.matches()) {
+        if (matcher.matches() && !file.getName().startsWith("._")) { // MacOS ignore
           setPoster(file);
           LOGGER.debug("found poster " + file.getPath());
           found = true;
@@ -1366,7 +1372,7 @@ public class TvShow extends MediaEntity {
       File[] files = new File(path).listFiles();
       for (File file : files) {
         Matcher matcher = pattern.matcher(file.getName());
-        if (matcher.matches()) {
+        if (matcher.matches() && !file.getName().startsWith("._")) { // MacOS ignore
           setFanart(file);
           LOGGER.debug("found fanart " + file.getPath());
           found = true;
@@ -1425,7 +1431,7 @@ public class TvShow extends MediaEntity {
       File[] files = new File(path).listFiles();
       for (File file : files) {
         Matcher matcher = pattern.matcher(file.getName());
-        if (matcher.matches()) {
+        if (matcher.matches() && !file.getName().startsWith("._")) { // MacOS ignore
           setBanner(file);
           LOGGER.debug("found banner " + file.getPath());
           found = true;
@@ -1451,7 +1457,7 @@ public class TvShow extends MediaEntity {
     File[] files = new File(path).listFiles();
     for (File file : files) {
       Matcher matcher = pattern.matcher(file.getName());
-      if (matcher.matches()) {
+      if (matcher.matches() && !file.getName().startsWith("._")) { // MacOS ignore
         LOGGER.debug("found season poster " + file.getPath());
         try {
           int season = Integer.parseInt(matcher.group(1));
