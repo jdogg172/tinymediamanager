@@ -1,7 +1,7 @@
 <project default="create_tmm_jar" name="Tiny Media Manager">
 
     <!-- software revision number -->
-    <property name="version" value="2.5.4" />
+    <property name="version" value="2.5.5" />
 
     <!-- build directories -->
     <property name="lib.dir" value="lib" />
@@ -47,7 +47,8 @@
         </javac>
         <!-- enhance several classes for objectdb -->
         <java classname="com.objectdb.Enhancer" fork="true" classpathref="classpath.default">
-          <arg line="-S ${bin.dir}/org/tinymediamanager/core/*.class"/>
+            <arg line="-s"/>
+            <arg line="${bin.dir}/org/tinymediamanager/core/*"/>
         </java>
         <!-- copy non java files -->
         <copy includeemptydirs="false" todir="${bin.dir}">
