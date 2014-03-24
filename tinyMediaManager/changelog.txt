@@ -5,6 +5,7 @@ x fixed media info loading problems for some users (JNA update to 4.1)
 x fixed a bug where an invalid config.xml prevented tmm from starting
 x fixed a bug when building the TV show tree 
 x fixed a bug where some settings got lost when updating
+x fixed writing of the watched flag to the XBMC TV show episode NFO
 
 Version 2.5.4
 =======================
