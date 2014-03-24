@@ -290,7 +290,8 @@ public class TinyMediaManager {
           if (newVersion) {
             UpgradeTasks.performUpgradeTasksBeforeDatabaseLoading(oldVersion); // do the upgrade tasks for the old version
             Globals.settings.setCurrentVersion();
-            Globals.settings.writeDefaultSettings();
+            // Globals.settings.writeDefaultSettings();
+            Globals.settings.saveSettings();
           }
 
           // init splash
