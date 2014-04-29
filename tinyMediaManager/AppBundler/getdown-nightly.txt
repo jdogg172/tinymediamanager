@@ -66,8 +66,8 @@ delete = lib/vlcj.jar
 delete = lib/commons-logging.jar
 delete = lib/log4j.jar
 
-resource = [windows] tinyMediaManager.exe.new #rename to new, for self-update
-resource = [windows] tinyMediaManagerCMD.exe
+resource = [windows] tinyMediaManager.new       #rename to new, for self-update
+resource = [windows] tinyMediaManagerCMD.new    #rename to new, for self-update
 resource = [!windows] tinyMediaManagerCMD.sh
 resource = [!windows] tinyMediaManager.sh
 resource = getdown-new.jar
