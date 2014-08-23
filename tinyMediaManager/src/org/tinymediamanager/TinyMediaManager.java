@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,6 @@ import java.awt.SplashScreen;
 import java.awt.Toolkit;
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -43,30 +42,35 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 import javax.swing.JOptionPane;
 import javax.swing.UIManager;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.output.FileWriterWithEncoding;
 import org.apache.commons.lang3.StringUtils;
 import org.jdesktop.beansbinding.ELProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.core.Constants;
-import org.tinymediamanager.core.MediaFile;
+import org.tinymediamanager.core.TmmModuleManager;
 import org.tinymediamanager.core.Utils;
-import org.tinymediamanager.core.movie.Movie;
+import org.tinymediamanager.core.entities.MediaFile;
 import org.tinymediamanager.core.movie.MovieList;
+import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.core.movie.MovieSearchAndScrapeOptions;
+import org.tinymediamanager.core.movie.entities.Movie;
 import org.tinymediamanager.core.movie.tasks.MovieRenameTask;
 import org.tinymediamanager.core.movie.tasks.MovieScrapeTask;
 import org.tinymediamanager.core.movie.tasks.MovieUpdateDatasourceTask;
-import org.tinymediamanager.core.tvshow.TvShow;
-import org.tinymediamanager.core.tvshow.TvShowEpisode;
+import org.tinymediamanager.core.threading.TmmTask;
+import org.tinymediamanager.core.threading.TmmTaskManager;
 import org.tinymediamanager.core.tvshow.TvShowList;
+import org.tinymediamanager.core.tvshow.TvShowModuleManager;
 import org.tinymediamanager.core.tvshow.TvShowSearchAndScrapeOptions;
+import org.tinymediamanager.core.tvshow.entities.TvShow;
+import org.tinymediamanager.core.tvshow.entities.TvShowEpisode;
 import org.tinymediamanager.core.tvshow.tasks.TvShowRenameTask;
 import org.tinymediamanager.core.tvshow.tasks.TvShowScrapeTask;
 import org.tinymediamanager.core.tvshow.tasks.TvShowUpdateDatasourceTask;
@@ -74,7 +78,6 @@ import org.tinymediamanager.scraper.util.CachedUrl;
 import org.tinymediamanager.scraper.util.StrgUtils;
 import org.tinymediamanager.thirdparty.MediaInfo;
 import org.tinymediamanager.ui.MainWindow;
-import org.tinymediamanager.ui.TmmSwingWorker;
 import org.tinymediamanager.ui.TmmUIHelper;
 import org.tinymediamanager.ui.TmmUILogCollector;
 import org.tinymediamanager.ui.TmmWindowSaver;
@@ -109,7 +112,7 @@ public class TinyMediaManager {
     // @formatter:off
     System.out.println("\n" +
         "=====================================================\n" +
-        "=== tinyMediaManager (c) 2012-2013 Manuel Laggner ===\n" +
+        "=== tinyMediaManager (c) 2012-2014 Manuel Laggner ===\n" +
         "=====================================================\n" +
         "\n" +
         "    SYNTAX: java -jar tmm.jar <parameters>\n" +
@@ -210,7 +213,7 @@ public class TinyMediaManager {
     }
 
     LOGGER.info("=====================================================");
-    LOGGER.info("=== tinyMediaManager (c) 2012-2013 Manuel Laggner ===");
+    LOGGER.info("=== tinyMediaManager (c) 2012-2014 Manuel Laggner ===");
     LOGGER.info("=====================================================");
     LOGGER.info("tmm.version      : " + ReleaseInfo.getRealVersion());
 
@@ -235,6 +238,7 @@ public class TinyMediaManager {
     // START character encoding debug
     debugCharacterEncoding("default encoding : ");
     System.setProperty("file.encoding", "UTF-8");
+    System.setProperty("sun.jnu.encoding", "UTF-8");
     Field charset;
     try {
       // we cannot (re)set the properties while running inside JVM
@@ -253,7 +257,7 @@ public class TinyMediaManager {
     Locale.setDefault(Utils.getLocaleFromLanguage(Globals.settings.getLanguage()));
     LOGGER.info("System language  : " + System.getProperty("user.language") + "_" + System.getProperty("user.country"));
     LOGGER.info("GUI language     : " + Locale.getDefault().getLanguage() + "_" + Locale.getDefault().getCountry());
-    LOGGER.info("Scraper language : " + Globals.settings.getMovieSettings().getScraperLanguage());
+    LOGGER.info("Scraper language : " + MovieModuleManager.MOVIE_SETTINGS.getScraperLanguage());
     LOGGER.info("TV Scraper lang  : " + Globals.settings.getTvShowSettings().getScraperLanguage());
 
     // start EDT
@@ -276,23 +280,11 @@ public class TinyMediaManager {
           }
           doStartupTasks();
 
-          // after 5 secs of beeing idle, the threads are removed till 0; see Globals
-          Globals.executor.allowCoreThreadTimeOut(true);
-
           // suppress logging messages from betterbeansbinding
           org.jdesktop.beansbinding.util.logging.Logger.getLogger(ELProperty.class.getName()).setLevel(Level.SEVERE);
 
           // init ui logger
           TmmUILogCollector.init();
-
-          // upgrade check
-          String oldVersion = Globals.settings.getVersion();
-          if (newVersion) {
-            UpgradeTasks.performUpgradeTasksBeforeDatabaseLoading(oldVersion); // do the upgrade tasks for the old version
-            Globals.settings.setCurrentVersion();
-            // Globals.settings.writeDefaultSettings();
-            Globals.settings.saveSettings();
-          }
 
           // init splash
           SplashScreen splash = null;
@@ -316,12 +308,29 @@ public class TinyMediaManager {
 
           // update check //////////////////////////////////////////////
           if (g2 != null) {
-            updateProgress(g2, "update check", 10);
+            updateProgress(g2, "starting tinyMediaManager", 0);
             splash.update();
           }
 
           LOGGER.info("=====================================================");
           LOGGER.info("starting tinyMediaManager");
+
+          // convert old database
+          // UpgradeTasks.convertDatabase(); // we need to check the exceptions before we can activate this
+
+          // upgrade check
+          String oldVersion = Globals.settings.getVersion();
+          if (newVersion) {
+            UpgradeTasks.performUpgradeTasksBeforeDatabaseLoading(oldVersion); // do the upgrade tasks for the old version
+            Globals.settings.setCurrentVersion();
+            Globals.settings.saveSettings();
+          }
+
+          // proxy settings
+          if (Globals.settings.useProxy()) {
+            LOGGER.info("setting proxy");
+            Globals.settings.setProxy();
+          }
 
           // set native dir (needs to be absolute)
           // String nativepath = TinyMediaManager.class.getClassLoader().getResource(".").getPath() + "native/";
@@ -337,12 +346,13 @@ public class TinyMediaManager {
           }
           nativepath += System.getProperty("os.arch");
           System.setProperty("jna.library.path", nativepath);
+
           // MediaInfo /////////////////////////////////////////////////////
           if (g2 != null) {
             updateProgress(g2, "loading MediaInfo libs", 20);
             splash.update();
           }
-          LOGGER.debug("Loading native mediainfo lib from: " + nativepath);
+          LOGGER.debug("Loading native mediainfo lib from: {}", nativepath);
           // load libMediainfo
           String miv = MediaInfo.version();
           if (!StringUtils.isEmpty(miv)) {
@@ -352,38 +362,22 @@ public class TinyMediaManager {
             LOGGER.error("could not load MediaInfo!");
           }
 
-          // initialize database //////////////////////////////////////////////
+          // load modules //////////////////////////////////////////////////
           if (g2 != null) {
-            updateProgress(g2, "initialize database", 30);
+            updateProgress(g2, "loading movie module", 30);
+            splash.update();
+          }
+          TmmModuleManager.getInstance().startUp();
+          TmmModuleManager.getInstance().registerModule(MovieModuleManager.getInstance());
+          TmmModuleManager.getInstance().enableModule(MovieModuleManager.getInstance());
+
+          if (g2 != null) {
+            updateProgress(g2, "loading TV show module", 40);
             splash.update();
           }
 
-          LOGGER.info("initialize database");
-          Globals.startDatabase();
-          LOGGER.debug("database opened");
-
-          // proxy settings
-          if (Globals.settings.useProxy()) {
-            LOGGER.info("setting proxy");
-            Globals.settings.setProxy();
-          }
-
-          // load database //////////////////////////////////////////////////
-          if (g2 != null) {
-            updateProgress(g2, "loading movies", 40);
-            splash.update();
-          }
-
-          MovieList movieList = MovieList.getInstance();
-          movieList.loadMoviesFromDatabase();
-
-          if (g2 != null) {
-            updateProgress(g2, "loading TV shows", 50);
-            splash.update();
-          }
-
-          TvShowList tvShowList = TvShowList.getInstance();
-          tvShowList.loadTvShowsFromDatabase();
+          TmmModuleManager.getInstance().registerModule(TvShowModuleManager.getInstance());
+          TmmModuleManager.getInstance().enableModule(TvShowModuleManager.getInstance());
 
           // VLC /////////////////////////////////////////////////////////
           // // try to initialize VLC native libs
@@ -432,7 +426,7 @@ public class TinyMediaManager {
             // updater, tracking, whatsoever)
             Utils.trackEvent("startup");
 
-            TmmWindowSaver.loadSettings(window);
+            TmmWindowSaver.getInstance().loadSettings(window);
             window.setVisible(true);
 
             // show changelog
@@ -443,7 +437,7 @@ public class TinyMediaManager {
           else {
             startCommandLineTasks();
             // wait for other tmm threads (artwork download et all)
-            while (Globals.poolRunning()) {
+            while (TmmTaskManager.getInstance().poolRunning()) {
               Thread.sleep(2000);
             }
 
@@ -451,15 +445,13 @@ public class TinyMediaManager {
             // MainWindows.shutdown()
             try {
               // send shutdown signal
-              Globals.executor.shutdown();
+              TmmTaskManager.getInstance().shutdown();
               // save unsaved settings
               Globals.settings.saveSettings();
-              // close database connection
-              Globals.shutdownDatabase();
-              // wait a bit for threads to finish (if any)
-              Globals.executor.awaitTermination(2, TimeUnit.SECONDS);
               // hard kill
-              Globals.executor.shutdownNow();
+              TmmTaskManager.getInstance().shutdownNow();
+              // close database connection
+              TmmModuleManager.getInstance().shutDown();
             }
             catch (Exception ex) {
               LOGGER.warn(ex.getMessage());
@@ -487,16 +479,18 @@ public class TinyMediaManager {
        *          the text
        */
       private void updateProgress(Graphics2D g2, String text, int progress) {
-        // LOGGER.debug("graphics found");
         Object oldAAValue = g2.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
         g2.setComposite(AlphaComposite.Clear);
         g2.fillRect(20, 200, 480, 305);
         g2.setPaintMode();
-        g2.setColor(Color.WHITE);
-        g2.drawString(text + "...", 20, 295);
-        g2.fillRect(20, 300, 460 * progress / 100, 10);
+
+        g2.setColor(new Color(51, 153, 255));
+        g2.fillRect(22, 272, 452 * progress / 100, 21);
+
+        g2.setColor(Color.black);
+        g2.drawString(text + "...", 23, 310);
         int l = g2.getFontMetrics().stringWidth(ReleaseInfo.getRealVersion()); // bound right
         g2.drawString(ReleaseInfo.getRealVersion(), 480 - l, 325);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, oldAAValue);
@@ -509,22 +503,44 @@ public class TinyMediaManager {
        *           the exception
        */
       private void setLookAndFeel() throws Exception {
+        // get font settings
+        String fontFamily = Globals.settings.getFontFamily();
+        try {
+          // sanity check
+          fontFamily = Font.decode(fontFamily).getFamily();
+        }
+        catch (Exception e) {
+          fontFamily = "Dialog";
+        }
+
+        int fontSize = Globals.settings.getFontSize();
+        if (fontSize < 12) {
+          fontSize = 12;
+        }
+
+        String fontString = fontFamily + " " + fontSize;
+
         // Get the native look and feel class name
         // String laf = UIManager.getSystemLookAndFeelClassName();
         Properties props = new Properties();
-        props.setProperty("controlTextFont", "Dialog 12");
-        props.setProperty("systemTextFont", "Dialog 12");
-        props.setProperty("userTextFont", "Dialog 12");
-        props.setProperty("menuTextFont", "Dialog 12");
-        props.setProperty("windowTitleFont", "Dialog bold 12");
-        props.setProperty("subTextFont", "Dialog 10");
+        props.setProperty("controlTextFont", fontString);
+        props.setProperty("systemTextFont", fontString);
+        props.setProperty("userTextFont", fontString);
+        props.setProperty("menuTextFont", fontString);
+        // props.setProperty("windowTitleFont", "Dialog bold 20");
+
+        fontSize = Math.round((float) (fontSize * 0.833));
+        fontString = fontFamily + " " + fontSize;
+
+        props.setProperty("subTextFont", fontString);
         props.setProperty("backgroundColor", "237 237 237");
         props.setProperty("menuBackgroundColor", "237 237 237");
+        props.setProperty("controlBackgroundColor", "237 237 237");
         props.setProperty("menuColorLight", "237 237 237");
         props.setProperty("menuColorDark", "237 237 237");
         props.setProperty("toolbarColorLight", "237 237 237");
         props.setProperty("toolbarColorDark", "237 237 237");
-        // props.setProperty("tooltipBackgroundColor", "237 237 237");
+        props.setProperty("tooltipBackgroundColor", "255 255 255");
         props.put("windowDecoration", "system");
         props.put("logoString", "");
 
@@ -557,24 +573,51 @@ public class TinyMediaManager {
           file = new File("tinyMediaManager.new");
           if (file.exists() && file.length() > 10000 && file.length() < 50000) {
             File cur = new File("tinyMediaManager.exe");
-            if (file.length() != cur.length() || !cur.exists()) {
-              try {
-                FileUtils.copyFile(file, cur);
-              }
-              catch (IOException e) {
-                LOGGER.error("Could not update the updater!");
-              }
+            // if (file.length() != cur.length() || !cur.exists()) {
+            try {
+              FileUtils.copyFile(file, cur);
             }
+            catch (IOException e) {
+              LOGGER.error("Could not update tmm!");
+            }
+            // }
+          }
+          file = new File("tinyMediaManagerUpd.new");
+          if (file.exists() && file.length() > 10000 && file.length() < 50000) {
+            File cur = new File("tinyMediaManagerUpd.exe");
+            // if (file.length() != cur.length() || !cur.exists()) {
+            try {
+              FileUtils.copyFile(file, cur);
+            }
+            catch (IOException e) {
+              LOGGER.error("Could not update the updater!");
+            }
+            // }
           }
           file = new File("tinyMediaManagerCMD.new");
           if (file.exists() && file.length() > 10000 && file.length() < 50000) {
             File cur = new File("tinyMediaManagerCMD.exe");
+            // if (file.length() != cur.length() || !cur.exists()) {
+            try {
+              FileUtils.copyFile(file, cur);
+            }
+            catch (IOException e) {
+              LOGGER.error("Could not update CMD TMM!");
+            }
+            // }
+          }
+        }
+
+        if (Platform.isMac()) {
+          file = new File("JavaApplicationStub.new");
+          if (file.exists() && file.length() > 0) {
+            File cur = new File("../../MacOS/JavaApplicationStub");
             if (file.length() != cur.length() || !cur.exists()) {
               try {
                 FileUtils.copyFile(file, cur);
               }
               catch (IOException e) {
-                LOGGER.error("Could not update the updater!");
+                LOGGER.error("Could not update JavaApplicationStub");
               }
             }
           }
@@ -593,13 +636,15 @@ public class TinyMediaManager {
               path = URLDecoder.decode(path, "UTF-8");
             }
             catch (UnsupportedEncodingException e1) {
+              path = URLDecoder.decode(path);
             }
-            StringBuilder sb = new StringBuilder("[Desktop Entry]\n");
+            StringBuilder sb = new StringBuilder(60);
+            sb.append("[Desktop Entry]\n");
             sb.append("Type=Application\n");
             sb.append("Name=tinyMediaManager\n");
             sb.append("Path=");
             sb.append(path);
-            sb.append("\n");
+            sb.append('\n');
             sb.append("Exec=/bin/sh \"");
             sb.append(path);
             sb.append("/tinyMediaManager.sh\"\n");
@@ -607,9 +652,9 @@ public class TinyMediaManager {
             sb.append(path);
             sb.append("/tmm.png\n");
             sb.append("Categories=Application;Multimedia;");
-            FileWriter writer;
+            FileWriterWithEncoding writer;
             try {
-              writer = new FileWriter(desktop);
+              writer = new FileWriterWithEncoding(desktop, "UTF-8");
               writer.write(sb.toString());
               writer.close();
               desktop.setExecutable(true);
@@ -671,23 +716,21 @@ public class TinyMediaManager {
    */
   private static void startCommandLineTasks() {
     try {
-      TmmSwingWorker task = null;
+      TmmTask task = null;
 
       // update movies //////////////////////////////////////////////
       if (updateMovies) {
         LOGGER.info("Commandline - updating movies...");
         if (updateMovieDs.isEmpty()) {
           task = new MovieUpdateDatasourceTask();
-          task.execute();
-          task.get(); // blocking
+          task.run(); // blocking
         }
         else {
-          List<String> dataSources = new ArrayList<String>(Globals.settings.getMovieSettings().getMovieDataSource());
+          List<String> dataSources = new ArrayList<String>(MovieModuleManager.MOVIE_SETTINGS.getMovieDataSource());
           for (Integer i : updateMovieDs) {
             if (dataSources != null && dataSources.size() >= i - 1) {
               task = new MovieUpdateDatasourceTask(dataSources.get(i - 1));
-              task.execute();
-              task.get(); // blocking
+              task.run(); // blocking
             }
           }
         }
@@ -699,11 +742,10 @@ public class TinyMediaManager {
             MovieSearchAndScrapeOptions options = new MovieSearchAndScrapeOptions();
             options.loadDefaults();
             task = new MovieScrapeTask(newMovies, true, options);
-            task.execute();
-            task.get(); // blocking
+            task.run(); // blocking
 
             // wait for other tmm threads (artwork download et all)
-            while (Globals.poolRunning()) {
+            while (TmmTaskManager.getInstance().poolRunning()) {
               Thread.sleep(2000);
             }
           }
@@ -716,8 +758,7 @@ public class TinyMediaManager {
           LOGGER.info("Commandline - rename & cleanup new movies...");
           if (newMovies.size() > 0) {
             task = new MovieRenameTask(newMovies);
-            task.execute();
-            task.get(); // blocking
+            task.run(); // blocking
           }
         }
       }
@@ -728,11 +769,10 @@ public class TinyMediaManager {
           MovieSearchAndScrapeOptions options = new MovieSearchAndScrapeOptions();
           options.loadDefaults();
           task = new MovieScrapeTask(unscrapedMovies, true, options);
-          task.execute();
-          task.get(); // blocking
+          task.run(); // blocking
 
           // wait for other tmm threads (artwork download et all)
-          while (Globals.poolRunning()) {
+          while (TmmTaskManager.getInstance().poolRunning()) {
             Thread.sleep(2000);
           }
         }
@@ -740,8 +780,7 @@ public class TinyMediaManager {
           LOGGER.info("Commandline - rename & cleanup new movies...");
           if (unscrapedMovies.size() > 0) {
             task = new MovieRenameTask(unscrapedMovies);
-            task.execute();
-            task.get(); // blocking
+            task.run(); // blocking
           }
         }
       }
@@ -751,21 +790,20 @@ public class TinyMediaManager {
         LOGGER.info("Commandline - updating TvShows and episodes...");
         if (updateTvDs.isEmpty()) {
           task = new TvShowUpdateDatasourceTask();
-          task.execute();
-          task.get(); // blocking
+          task.run(); // blocking
         }
         else {
           List<String> dataSources = new ArrayList<String>(Globals.settings.getTvShowSettings().getTvShowDataSource());
           for (Integer i : updateTvDs) {
             if (dataSources != null && dataSources.size() >= i - 1) {
               task = new TvShowUpdateDatasourceTask(dataSources.get(i - 1));
-              task.execute();
-              task.get(); // blocking
+              task.run(); // blocking
             }
           }
         }
         List<TvShow> newTv = TvShowList.getInstance().getNewTvShows();
         List<TvShowEpisode> newEp = TvShowList.getInstance().getNewEpisodes();
+        LOGGER.info("Commandline - found " + newTv.size() + " TvShow(s) containing " + newEp.size() + " new episode(s)");
 
         if (scrapeNew) {
           LOGGER.info("Commandline - scraping new TvShows...");
@@ -774,8 +812,7 @@ public class TinyMediaManager {
             TvShowSearchAndScrapeOptions options = new TvShowSearchAndScrapeOptions();
             options.loadDefaults();
             task = new TvShowScrapeTask(newTv, true, options);
-            task.execute();
-            task.get(); // blocking
+            task.run(); // blocking
           }
           else {
             LOGGER.info("No new TvShows/episodes found to scrape - skipping");
@@ -784,10 +821,9 @@ public class TinyMediaManager {
 
         if (renameNew) {
           LOGGER.info("Commandline - rename & cleanup new episodes...");
-          if (newTv.size() > 0 && newEp.size() > 0) {
+          if (newEp.size() > 0) {
             task = new TvShowRenameTask(null, newEp, true); // just rename new EPs AND root folder
-            task.execute();
-            task.get(); // blocking
+            task.run(); // blocking
           }
         }
       }

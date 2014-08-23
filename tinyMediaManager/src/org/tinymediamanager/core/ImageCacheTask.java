@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,9 +21,10 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tinymediamanager.core.entities.MediaFile;
 
 /**
- * The Class ImageCacheTask.
+ * The Class ImageCacheTask. Cache a bunch of images in a separate task
  * 
  * @author Manuel Laggner
  */
@@ -32,46 +33,26 @@ public class ImageCacheTask implements Runnable {
 
   private List<File>          filesToCache = new ArrayList<File>();
 
-  /**
-   * Instantiates a new image cache task.
-   * 
-   * @param pathToFile
-   *          the path to file
-   */
   public ImageCacheTask(String pathToFile) {
     filesToCache.add(new File(pathToFile));
   }
 
-  /**
-   * Instantiates a new image cache task.
-   * 
-   * @param file
-   *          the file
-   */
   public ImageCacheTask(File file) {
     filesToCache.add(file);
   }
 
-  /**
-   * Instantiates a new image cache task.
-   * 
-   * @param files
-   *          the files
-   */
   public ImageCacheTask(List<File> files) {
     filesToCache.addAll(files);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see java.lang.Runnable#run()
-   */
   @Override
   public void run() {
     for (File fileToCache : filesToCache) {
       try {
         ImageCache.cacheImage(new MediaFile(fileToCache));
+      }
+      catch (EmptyFileException e) {
+        LOGGER.warn("failed to cache file (file is empty): " + fileToCache.getPath());
       }
       catch (Exception e) {
         LOGGER.warn("failed to cache file: " + fileToCache.getPath());

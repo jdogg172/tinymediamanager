@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,13 +22,13 @@ import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.ResourceBundle;
 
 import javax.swing.AbstractAction;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
-import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
@@ -56,10 +56,13 @@ import org.jdesktop.swingbinding.SwingBindings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
-import org.tinymediamanager.core.tvshow.TvShow;
+import org.tinymediamanager.core.MediaFileType;
+import org.tinymediamanager.core.threading.TmmTask;
+import org.tinymediamanager.core.threading.TmmTaskManager;
 import org.tinymediamanager.core.tvshow.TvShowList;
 import org.tinymediamanager.core.tvshow.TvShowScraperMetadataConfig;
 import org.tinymediamanager.core.tvshow.TvShowScrapers;
+import org.tinymediamanager.core.tvshow.entities.TvShow;
 import org.tinymediamanager.scraper.IMediaArtworkProvider;
 import org.tinymediamanager.scraper.IMediaTrailerProvider;
 import org.tinymediamanager.scraper.ITvShowMetadataProvider;
@@ -67,13 +70,16 @@ import org.tinymediamanager.scraper.MediaArtwork;
 import org.tinymediamanager.scraper.MediaMetadata;
 import org.tinymediamanager.scraper.MediaSearchResult;
 import org.tinymediamanager.scraper.MediaType;
+import org.tinymediamanager.scraper.trakttv.SyncTraktTvTask;
 import org.tinymediamanager.ui.EqualsLayout;
+import org.tinymediamanager.ui.IconManager;
 import org.tinymediamanager.ui.MainWindow;
-import org.tinymediamanager.ui.TmmWindowSaver;
+import org.tinymediamanager.ui.TmmFontHelper;
 import org.tinymediamanager.ui.UTF8Control;
 import org.tinymediamanager.ui.components.ImageLabel;
 import org.tinymediamanager.ui.dialogs.ImageChooserDialog;
 import org.tinymediamanager.ui.dialogs.ImageChooserDialog.ImageType;
+import org.tinymediamanager.ui.dialogs.TmmDialog;
 import org.tinymediamanager.ui.tvshows.TvShowChooserModel;
 import org.tinymediamanager.ui.tvshows.TvShowScraperMetadataPanel;
 
@@ -87,7 +93,7 @@ import com.jgoodies.forms.layout.RowSpec;
  * 
  * @author Manuel Laggner
  */
-public class TvShowChooserDialog extends JDialog implements ActionListener {
+public class TvShowChooserDialog extends TmmDialog implements ActionListener {
   private static final long           serialVersionUID      = 2371518113606870230L;
   private static final ResourceBundle BUNDLE                = ResourceBundle.getBundle("messages", new UTF8Control());                  //$NON-NLS-1$
   private static final Logger         LOGGER                = LoggerFactory.getLogger(TvShowChooserDialog.class);
@@ -123,12 +129,8 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
    *          the in queue
    */
   public TvShowChooserDialog(TvShow tvShow, boolean inQueue) {
-    setTitle(BUNDLE.getString("tvshowchooser.search")); //$NON-NLS-1$
-    setName("tvShowChooser");
-    setBounds(5, 5, 800, 500);
-    TmmWindowSaver.loadSettings(this);
-    setIconImage(Globals.logo);
-    setModal(true);
+    super(BUNDLE.getString("tvshowchooser.search"), "tvShowChooser"); //$NON-NLS-1$
+    setBounds(5, 5, 985, 586);
 
     // copy the values
     TvShowScraperMetadataConfig settings = Globals.settings.getTvShowScraperMetadataConfig();
@@ -184,6 +186,7 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
 
       {
         JButton btnSearch = new JButton(BUNDLE.getString("Button.search")); //$NON-NLS-1$
+        btnSearch.setIcon(IconManager.SEARCH);
         panelSearchField.add(btnSearch, "8, 1");
         btnSearch.addActionListener(new ActionListener() {
           public void actionPerformed(ActionEvent arg0) {
@@ -249,7 +252,7 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
           lblTvShowName.setLineWrap(true);
           lblTvShowName.setOpaque(false);
           lblTvShowName.setWrapStyleWord(true);
-          lblTvShowName.setFont(new Font("Dialog", Font.BOLD, 14));
+          TmmFontHelper.changeFont(lblTvShowName, 1.166, Font.BOLD);
           panelSearchDetail.add(lblTvShowName, "2, 1, 3, 1, fill, top");
         }
         {
@@ -276,7 +279,7 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
     }
     {
       JPanel panelScraperMetadataSetting = new TvShowScraperMetadataPanel(scraperMetadataConfig);
-      contentPanel.add(panelScraperMetadataSetting, "2, 9, default, fill");
+      contentPanel.add(panelScraperMetadataSetting, "2, 9, fill, fill");
     }
 
     {
@@ -285,7 +288,7 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
       {
         bottomPane.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.LABEL_COMPONENT_GAP_COLSPEC, ColumnSpec.decode("max(82dlu;default)"),
             FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), FormFactory.DEFAULT_COLSPEC, }, new RowSpec[] {
-            FormFactory.LINE_GAP_ROWSPEC, RowSpec.decode("25px"), }));
+            FormFactory.LINE_GAP_ROWSPEC, RowSpec.decode("25px"), FormFactory.RELATED_GAP_ROWSPEC, }));
         {
           progressBar = new JProgressBar();
           bottomPane.add(progressBar, "2, 2");
@@ -303,11 +306,13 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
           okButton = new JButton(BUNDLE.getString("Button.ok")); //$NON-NLS-1$
           buttonPane.add(okButton);
           okButton.setActionCommand("OK");
+          okButton.setIcon(IconManager.APPLY);
           okButton.addActionListener(this);
 
           JButton cancelButton = new JButton(BUNDLE.getString("Button.cancel")); //$NON-NLS-1$
           buttonPane.add(cancelButton);
           cancelButton.setActionCommand("Cancel");
+          cancelButton.setIcon(IconManager.CANCEL);
           cancelButton.addActionListener(this);
 
           if (inQueue) {
@@ -315,6 +320,7 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
             buttonPane.add(abortButton);
             abortButton.setActionCommand("Abort");
             abortButton.addActionListener(this);
+            abortButton.setIcon(IconManager.PROCESS_STOP);
           }
         }
       }
@@ -334,17 +340,7 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
 
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-   */
-  /**
-   * Action performed.
-   * 
-   * @param e
-   *          the e
-   */
+  @Override
   public void actionPerformed(ActionEvent e) {
     if ("OK".equals(e.getActionCommand())) {
       int row = table.getSelectedRow();
@@ -375,7 +371,7 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
                 dialog.setLocationRelativeTo(MainWindow.getActiveInstance());
                 dialog.setVisible(true);
                 tvShowToScrape.setPosterUrl(lblImage.getImageUrl());
-                tvShowToScrape.writePosterImage();
+                tvShowToScrape.downloadArtwork(MediaFileType.POSTER);
               }
 
               // fanart
@@ -387,7 +383,7 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
                     extrathumbs, extrafanarts, MediaType.TV_SHOW);
                 dialog.setVisible(true);
                 tvShowToScrape.setFanartUrl(lblImage.getImageUrl());
-                tvShowToScrape.writeFanartImage();
+                tvShowToScrape.downloadArtwork(MediaFileType.FANART);
               }
 
               // banner
@@ -397,12 +393,7 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
                     MediaType.TV_SHOW);
                 dialog.setVisible(true);
                 tvShowToScrape.setBannerUrl(lblImage.getImageUrl());
-                tvShowToScrape.writeBannerImage();
-              }
-
-              // season posters
-              {
-                // FIXME
+                tvShowToScrape.downloadArtwork(MediaFileType.BANNER);
               }
             }
             else {
@@ -429,44 +420,34 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
 
           setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
 
-          this.setVisible(false);
-          dispose();
+          if (Globals.settings.getTvShowSettings().getSyncTrakt()) {
+            TmmTask task = new SyncTraktTvTask(null, Arrays.asList(tvShowToScrape));
+            TmmTaskManager.getInstance().addUnnamedTask(task);
+          }
+
+          setVisible(false);
         }
       }
     }
 
     // cancel
     if ("Cancel".equals(e.getActionCommand())) {
-      this.setVisible(false);
-      dispose();
+      setVisible(false);
     }
 
     // Abort queue
     if ("Abort".equals(e.getActionCommand())) {
       continueQueue = false;
-      this.setVisible(false);
-      dispose();
+      setVisible(false);
     }
 
   }
 
-  /**
-   * Search tv show.
-   * 
-   * @param searchTerm
-   *          the search term
-   */
   private void searchTvShow(String searchTerm) {
     SearchTask task = new SearchTask(searchTerm);
     task.execute();
   }
 
-  /**
-   * Start progress bar.
-   * 
-   * @param description
-   *          the description
-   */
   private void startProgressBar(final String description) {
     SwingUtilities.invokeLater(new Runnable() {
       @Override
@@ -478,9 +459,6 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
     });
   }
 
-  /**
-   * Stop progress bar.
-   */
   private void stopProgressBar() {
     SwingUtilities.invokeLater(new Runnable() {
       @Override
@@ -492,31 +470,13 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
     });
   }
 
-  /**
-   * The Class SearchTask.
-   * 
-   * @author Manuel Laggner
-   */
   private class SearchTask extends SwingWorker<Void, Void> {
-
-    /** The search term. */
     private String searchTerm;
 
-    /**
-     * Instantiates a new search task.
-     * 
-     * @param searchTerm
-     *          the search term
-     */
     public SearchTask(String searchTerm) {
       this.searchTerm = searchTerm;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.SwingWorker#doInBackground()
-     */
     @Override
     public Void doInBackground() {
       startProgressBar(BUNDLE.getString("chooser.searchingfor") + " " + searchTerm); //$NON-NLS-1$
@@ -543,11 +503,6 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
       return null;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.SwingWorker#done()
-     */
     @Override
     public void done() {
       stopProgressBar();
@@ -561,11 +516,6 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
       this.model = model;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.SwingWorker#doInBackground()
-     */
     @Override
     public Void doInBackground() {
       startProgressBar(BUNDLE.getString("chooser.scrapeing") + " " + model.getName()); //$NON-NLS-1$
@@ -578,11 +528,6 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
       return null;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.SwingWorker#done()
-     */
     @Override
     public void done() {
       stopProgressBar();
@@ -626,8 +571,6 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
    * @return true, if successful
    */
   public boolean showDialog() {
-    pack();
-    setLocationRelativeTo(MainWindow.getActiveInstance());
     setVisible(true);
     return continueQueue;
   }
@@ -638,11 +581,6 @@ public class TvShowChooserDialog extends JDialog implements ActionListener {
     public ChangeScraperAction() {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-     */
     @Override
     public void actionPerformed(ActionEvent e) {
       TvShowScrapers selectedScraper = (TvShowScrapers) cbScraper.getSelectedItem();

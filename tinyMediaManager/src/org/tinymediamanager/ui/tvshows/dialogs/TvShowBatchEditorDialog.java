@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,28 +24,32 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.ResourceBundle;
+import java.util.Set;
 
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
-import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSpinner;
 import javax.swing.border.TitledBorder;
 
 import org.tinymediamanager.Globals;
-import org.tinymediamanager.core.tvshow.TvShow;
-import org.tinymediamanager.core.tvshow.TvShowEpisode;
+import org.tinymediamanager.core.threading.TmmTask;
+import org.tinymediamanager.core.threading.TmmTaskManager;
 import org.tinymediamanager.core.tvshow.TvShowList;
+import org.tinymediamanager.core.tvshow.entities.TvShow;
+import org.tinymediamanager.core.tvshow.entities.TvShowEpisode;
 import org.tinymediamanager.scraper.MediaGenres;
-import org.tinymediamanager.ui.TmmWindowSaver;
+import org.tinymediamanager.scraper.trakttv.SyncTraktTvTask;
+import org.tinymediamanager.ui.IconManager;
 import org.tinymediamanager.ui.UTF8Control;
 import org.tinymediamanager.ui.components.AutocompleteComboBox;
-import org.tinymediamanager.ui.movies.dialogs.MovieEditorDialog;
+import org.tinymediamanager.ui.dialogs.TmmDialog;
 
 import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
@@ -57,39 +61,20 @@ import com.jgoodies.forms.layout.RowSpec;
  * 
  * @author Manuel Laggner
  */
-public class TvShowBatchEditorDialog extends JDialog {
-
-  /** The Constant serialVersionUID. */
+public class TvShowBatchEditorDialog extends TmmDialog {
   private static final long           serialVersionUID = 3527478264068979388L;
-
-  /** The Constant BUNDLE. */
   private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
 
-  /** The tv show list. */
   private TvShowList                  tvShowList       = TvShowList.getInstance();
-
-  /** The tv shows to edit. */
   private List<TvShow>                tvShowsToEdit;
-
-  /** The tv show episodes to edit. */
   private List<TvShowEpisode>         tvShowEpisodesToEdit;
-
-  /** The episodes changed. */
   private boolean                     episodesChanged  = false;
-
-  /** The tv shows changed. */
   private boolean                     tvShowsChanged   = false;
 
-  /** The cb genres. */
+  /** UI components */
   private JComboBox                   cbGenres;
-
-  /** The cb tags. */
   private JComboBox                   cbTags;
-
-  /** The chckbx watched. */
   private JCheckBox                   chckbxWatched;
-
-  /** The sp season. */
   private JSpinner                    spSeason;
 
   /**
@@ -101,12 +86,9 @@ public class TvShowBatchEditorDialog extends JDialog {
    *          the episodes
    */
   public TvShowBatchEditorDialog(final List<TvShow> tvShows, final List<TvShowEpisode> episodes) {
-    setModal(true);
-    setIconImage(Globals.logo);
-    setTitle(BUNDLE.getString("tvshow.bulkedit")); //$NON-NLS-1$
-    setName("movieBatchEditor");
+    super(BUNDLE.getString("tvshow.bulkedit"), "movieBatchEditor"); //$NON-NLS-1$
     setBounds(5, 5, 350, 286);
-    TmmWindowSaver.loadSettings(this);
+
     getContentPane().setLayout(new BorderLayout(0, 0));
 
     tvShowsToEdit = tvShows;
@@ -130,12 +112,12 @@ public class TvShowBatchEditorDialog extends JDialog {
 
     JButton btnAddGenre = new JButton("");
     panelTvShows.add(btnAddGenre, "6, 2");
-    btnAddGenre.setIcon(new ImageIcon(MovieEditorDialog.class.getResource("/org/tinymediamanager/ui/images/Add.png")));
+    btnAddGenre.setIcon(IconManager.LIST_ADD);
     btnAddGenre.setMargin(new Insets(2, 2, 2, 2));
 
     JButton btnRemoveGenre = new JButton("");
     panelTvShows.add(btnRemoveGenre, "8, 2");
-    btnRemoveGenre.setIcon(new ImageIcon(MovieEditorDialog.class.getResource("/org/tinymediamanager/ui/images/Remove.png")));
+    btnRemoveGenre.setIcon(IconManager.LIST_REMOVE);
     btnRemoveGenre.setMargin(new Insets(2, 2, 2, 2));
 
     JLabel lblTags = new JLabel("Tag");
@@ -147,12 +129,12 @@ public class TvShowBatchEditorDialog extends JDialog {
 
     JButton btnAddTag = new JButton("");
     panelTvShows.add(btnAddTag, "6, 4");
-    btnAddTag.setIcon(new ImageIcon(MovieEditorDialog.class.getResource("/org/tinymediamanager/ui/images/Add.png")));
+    btnAddTag.setIcon(IconManager.LIST_ADD);
     btnAddTag.setMargin(new Insets(2, 2, 2, 2));
 
     JButton btnRemoveTag = new JButton("");
     panelTvShows.add(btnRemoveTag, "8, 4");
-    btnRemoveTag.setIcon(new ImageIcon(MovieEditorDialog.class.getResource("/org/tinymediamanager/ui/images/Remove.png")));
+    btnRemoveTag.setIcon(IconManager.LIST_REMOVE);
     btnRemoveTag.setMargin(new Insets(2, 2, 2, 2));
     btnRemoveTag.addActionListener(new ActionListener() {
       @Override
@@ -234,7 +216,7 @@ public class TvShowBatchEditorDialog extends JDialog {
 
       JButton btnWatched = new JButton("");
       btnWatched.setMargin(new Insets(2, 2, 2, 2));
-      btnWatched.setIcon(new ImageIcon(TvShowBatchEditorDialog.class.getResource("/org/tinymediamanager/ui/images/Checkmark_big.png")));
+      btnWatched.setIcon(IconManager.APPLY);
       btnWatched.addActionListener(new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
@@ -257,7 +239,7 @@ public class TvShowBatchEditorDialog extends JDialog {
       panelTvShowEpisodes.add(spSeason, "4, 4, left, default");
 
       JButton btnSeason = new JButton("");
-      btnSeason.setIcon(new ImageIcon(TvShowBatchEditorDialog.class.getResource("/org/tinymediamanager/ui/images/Checkmark_big.png")));
+      btnSeason.setIcon(IconManager.APPLY);
       btnSeason.setMargin(new Insets(2, 2, 2, 2));
       btnSeason.addActionListener(new ActionListener() {
         @Override
@@ -281,6 +263,7 @@ public class TvShowBatchEditorDialog extends JDialog {
       getContentPane().add(panelButtons, BorderLayout.SOUTH);
 
       JButton btnClose = new JButton(BUNDLE.getString("Button.close")); //$NON-NLS-1$
+      btnClose.setIcon(IconManager.APPLY);
       btnClose.addActionListener(new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent arg0) {
@@ -304,8 +287,17 @@ public class TvShowBatchEditorDialog extends JDialog {
             setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
           }
 
+          if (Globals.settings.getTvShowSettings().getSyncTrakt()) {
+            Set<TvShow> tvShows = new HashSet<TvShow>();
+            for (TvShowEpisode episode : tvShowEpisodesToEdit) {
+              tvShows.add(episode.getTvShow());
+            }
+            tvShows.addAll(tvShowsToEdit);
+            TmmTask task = new SyncTraktTvTask(null, new ArrayList<TvShow>(tvShows));
+            TmmTaskManager.getInstance().addUnnamedTask(task);
+          }
+
           setVisible(false);
-          dispose();
         }
       });
       panelButtons.add(btnClose);
@@ -336,6 +328,5 @@ public class TvShowBatchEditorDialog extends JDialog {
         }
       });
     }
-
   }
 }

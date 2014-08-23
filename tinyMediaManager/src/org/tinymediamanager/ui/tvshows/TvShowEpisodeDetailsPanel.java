@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import java.awt.event.ActionListener;
 import java.io.File;
 import java.util.ResourceBundle;
 
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -33,11 +32,13 @@ import org.jdesktop.beansbinding.BeanProperty;
 import org.jdesktop.beansbinding.Bindings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tinymediamanager.core.MediaFile;
 import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
+import org.tinymediamanager.core.entities.MediaFile;
+import org.tinymediamanager.ui.IconManager;
+import org.tinymediamanager.ui.TmmFontHelper;
 import org.tinymediamanager.ui.TmmUIHelper;
 import org.tinymediamanager.ui.UTF8Control;
 import org.tinymediamanager.ui.components.LinkLabel;
@@ -83,15 +84,15 @@ public class TvShowEpisodeDetailsPanel extends JPanel {
             FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
 
     JLabel lblSeasonT = new JLabel(BUNDLE.getString("metatag.season")); //$NON-NLS-1$
-    lblSeasonT.setFont(lblSeasonT.getFont().deriveFont(14f).deriveFont(Font.BOLD));
+    TmmFontHelper.changeFont(lblSeasonT, 1.166, Font.BOLD);
     add(lblSeasonT, "2, 1");
 
     lblSeason = new JLabel("");
-    lblSeason.setFont(lblSeason.getFont().deriveFont(14f));
+    TmmFontHelper.changeFont(lblSeason, 1.166);
     add(lblSeason, "4, 1");
 
     btnPlay = new JButton("");
-    btnPlay.setIcon(new ImageIcon(TvShowEpisodeDetailsPanel.class.getResource("/org/tinymediamanager/ui/images/Play.png")));
+    btnPlay.setIcon(IconManager.PLAY);
     btnPlay.addActionListener(new ActionListener() {
       @Override
       public void actionPerformed(ActionEvent arg0) {
@@ -109,11 +110,11 @@ public class TvShowEpisodeDetailsPanel extends JPanel {
     add(btnPlay, "6, 1, 1, 4");
 
     JLabel lblEpisodeT = new JLabel(BUNDLE.getString("metatag.episode")); //$NON-NLS-1$
-    lblEpisodeT.setFont(lblEpisodeT.getFont().deriveFont(14f).deriveFont(Font.BOLD));
+    TmmFontHelper.changeFont(lblEpisodeT, 1.166, Font.BOLD);
     add(lblEpisodeT, "2, 2");
 
     lblEpisode = new JLabel("");
-    lblEpisode.setFont(lblEpisode.getFont().deriveFont(14f));
+    TmmFontHelper.changeFont(lblEpisode, 1.166);
     add(lblEpisode, "4, 2");
 
     JLabel lblAiredT = new JLabel(BUNDLE.getString("metatag.aired")); //$NON-NLS-1$

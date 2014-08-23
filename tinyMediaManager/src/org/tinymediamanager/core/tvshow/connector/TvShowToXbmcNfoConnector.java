@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,13 +46,13 @@ import org.apache.commons.lang3.SystemUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
-import org.tinymediamanager.core.MediaFile;
 import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
-import org.tinymediamanager.core.tvshow.TvShow;
-import org.tinymediamanager.core.tvshow.TvShowActor;
+import org.tinymediamanager.core.entities.MediaFile;
+import org.tinymediamanager.core.tvshow.entities.TvShow;
+import org.tinymediamanager.core.tvshow.entities.TvShowActor;
 import org.tinymediamanager.scraper.Certification;
 import org.tinymediamanager.scraper.MediaGenres;
 
@@ -63,7 +63,7 @@ import org.tinymediamanager.scraper.MediaGenres;
  */
 @XmlRootElement(name = "tvshow")
 @XmlType(propOrder = { "title", "sorttitle", "year", "rating", "votes", "plot", "mpaa", "episodeguide", "id", "genres", "tags", "premiered",
-    "status", "studio", "thumb", "actors" })
+    "status", "studio", "thumb", "actors", "unsupportedElements" })
 public class TvShowToXbmcNfoConnector {
 
   private static final Logger LOGGER    = LoggerFactory.getLogger(TvShowToXbmcNfoConnector.class);
@@ -91,6 +91,9 @@ public class TvShowToXbmcNfoConnector {
   @XmlElement(name = "tag")
   private List<String>        tags;
 
+  @XmlAnyElement(lax = true)
+  private List<Object>        unsupportedElements;
+
   /** not supported tags, but used to retrain in NFO. */
   @XmlElement
   List<Thumb>                 thumb;
@@ -113,6 +116,7 @@ public class TvShowToXbmcNfoConnector {
     actors = new ArrayList<Object>();
     tags = new ArrayList<String>();
     episodeguide = new EpisodeGuide();
+    unsupportedElements = new ArrayList<Object>();
   }
 
   public static void setData(TvShow tvShow) {
@@ -122,6 +126,8 @@ public class TvShowToXbmcNfoConnector {
     }
 
     TvShowToXbmcNfoConnector xbmc = null;
+    List<Object> unsupportedTags = new ArrayList<Object>();
+
     String nfoFilename = "tvshow.nfo";
     File nfoFile = new File(tvShow.getPath(), nfoFilename);
 
@@ -141,10 +147,18 @@ public class TvShowToXbmcNfoConnector {
     if (xbmc == null) {
       xbmc = new TvShowToXbmcNfoConnector();
     }
+    else {
+      // store all unsupported tags
+      for (Object obj : xbmc.actors) { // ugly hack for invalid xml structure
+        if (!(obj instanceof Actor)) {
+          unsupportedTags.add(obj);
+        }
+      }
+    }
 
     // set data
-    if (tvShow.getId("tvdb") != null) {
-      String tvdbid = tvShow.getId("tvdb").toString();
+    if (tvShow.getTvdbId() != null) {
+      String tvdbid = tvShow.getTvdbId();
       xbmc.setId(tvdbid);
       xbmc.episodeguide.url.cache = tvdbid + ".xml";
       xbmc.episodeguide.url.url = "http://www.thetvdb.com/api/1D62F2F90030C444/series/" + tvdbid + "/all/"
@@ -178,6 +192,9 @@ public class TvShowToXbmcNfoConnector {
       xbmc.tags.add(tag);
     }
 
+    // add all unsupported tags again
+    xbmc.unsupportedElements.addAll(unsupportedTags);
+
     // and marshall it
     try {
       Marshaller m = context.createMarshaller();
@@ -204,6 +221,7 @@ public class TvShowToXbmcNfoConnector {
       tvShow.addToMediaFiles(new MediaFile(nfoFile));
     }
     catch (Exception e) {
+      e.printStackTrace();
       LOGGER.error(nfoFilename + " " + e.getMessage());
       MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, tvShow, "message.nfo.writeerror", new String[] { ":",
           e.getLocalizedMessage() }));
@@ -221,7 +239,7 @@ public class TvShowToXbmcNfoConnector {
       TvShowToXbmcNfoConnector xbmc = parseNFO(nfo);
       tvShow = new TvShow();
       if (StringUtils.isNotBlank(xbmc.getId())) {
-        tvShow.setId("tvdb", xbmc.getId());
+        tvShow.setTvdbId(xbmc.getId());
       }
       tvShow.setTitle(xbmc.getTitle());
       tvShow.setSortTitle(xbmc.getSorttitle());

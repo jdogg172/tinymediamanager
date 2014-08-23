@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,8 @@ import javax.swing.ListCellRenderer;
 import javax.swing.UIManager;
 import javax.swing.plaf.ComponentUI;
 import javax.swing.plaf.basic.BasicComboBoxEditor;
+
+import org.tinymediamanager.ui.TmmFontHelper;
 
 import com.jtattoo.plaf.luna.LunaComboBoxUI;
 
@@ -85,7 +87,7 @@ public class SmallComboBox extends JComboBox {
 
       labelItem.setOpaque(false);
       labelItem.setHorizontalAlignment(JLabel.LEFT);
-      labelItem.setFont(labelItem.getFont().deriveFont(11f));
+      TmmFontHelper.changeFont(labelItem, 0.916);
 
       add(labelItem, constraints);
     }

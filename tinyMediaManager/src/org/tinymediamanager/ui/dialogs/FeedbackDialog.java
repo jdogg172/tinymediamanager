@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.ResourceBundle;
 
 import javax.swing.JButton;
-import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -35,18 +34,18 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
+import org.apache.http.client.HttpClient;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
 import org.tinymediamanager.ReleaseInfo;
-import org.tinymediamanager.core.Utils;
+import org.tinymediamanager.scraper.util.TmmHttpClient;
 import org.tinymediamanager.ui.EqualsLayout;
-import org.tinymediamanager.ui.TmmWindowSaver;
+import org.tinymediamanager.ui.IconManager;
 import org.tinymediamanager.ui.UTF8Control;
 
 import com.jgoodies.forms.factories.FormFactory;
@@ -59,7 +58,7 @@ import com.jgoodies.forms.layout.RowSpec;
  * 
  * @author Manuel Laggner
  */
-public class FeedbackDialog extends JDialog {
+public class FeedbackDialog extends TmmDialog {
   private static final long           serialVersionUID = -6659205003576096326L;
   private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
   private static final Logger         LOGGER           = LoggerFactory.getLogger(FeedbackDialog.class);
@@ -72,13 +71,8 @@ public class FeedbackDialog extends JDialog {
    * Instantiates a new feedback dialog.
    */
   public FeedbackDialog() {
-    setTitle(BUNDLE.getString("Feedback")); //$NON-NLS-1$
-    setName("feedback");
-    setBounds(100, 100, 450, 303);
-    TmmWindowSaver.loadSettings(this);
-
-    setIconImage(Globals.logo);
-    setModal(true);
+    super(BUNDLE.getString("Feedback"), "feedback"); //$NON-NLS-1$
+    setBounds(100, 100, 450, 320);
 
     getContentPane().setLayout(
         new FormLayout(
@@ -89,9 +83,9 @@ public class FeedbackDialog extends JDialog {
     JPanel panelContent = new JPanel();
     getContentPane().add(panelContent, "2, 2, fill, fill");
     panelContent.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
-        FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), }, new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC,
-        FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC,
-        RowSpec.decode("default:grow"), }));
+        FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), FormFactory.RELATED_GAP_COLSPEC, }, new RowSpec[] {
+        FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
+        FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("default:grow"), }));
 
     JLabel lblName = new JLabel(BUNDLE.getString("Feedback.name")); //$NON-NLS-1$
     panelContent.add(lblName, "2, 2, right, default");
@@ -123,6 +117,7 @@ public class FeedbackDialog extends JDialog {
     getContentPane().add(panelButtons, "2, 4, fill, fill");
 
     JButton btnSend = new JButton(BUNDLE.getString("Feedback")); //$NON-NLS-1$
+    btnSend.setIcon(IconManager.APPLY);
     btnSend.addActionListener(new ActionListener() {
       @Override
       public void actionPerformed(ActionEvent arg0) {
@@ -133,20 +128,19 @@ public class FeedbackDialog extends JDialog {
         }
 
         // send feedback
-        DefaultHttpClient client = Utils.getHttpClient();
+        HttpClient client = TmmHttpClient.getHttpClient();
         HttpPost post = new HttpPost("https://script.google.com/macros/s/AKfycbxTIhI58gwy0UJ0Z1CdmZDdHlwBDU_vugBmQxcKN9aug4nfgrgZ/exec");
         try {
           List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(1);
-
-          // String message = new String("Feedback from " + tfName.getText() + "\nEmail: " + tfEmail.getText() + "\nUUID: "
-          // + System.getProperty("tmm.uuid") + "\n\n");
-          // message += textArea.getText();
 
           StringBuilder message = new StringBuilder("Feedback from ");
           message.append(tfName.getText());
           message.append("\nEmail:");
           message.append(tfEmail.getText());
-          message.append("\n\nVersion: ");
+          message.append("\n");
+          message.append("\nis Donator?: ");
+          message.append(Globals.isDonator());
+          message.append("\nVersion: ");
           message.append(ReleaseInfo.getRealVersion());
           message.append("\nBuild: ");
           message.append(ReleaseInfo.getRealBuildDate());
@@ -176,17 +170,16 @@ public class FeedbackDialog extends JDialog {
 
         JOptionPane.showMessageDialog(null, BUNDLE.getString("Feedback.send.ok")); //$NON-NLS-1$
         setVisible(false);
-        dispose();
       }
     });
     panelButtons.add(btnSend);
 
     JButton btnCacnel = new JButton(BUNDLE.getString("Button.cancel")); //$NON-NLS-1$
+    btnCacnel.setIcon(IconManager.CANCEL);
     btnCacnel.addActionListener(new ActionListener() {
       @Override
       public void actionPerformed(ActionEvent e) {
         setVisible(false);
-        dispose();
       }
     });
     panelButtons.add(btnCacnel);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,32 +21,16 @@ package org.tinymediamanager.core.movie.connector;
  * @author Manuel Laggner
  */
 public enum MovieConnectors {
+  XBMC("Kodi / XBMC"), MP("MediaPortal");
 
-  /** The xbmc. */
-  XBMC("XBMC"),
-  /** The mp. */
-  MP("MediaPortal");
-
-  /** The title. */
   private String title;
 
-  /**
-   * Instantiates a new movie connectors.
-   * 
-   * @param title
-   *          the title
-   */
   private MovieConnectors(String title) {
     this.title = title;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see java.lang.Enum#toString()
-   */
+  @Override
   public String toString() {
     return this.title;
   }
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,11 +26,12 @@ import javax.swing.JOptionPane;
 
 import org.tinymediamanager.Globals;
 import org.tinymediamanager.core.ImageCacheTask;
-import org.tinymediamanager.core.movie.Movie;
 import org.tinymediamanager.core.movie.MovieList;
-import org.tinymediamanager.core.movie.MovieSet;
-import org.tinymediamanager.core.tvshow.TvShow;
+import org.tinymediamanager.core.movie.entities.Movie;
+import org.tinymediamanager.core.movie.entities.MovieSet;
+import org.tinymediamanager.core.threading.TmmTaskManager;
 import org.tinymediamanager.core.tvshow.TvShowList;
+import org.tinymediamanager.core.tvshow.entities.TvShow;
 import org.tinymediamanager.ui.UTF8Control;
 
 /**
@@ -79,6 +80,6 @@ public class RebuildImageCacheAction extends AbstractAction {
     }
 
     ImageCacheTask task = new ImageCacheTask(imageFiles);
-    Globals.executor.execute(task);
+    TmmTaskManager.getInstance().addUnnamedTask(task);
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,14 +23,13 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InterruptedIOException;
 import java.io.UnsupportedEncodingException;
-import java.net.ConnectException;
+import java.lang.management.ManagementFactory;
+import java.lang.management.RuntimeMXBean;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.URLEncoder;
-import java.net.UnknownHostException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -49,43 +48,20 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import javax.net.ssl.SSLException;
-
 import org.apache.commons.io.FileExistsException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.LocaleUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.HttpEntityEnclosingRequest;
-import org.apache.http.HttpHost;
-import org.apache.http.HttpRequest;
-import org.apache.http.auth.AuthScope;
-import org.apache.http.auth.NTCredentials;
-import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.HttpRequestRetryHandler;
-import org.apache.http.conn.params.ConnRoutePNames;
-import org.apache.http.conn.scheme.PlainSocketFactory;
-import org.apache.http.conn.scheme.Scheme;
-import org.apache.http.conn.scheme.SchemeRegistry;
-import org.apache.http.conn.ssl.SSLSocketFactory;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.conn.PoolingClientConnectionManager;
-import org.apache.http.params.HttpConnectionParams;
-import org.apache.http.params.HttpParams;
-import org.apache.http.params.HttpProtocolParams;
-import org.apache.http.protocol.ExecutionContext;
-import org.apache.http.protocol.HttpContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tinymediamanager.Globals;
+import org.tinymediamanager.LaunchUtil;
 import org.tinymediamanager.ReleaseInfo;
 import org.tinymediamanager.core.Message.MessageLevel;
-import org.tinymediamanager.scraper.MediaLanguages;
 import org.tinymediamanager.scraper.util.StrgUtils;
 import org.tinymediamanager.scraper.util.Url;
-
-import com.sun.jna.Platform;
+import org.tinymediamanager.ui.TmmWindowSaver;
 
 /**
  * The Class Utils.
@@ -93,16 +69,6 @@ import com.sun.jna.Platform;
  * @author Manuel Laggner / Myron Boyle
  */
 public class Utils {
-
-  /** The client. */
-  private static DefaultHttpClient                  client;
-  /** The Constant HTTP_USER_AGENT. */
-
-  // do not use static here, since we need to FIRST set our language....
-  // protected static final String HTTP_USER_AGENT = "Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:19.0) Gecko/20100101 Firefox/19.0";
-  // public static final String HTTP_USER_AGENT = generateUA();
-
-  /** The Constant LOGGER. */
   private static final Logger                       LOGGER            = LoggerFactory.getLogger(Utils.class);
 
   /**
@@ -310,7 +276,7 @@ public class Utils {
    */
   public static String cleanStackingMarkers(String filename) {
     if (!StringUtils.isEmpty(filename)) {
-      return filename.replaceAll("(?i)([\\( _.-]*(cd|dvd|part|pt|dis[ck])([0-9])[\\) _.-]*)", "").trim();
+      return filename.replaceAll("(?i)([\\( _.-]*(cd|dvd|part|pt|dis[ck])([0-9]{1,2})[\\) _.-]*)", "").trim();
     }
     return filename;
   }
@@ -324,7 +290,7 @@ public class Utils {
    */
   public static String getStackingMarker(String filename) {
     if (!StringUtils.isEmpty(filename)) {
-      return StrgUtils.substr(filename, "(?i)((cd|dvd|part|pt|dis[ck])([0-9]))");
+      return StrgUtils.substr(filename, "(?i)((cd|dvd|part|pt|dis[ck])([0-9]{1,2}))");
     }
     return "";
   }
@@ -391,123 +357,6 @@ public class Utils {
     return str.replaceFirst("^\\\"(.*)\\\"$", "$1");
   }
 
-  /*
-   * provide a httpclient with proxy set
-   */
-  /**
-   * Gets the http client.
-   * 
-   * @return the http client
-   */
-  public static DefaultHttpClient getHttpClient() {
-    SchemeRegistry schemeRegistry = new SchemeRegistry();
-    schemeRegistry.register(new Scheme("http", 80, PlainSocketFactory.getSocketFactory()));
-    schemeRegistry.register(new Scheme("https", 443, SSLSocketFactory.getSocketFactory()));
-
-    PoolingClientConnectionManager cm = new PoolingClientConnectionManager(schemeRegistry);
-    // Increase max total connection to 10
-    cm.setMaxTotal(10);
-    // Increase default max connection per route to 4
-    cm.setDefaultMaxPerRoute(4);
-
-    client = new DefaultHttpClient(cm);
-
-    HttpParams params = client.getParams();
-    HttpConnectionParams.setConnectionTimeout(params, 10000);
-    HttpConnectionParams.setSoTimeout(params, 10000);
-
-    // set queue timeouts
-    params.setParameter("http.conn-manager.timeout", 120000L);
-    params.setParameter("http.protocol.wait-for-continue", 10000L);
-    params.setParameter("http.tcp.nodelay", true);
-
-    String ua = generateUA();
-    LOGGER.debug("setting HTTP user-agent to: " + ua);
-    HttpProtocolParams.setUserAgent(params, ua);
-
-    // my own retry handler
-    HttpRequestRetryHandler myRetryHandler = new HttpRequestRetryHandler() {
-      public boolean retryRequest(IOException exception, int executionCount, HttpContext context) {
-        if (executionCount >= 5) {
-          // Do not retry if over max retry count
-          return false;
-        }
-        if (exception instanceof InterruptedIOException) {
-          // Timeout
-          return true;
-        }
-        if (exception instanceof UnknownHostException) {
-          // Unknown host
-          return false;
-        }
-        if (exception instanceof ConnectException) {
-          // Connection refused
-          return false;
-        }
-        if (exception instanceof SSLException) {
-          // SSL handshake exception
-          return false;
-        }
-        HttpRequest request = (HttpRequest) context.getAttribute(ExecutionContext.HTTP_REQUEST);
-        boolean idempotent = !(request instanceof HttpEntityEnclosingRequest);
-        if (idempotent) {
-          // Retry if the request is considered idempotent
-          return true;
-        }
-        return false;
-      }
-    };
-
-    client.setHttpRequestRetryHandler(myRetryHandler);
-
-    if ((Globals.settings.useProxy())) {
-      setProxy(client);
-    }
-
-    return client;
-  }
-
-  /**
-   * Sets the proxy.
-   * 
-   * @param httpClient
-   *          the new proxy
-   */
-  protected static void setProxy(DefaultHttpClient httpClient) {
-    HttpHost proxyHost = null;
-    if (StringUtils.isNotEmpty(Globals.settings.getProxyPort())) {
-      proxyHost = new HttpHost(Globals.settings.getProxyHost(), Integer.parseInt(Globals.settings.getProxyPort()));
-    }
-    else {
-      proxyHost = new HttpHost(Globals.settings.getProxyHost());
-    }
-
-    // authenticate
-    if (!StringUtils.isEmpty(Globals.settings.getProxyUsername()) && !StringUtils.isEmpty(Globals.settings.getProxyPassword())) {
-      if (Globals.settings.getProxyUsername().contains("\\")) {
-        // use NTLM
-        int offset = Globals.settings.getProxyUsername().indexOf("\\");
-        String domain = Globals.settings.getProxyUsername().substring(0, offset);
-        String username = Globals.settings.getProxyUsername().substring(offset + 1, Globals.settings.getProxyUsername().length());
-        httpClient.getCredentialsProvider().setCredentials(AuthScope.ANY,
-            new NTCredentials(username, Globals.settings.getProxyPassword(), "", domain));
-      }
-      else {
-        httpClient.getCredentialsProvider().setCredentials(AuthScope.ANY,
-            new UsernamePasswordCredentials(Globals.settings.getProxyUsername(), Globals.settings.getProxyPassword()));
-      }
-    }
-
-    // set proxy
-    httpClient.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, proxyHost);
-
-    // try to get proxy settings from JRE - is probably added in HttpClient 4.3
-    // ProxySelectorRoutePlanner routePlanner = new
-    // ProxySelectorRoutePlanner(httpClient.getConnectionManager().getSchemeRegistry(),
-    // ProxySelector.getDefault());
-    // httpClient.setRoutePlanner(routePlanner);
-  }
-
   /**
    * Starts a thread and does a "ping" on our tracking server, sending the event (and the random UUID + some env vars).
    * 
@@ -530,11 +379,6 @@ public class Utils {
             String uuid = FileUtils.readFileToString(uuidFile);
             System.setProperty("tmm.uuid", uuid);
 
-            // 2013-01-29 10:20:43 | event=startup | os=Windows 7 | arch=amd64 | Java=1.6.0_26 | country=DE
-            // String nfo = "&os=" + getEncProp("os.name") + "&arch=" + getEncProp("os.arch") + "&java=" + getEncProp("java.version") + "&lang="
-            // + getEncProp("user.language") + "_" + getEncProp("user.country");
-            // Url url = new Url("http://tracker.tinymediamanager.org/track.php?uuid=" + uuid + "&event=" + event + nfo);
-
             // https://developers.google.com/analytics/devguides/collection/protocol/v1/parameters
             // @formatter:off
             String ga = "v=1"
@@ -545,9 +389,10 @@ public class Utils {
                 + "&t=event"
                 + "&ec=" + event
                 + "&ea=" + event 
+                + "&aip=1" 
                 + "&je=1"
                 + "&ul=" + getEncProp("user.language") + "-" + getEncProp("user.country")  // use real system language
-                + "&vp=" + Globals.settings.getWindowConfig().getInteger("mainWindowW") + "x" + Globals.settings.getWindowConfig().getInteger("mainWindowH")
+                + "&vp=" + TmmWindowSaver.getInstance().getInteger("mainWindowW") + "x" + TmmWindowSaver.getInstance().getInteger("mainWindowH")
                 + "&sr=" + java.awt.Toolkit.getDefaultToolkit().getScreenSize().width + "x" + java.awt.Toolkit.getDefaultToolkit().getScreenSize().height 
                 + "&cd1=" + getEncProp("os.name") 
                 + "&cd2=" + getEncProp("os.arch") 
@@ -582,48 +427,6 @@ public class Utils {
     catch (UnsupportedEncodingException e) {
       return URLEncoder.encode(System.getProperty(prop));
     }
-  }
-
-  protected static String generateUA() {
-    // this is due to the fact, that the OS is not correctly recognized (eg Mobile FirefoxOS, where it isn't)
-    String hardcodeOS = "";
-    if (Platform.isWindows()) {
-      hardcodeOS = "Windows; Windows NT " + System.getProperty("os.version");
-    }
-    else if (Platform.isMac()) {
-      hardcodeOS = "Macintosh";
-    }
-    else if (Platform.isLinux()) {
-      hardcodeOS = "X11";
-    }
-    else {
-      hardcodeOS = System.getProperty("os.name");
-    }
-
-    // set header according to movie scraper language (or default GUI language as fallback)
-    Locale l = null;
-    MediaLanguages ml = Globals.settings.getMovieSettings().getScraperLanguage();
-    if (ml == null) {
-      ml = Globals.settings.getTvShowSettings().getScraperLanguage();
-    }
-    if (ml != null) {
-      l = getLocaleFromLanguage(ml.name());
-    }
-    else {
-      l = getLocaleFromLanguage(Locale.getDefault().getLanguage());
-    }
-
-    // @formatter:off
-    String ua = String.format("Mozilla/5.0 (%1$s; %2$s %3$s; U; %4$s; %5$s-%6$s; rv:26.0) Gecko/20100101 Firefox/26.0", 
-        hardcodeOS,
-        System.getProperty("os.name", ""),
-        System.getProperty("os.version", ""),
-        System.getProperty("os.arch", ""),
-        l.getLanguage(),
-        l.getCountry());
-    // @formatter:on
-
-    return ua;
   }
 
   public static void removeEmptyStringsFromList(List<String> list) {
@@ -705,7 +508,10 @@ public class Utils {
     }
     if (!destDir.getParentFile().exists()) {
       // create parent folder structure, else renameTo does not work
-      destDir.getParentFile().mkdirs();
+      boolean ok = destDir.getParentFile().mkdirs();
+      if (!ok) {
+        LOGGER.error("could not create directory structure " + destDir.getParentFile());
+      }
     }
 
     // rename folder; try 5 times and wait a sec
@@ -912,6 +718,7 @@ public class Utils {
         in.close();
         zos.closeEntry();
         zos.close();
+
       }
       catch (IOException e) {
         LOGGER.error("Could not backup file " + backup);
@@ -1000,6 +807,67 @@ public class Utils {
     int minutes = (int) (sec / 60) % 60;
     int hours = (int) (sec / (60 * 60)) % 24;
     return String.format("%02d", hours) + ":" + String.format("%02d", minutes) + ":" + String.format("%02d", seconds);
+  }
+
+  /**
+   * create a ProcessBuilder for restarting TMM
+   * 
+   * @return the process builder
+   */
+  public static ProcessBuilder getPBforTMMrestart() {
+    File f = new File("tmm.jar");
+    if (!f.exists()) {
+      LOGGER.error("cannot restart TMM - tmm.jar not found.");
+      return null; // when we are in SVN, return null = normal close
+    }
+    List<String> arguments = getJVMArguments();
+    arguments.add(0, LaunchUtil.getJVMPath()); // java exe before JVM args
+    arguments.add("-jar");
+    arguments.add("tmm.jar");
+    ProcessBuilder pb = new ProcessBuilder(arguments);
+    pb.directory(new File("").getAbsoluteFile()); // set working directory (current TMM dir)
+    return pb;
+  }
+
+  /**
+   * create a ProcessBuilder for restarting TMM to the updater
+   * 
+   * @return the process builder
+   */
+  public static ProcessBuilder getPBforTMMupdate() {
+    File f = new File("getdown.jar");
+    if (!f.exists()) {
+      LOGGER.error("cannot start updater - getdown.jar not found.");
+      return null; // when we are in SVN, return null = normal close
+    }
+    List<String> arguments = getJVMArguments();
+    arguments.add(0, LaunchUtil.getJVMPath()); // java exe before JVM args
+    arguments.add("-jar");
+    arguments.add("getdown.jar");
+    arguments.add(".");
+    ProcessBuilder pb = new ProcessBuilder(arguments);
+    pb.directory(new File("").getAbsoluteFile()); // set working directory (current TMM dir)
+    return pb;
+  }
+
+  /**
+   * gets all the JVM parameters used for starting TMM<br>
+   * like -Dfile.encoding=UTF8 or others<br>
+   * needed for restarting tmm :)
+   * 
+   * @return list of jvm parameters
+   */
+  private static List<String> getJVMArguments() {
+    RuntimeMXBean runtimeMxBean = ManagementFactory.getRuntimeMXBean();
+    List<String> arguments = new ArrayList<String>(runtimeMxBean.getInputArguments());
+    // fixtate some
+    if (!arguments.contains("-Djava.net.preferIPv4Stack=true")) {
+      arguments.add("-Djava.net.preferIPv4Stack=true");
+    }
+    if (!arguments.contains("-Dfile.encoding=UTF-8")) {
+      arguments.add("-Dfile.encoding=UTF-8");
+    }
+    return arguments;
   }
 
 }

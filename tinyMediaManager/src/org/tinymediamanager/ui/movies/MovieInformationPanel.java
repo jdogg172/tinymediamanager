@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,20 +39,20 @@ import org.jdesktop.beansbinding.AutoBinding;
 import org.jdesktop.beansbinding.AutoBinding.UpdateStrategy;
 import org.jdesktop.beansbinding.BeanProperty;
 import org.jdesktop.beansbinding.Bindings;
-import org.tinymediamanager.core.MediaFile;
-import org.tinymediamanager.core.MediaFileType;
-import org.tinymediamanager.core.movie.Movie;
+import org.tinymediamanager.core.entities.MediaFile;
+import org.tinymediamanager.core.movie.entities.Movie;
 import org.tinymediamanager.scraper.Certification;
-import org.tinymediamanager.ui.CertificationImageConverter;
-import org.tinymediamanager.ui.MediaInfoAudioCodecConverter;
-import org.tinymediamanager.ui.MediaInfoVideoCodecConverter;
-import org.tinymediamanager.ui.MediaInfoVideoFormatConverter;
+import org.tinymediamanager.ui.TmmFontHelper;
 import org.tinymediamanager.ui.UTF8Control;
-import org.tinymediamanager.ui.VoteCountConverter;
-import org.tinymediamanager.ui.WatchedIconConverter2;
 import org.tinymediamanager.ui.components.ImageLabel;
 import org.tinymediamanager.ui.components.ImagePanel;
 import org.tinymediamanager.ui.components.StarRater;
+import org.tinymediamanager.ui.converter.CertificationImageConverter;
+import org.tinymediamanager.ui.converter.MediaInfoAudioCodecConverter;
+import org.tinymediamanager.ui.converter.MediaInfoVideoCodecConverter;
+import org.tinymediamanager.ui.converter.MediaInfoVideoFormatConverter;
+import org.tinymediamanager.ui.converter.VoteCountConverter;
+import org.tinymediamanager.ui.converter.WatchedIconConverter2;
 
 import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
@@ -200,9 +200,8 @@ public class MovieInformationPanel extends JPanel {
     panelMovieHeader.add(panelMovieTitle, BorderLayout.NORTH);
     panelMovieTitle.setLayout(new BorderLayout(0, 0));
     lblMovieName = new JLabel("");
-    // panelMovieHeader.add(lblMovieName, BorderLayout.NORTH);
+    TmmFontHelper.changeFont(lblMovieName, 1.33, Font.BOLD);
     panelMovieTitle.add(lblMovieName);
-    lblMovieName.setFont(new Font("Dialog", Font.BOLD, 16));
 
     JPanel panelRatingTagline = new JPanel();
     panelMovieHeader.add(panelRatingTagline, BorderLayout.CENTER);
@@ -216,7 +215,7 @@ public class MovieInformationPanel extends JPanel {
     lblVoteCount = new JLabel("");
     panelRatingTagline.add(lblVoteCount, "3, 2, left, center");
 
-    panelRatingStars = new StarRater(5, 2);
+    panelRatingStars = new StarRater(10, 1);
     panelRatingTagline.add(panelRatingStars, "1, 2, left, top");
     panelRatingStars.setEnabled(false);
 
@@ -348,20 +347,10 @@ public class MovieInformationPanel extends JPanel {
 
             synchronized (mediaFiles) {
               mediaFiles.clear();
-              for (MediaFile mediafile : movie.getMediaFiles(MediaFileType.POSTER)) {
-                mediaFiles.add(mediafile);
-              }
-              for (MediaFile mediafile : movie.getMediaFiles(MediaFileType.FANART)) {
-                mediaFiles.add(mediafile);
-              }
-              for (MediaFile mediafile : movie.getMediaFiles(MediaFileType.BANNER)) {
-                mediaFiles.add(mediafile);
-              }
-              for (MediaFile mediafile : movie.getMediaFiles(MediaFileType.EXTRAFANART)) {
-                mediaFiles.add(mediafile);
-              }
-              for (MediaFile mediafile : movie.getMediaFiles(MediaFileType.THUMB)) {
-                mediaFiles.add(mediafile);
+              for (MediaFile mediafile : movie.getMediaFiles()) {
+                if (mediafile.isGraphic()) {
+                  mediaFiles.add(mediafile);
+                }
               }
               panelArtwork.rebuildPanel();
             }

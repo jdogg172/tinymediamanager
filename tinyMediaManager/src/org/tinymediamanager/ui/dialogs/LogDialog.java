@@ -1,10 +1,25 @@
+/*
+ * Copyright 2012 - 2014 Manuel Laggner
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.tinymediamanager.ui.dialogs;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ResourceBundle;
 
-import javax.swing.JDialog;
+import javax.swing.JButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.Timer;
@@ -13,7 +28,6 @@ import javax.swing.text.Document;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tinymediamanager.Globals;
 import org.tinymediamanager.ui.TmmUILogAppender.LogOutput;
 import org.tinymediamanager.ui.TmmUILogCollector;
 import org.tinymediamanager.ui.UTF8Control;
@@ -23,7 +37,7 @@ import com.jgoodies.forms.layout.ColumnSpec;
 import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.RowSpec;
 
-public class LogDialog extends JDialog implements ActionListener {
+public class LogDialog extends TmmDialog implements ActionListener {
   private static final long           serialVersionUID = -5054005564554148578L;
   private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
   private static final Logger         LOGGER           = LoggerFactory.getLogger(LogDialog.class);
@@ -35,16 +49,16 @@ public class LogDialog extends JDialog implements ActionListener {
   private final Timer                 timerRefresh;
 
   public LogDialog() {
-    setIconImage(Globals.logo);
-    setTitle(BUNDLE.getString("logwindow.title")); //$NON-NLS-1$
-    setSize(600, 250);
+    super(BUNDLE.getString("logwindow.title"), "log"); //$NON-NLS-1$
+    setBounds(5, 5, 1000, 590);
 
     timerRefresh = new Timer(REFRESH_PERIOD, this);
     timerRefresh.setInitialDelay(0);
 
     getContentPane().setLayout(
         new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), FormFactory.RELATED_GAP_COLSPEC, },
-            new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("default:grow"), FormFactory.RELATED_GAP_ROWSPEC, }));
+            new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("default:grow"), FormFactory.RELATED_GAP_ROWSPEC,
+                FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, }));
 
     JScrollPane scrollPane = new JScrollPane();
     getContentPane().add(scrollPane, "2, 2, fill, fill");
@@ -56,6 +70,16 @@ public class LogDialog extends JDialog implements ActionListener {
     taLogs.setLineWrap(true);
 
     taLogs.setText(TmmUILogCollector.instance.getLogOutput().getContent());
+    {
+      JButton btnClose = new JButton(BUNDLE.getString("Button.close")); //$NON-NLS-1$
+      btnClose.addActionListener(new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent arg0) {
+          setVisible(false);
+        }
+      });
+      getContentPane().add(btnClose, "2, 4, right, default");
+    }
     timerRefresh.start();
   }
 
@@ -64,6 +88,11 @@ public class LogDialog extends JDialog implements ActionListener {
     if (ae.getSource() == timerRefresh) {
       updateApplicationLog();
     }
+  }
+
+  @Override
+  public void pack() {
+    // do not let it pack - it looks weird
   }
 
   private void updateApplicationLog() {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package org.tinymediamanager.ui.moviesets.dialogs;
 
 import java.awt.BorderLayout;
+import java.awt.Cursor;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -27,16 +28,16 @@ import java.util.ResourceBundle;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
-import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
+import javax.swing.border.EmptyBorder;
 
 import org.apache.commons.lang3.StringUtils;
 import org.jdesktop.beansbinding.AutoBinding.UpdateStrategy;
@@ -46,23 +47,26 @@ import org.jdesktop.swingbinding.JTableBinding;
 import org.jdesktop.swingbinding.SwingBindings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tinymediamanager.Globals;
+import org.tinymediamanager.core.Constants;
+import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.Utils;
-import org.tinymediamanager.core.movie.Movie;
 import org.tinymediamanager.core.movie.MovieList;
-import org.tinymediamanager.core.movie.MovieSet;
+import org.tinymediamanager.core.movie.MovieModuleManager;
+import org.tinymediamanager.core.movie.entities.Movie;
+import org.tinymediamanager.core.movie.entities.MovieSet;
 import org.tinymediamanager.scraper.IMediaArtworkProvider;
 import org.tinymediamanager.scraper.MediaMetadata;
 import org.tinymediamanager.scraper.MediaScrapeOptions;
 import org.tinymediamanager.scraper.MediaType;
 import org.tinymediamanager.scraper.tmdb.TmdbMetadataProvider;
 import org.tinymediamanager.ui.EqualsLayout;
+import org.tinymediamanager.ui.IconManager;
 import org.tinymediamanager.ui.MainWindow;
-import org.tinymediamanager.ui.TmmWindowSaver;
 import org.tinymediamanager.ui.UTF8Control;
 import org.tinymediamanager.ui.components.ImageLabel;
 import org.tinymediamanager.ui.dialogs.ImageChooserDialog;
 import org.tinymediamanager.ui.dialogs.ImageChooserDialog.ImageType;
+import org.tinymediamanager.ui.dialogs.TmmDialog;
 
 import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
@@ -70,15 +74,16 @@ import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.RowSpec;
 
 /**
- * The Class MovieSetEditor.
+ * The Class MovieSetEditorDialog. Edit movie sets
  * 
  * @author Manuel Laggner
  */
-public class MovieSetEditorDialog extends JDialog {
+public class MovieSetEditorDialog extends TmmDialog {
   private static final long           serialVersionUID    = -4446433759280691976L;
   private static final Logger         LOGGER              = LoggerFactory.getLogger(MovieSetEditorDialog.class);
   private static final ResourceBundle BUNDLE              = ResourceBundle.getBundle("messages", new UTF8Control());     //$NON-NLS-1$
 
+  private MovieList                   movieList           = MovieList.getInstance();
   private MovieSet                    movieSetToEdit;
   private List<Movie>                 moviesInSet         = ObservableCollections.observableList(new ArrayList<Movie>());
   private List<Movie>                 removedMovies       = new ArrayList<Movie>();
@@ -92,6 +97,9 @@ public class MovieSetEditorDialog extends JDialog {
   private ImageLabel                  lblFanart;
   private JTextPane                   tpOverview;
   private JTextField                  tfTmdbId;
+  private ImageLabel                  lblLogo;
+  private ImageLabel                  lblBanner;
+  private ImageLabel                  lblClearart;
 
   private final Action                actionMoveMovieDown = new MoveDownAction();
   private final Action                actionRemoveMovie   = new RemoveMovieAction();
@@ -110,12 +118,8 @@ public class MovieSetEditorDialog extends JDialog {
    *          the in queue
    */
   public MovieSetEditorDialog(MovieSet movieSet, boolean inQueue) {
-    setModal(true);
-    setIconImage(Globals.logo);
-    setTitle(BUNDLE.getString("movieset.edit")); //$NON-NLS-1$
-    setName("movieSetEditor");
+    super(BUNDLE.getString("movieset.edit"), "movieSetEditor"); //$NON-NLS-1$
     setBounds(5, 5, 800, 500);
-    TmmWindowSaver.loadSettings(this);
 
     movieSetToEdit = movieSet;
     try {
@@ -126,16 +130,20 @@ public class MovieSetEditorDialog extends JDialog {
     }
 
     getContentPane().setLayout(new BorderLayout());
+    JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.NORTH);
+    getContentPane().add(tabbedPane, BorderLayout.CENTER);
 
     JPanel panelContent = new JPanel();
-    panelContent.setLayout(new FormLayout(new ColumnSpec[] { ColumnSpec.decode("2dlu"), FormFactory.DEFAULT_COLSPEC, FormFactory.RELATED_GAP_COLSPEC,
-        ColumnSpec.decode("100px"), FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("300px:grow"), FormFactory.RELATED_GAP_COLSPEC,
-        ColumnSpec.decode("250px:grow"), ColumnSpec.decode("2dlu"), }, new RowSpec[] { FormFactory.NARROW_LINE_GAP_ROWSPEC,
-        FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC,
-        RowSpec.decode("75px:grow"), FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC,
-        FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC,
-        FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("default:grow"), FormFactory.NARROW_LINE_GAP_ROWSPEC, }));
-    getContentPane().add(panelContent, BorderLayout.CENTER);
+    panelContent.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
+        FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("100px"), FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("300px:grow"),
+        FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("250px:grow"), FormFactory.RELATED_GAP_COLSPEC, }, new RowSpec[] {
+        FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
+        FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("75px:grow"), FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
+        FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
+        FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("default:grow"),
+        FormFactory.NARROW_LINE_GAP_ROWSPEC, }));
+
+    tabbedPane.addTab(BUNDLE.getString("metatag.details"), panelContent); //$NON-NLS-1$
 
     JLabel lblName = new JLabel(BUNDLE.getString("movieset.title")); //$NON-NLS-1$
     panelContent.add(lblName, "2, 2, right, default");
@@ -156,7 +164,7 @@ public class MovieSetEditorDialog extends JDialog {
         catch (Exception e1) {
         }
         HashMap<String, Object> ids = new HashMap<String, Object>(movieSetToEdit.getIds());
-        ids.put("tmdbId", tmdbId);
+        ids.put(Constants.TMDBID, tmdbId);
         // MovieSetImageChooserDialog dialog = new MovieSetImageChooserDialog(tmdbId, ImageType.POSTER, lblPoster);
         ImageChooserDialog dialog = new ImageChooserDialog(ids, ImageType.POSTER, artworkProviders, lblPoster, null, null, MediaType.MOVIE);
         dialog.setLocationRelativeTo(MainWindow.getActiveInstance());
@@ -214,7 +222,7 @@ public class MovieSetEditorDialog extends JDialog {
         catch (Exception e1) {
         }
         HashMap<String, Object> ids = new HashMap<String, Object>(movieSetToEdit.getIds());
-        ids.put("tmdbId", tmdbId);
+        ids.put(Constants.TMDBID, tmdbId);
         ImageChooserDialog dialog = new ImageChooserDialog(ids, ImageType.FANART, artworkProviders, lblFanart, null, null, MediaType.MOVIE);
         // MovieSetImageChooserDialog dialog = new MovieSetImageChooserDialog(tmdbId, ImageType.FANART, lblFanart);
         dialog.setLocationRelativeTo(MainWindow.getActiveInstance());
@@ -228,12 +236,84 @@ public class MovieSetEditorDialog extends JDialog {
     panelContent.add(btnMoveMovieDown, "2, 14, right, top");
 
     /**
+     * Artwork pane
+     */
+    {
+      JPanel artworkPanel = new JPanel();
+      tabbedPane.addTab(BUNDLE.getString("metatag.extraartwork"), null, artworkPanel, null); //$NON-NLS-1$
+      artworkPanel.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("250px:grow"),
+          FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("250px:grow"), FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("150px:grow"),
+          FormFactory.RELATED_GAP_COLSPEC, }, new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
+          FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("50px:grow(2)"), FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
+          FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("200px:grow(2)"), FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("default:grow"), }));
+      {
+        JLabel lblLogoT = new JLabel("Logo");
+        artworkPanel.add(lblLogoT, "2, 2");
+      }
+      {
+        lblLogo = new ImageLabel();
+        lblLogo.setAlternativeText(BUNDLE.getString("image.notfound.logo")); //$NON-NLS-1$
+        lblLogo.addMouseListener(new MouseAdapter() {
+          @Override
+          public void mouseClicked(MouseEvent e) {
+            ImageChooserDialog dialog = new ImageChooserDialog(movieSetToEdit.getIds(), ImageType.LOGO, movieList.getArtworkProviders(), lblLogo,
+                null, null, MediaType.MOVIE);
+            dialog.setLocationRelativeTo(MainWindow.getActiveInstance());
+            dialog.setVisible(true);
+          }
+        });
+        {
+          JLabel lblBannerT = new JLabel("Banner");
+          artworkPanel.add(lblBannerT, "4, 2");
+        }
+        lblLogo.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        artworkPanel.add(lblLogo, "2, 4, fill, fill");
+      }
+      {
+        lblBanner = new ImageLabel();
+        lblBanner.setAlternativeText(BUNDLE.getString("image.notfound.banner")); //$NON-NLS-1$
+        lblBanner.addMouseListener(new MouseAdapter() {
+          @Override
+          public void mouseClicked(MouseEvent e) {
+            ImageChooserDialog dialog = new ImageChooserDialog(movieSetToEdit.getIds(), ImageType.BANNER, movieList.getArtworkProviders(), lblBanner,
+                null, null, MediaType.MOVIE);
+            dialog.setLocationRelativeTo(MainWindow.getActiveInstance());
+            dialog.setVisible(true);
+          }
+        });
+        lblBanner.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        artworkPanel.add(lblBanner, "4, 4, 3, 1, fill, fill");
+      }
+
+      {
+        JLabel lblClearartT = new JLabel("ClearArt");
+        artworkPanel.add(lblClearartT, "2, 6");
+      }
+      {
+        lblClearart = new ImageLabel();
+        lblClearart.setAlternativeText(BUNDLE.getString("image.notfound.clearart")); //$NON-NLS-1$
+        lblClearart.addMouseListener(new MouseAdapter() {
+          @Override
+          public void mouseClicked(MouseEvent e) {
+            ImageChooserDialog dialog = new ImageChooserDialog(movieSetToEdit.getIds(), ImageType.CLEARART, movieList.getArtworkProviders(),
+                lblClearart, null, null, MediaType.MOVIE);
+            dialog.setLocationRelativeTo(MainWindow.getActiveInstance());
+            dialog.setVisible(true);
+          }
+        });
+        lblClearart.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        artworkPanel.add(lblClearart, "2, 8, fill, fill");
+      }
+    }
+
+    /**
      * Button pane
      */
     {
       JPanel buttonPane = new JPanel();
       getContentPane().add(buttonPane, BorderLayout.SOUTH);
       EqualsLayout layout = new EqualsLayout(5);
+      buttonPane.setBorder(new EmptyBorder(4, 4, 4, 4));
       layout.setMinWidth(100);
       buttonPane.setLayout(layout);
       {
@@ -259,10 +339,16 @@ public class MovieSetEditorDialog extends JDialog {
       tfName.setText(movieSetToEdit.getTitle());
       tfTmdbId.setText(String.valueOf(movieSetToEdit.getTmdbId()));
       tpOverview.setText(movieSetToEdit.getPlot());
-      lblPoster.setImageUrl(movieSetToEdit.getPosterUrl());
       moviesInSet.addAll(movieSetToEdit.getMovies());
       lblPoster.setImageUrl(movieSetToEdit.getPosterUrl());
+      lblPoster.setImagePath(movieSetToEdit.getPoster());
       lblFanart.setImageUrl(movieSetToEdit.getFanartUrl());
+      lblFanart.setImagePath(movieSetToEdit.getFanart());
+
+      // extra artwork
+      lblBanner.setImagePath(movieSetToEdit.getArtworkFilename(MediaFileType.BANNER));
+      lblLogo.setImagePath(movieSetToEdit.getArtworkFilename(MediaFileType.LOGO));
+      lblClearart.setImagePath(movieSetToEdit.getArtworkFilename(MediaFileType.CLEARART));
     }
 
     initDataBindings();
@@ -272,9 +358,14 @@ public class MovieSetEditorDialog extends JDialog {
     tableMovies.getTableHeader().getColumnModel().getColumn(0).setHeaderValue(BUNDLE.getString("metatag.name"));
 
     // year column
-    tableMovies.getTableHeader().getColumnModel().getColumn(1).setPreferredWidth(35);
-    tableMovies.getTableHeader().getColumnModel().getColumn(1).setMinWidth(35);
-    tableMovies.getTableHeader().getColumnModel().getColumn(1).setMaxWidth(50);
+    int width = tableMovies.getFontMetrics(tableMovies.getFont()).stringWidth(" 2000");
+    int titleWidth = tableMovies.getFontMetrics(tableMovies.getFont()).stringWidth(BUNDLE.getString("metatag.year")); //$NON-NLS-1$
+    if (titleWidth > width) {
+      width = titleWidth;
+    }
+    tableMovies.getTableHeader().getColumnModel().getColumn(1).setPreferredWidth(width);
+    tableMovies.getTableHeader().getColumnModel().getColumn(1).setMinWidth(width);
+    tableMovies.getTableHeader().getColumnModel().getColumn(1).setMaxWidth((int) (width * 1.5));
     tableMovies.getTableHeader().getColumnModel().getColumn(1).setHeaderValue(BUNDLE.getString("metatag.year"));
 
     // watched column
@@ -284,29 +375,15 @@ public class MovieSetEditorDialog extends JDialog {
     tableMovies.getTableHeader().getColumnModel().getColumn(2).setHeaderValue(BUNDLE.getString("metatag.watched"));
   }
 
-  /**
-   * The Class RemoveMovieAction.
-   * 
-   * @author Manuel Laggner
-   */
   private class RemoveMovieAction extends AbstractAction {
+    private static final long serialVersionUID = 8013039811395731218L;
 
-    /** The Constant serialVersionUID. */
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * Instantiates a new removes the movie action.
-     */
     public RemoveMovieAction() {
-      putValue(LARGE_ICON_KEY, new ImageIcon(getClass().getResource("/org/tinymediamanager/ui/images/Remove.png")));
+      putValue(LARGE_ICON_KEY, IconManager.LIST_REMOVE);
       putValue(SHORT_DESCRIPTION, BUNDLE.getString("movieset.movie.remove")); //$NON-NLS-1$
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-     */
+    @Override
     public void actionPerformed(ActionEvent e) {
       int row = tableMovies.getSelectedRow();
       if (row > -1) {
@@ -317,29 +394,15 @@ public class MovieSetEditorDialog extends JDialog {
     }
   }
 
-  /**
-   * The Class MoveUpAction.
-   * 
-   * @author Manuel Laggner
-   */
   private class MoveUpAction extends AbstractAction {
+    private static final long serialVersionUID = -4620223948432713667L;
 
-    /** The Constant serialVersionUID. */
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * Instantiates a new move up action.
-     */
     public MoveUpAction() {
-      putValue(LARGE_ICON_KEY, new ImageIcon(getClass().getResource("/org/tinymediamanager/ui/images/Button_Up.png")));
+      putValue(LARGE_ICON_KEY, IconManager.ARROW_UP);
       putValue(SHORT_DESCRIPTION, BUNDLE.getString("movieset.movie.moveup")); //$NON-NLS-1$
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-     */
+    @Override
     public void actionPerformed(ActionEvent e) {
       int row = tableMovies.getSelectedRow();
       if (row > 0) {
@@ -349,29 +412,15 @@ public class MovieSetEditorDialog extends JDialog {
     }
   }
 
-  /**
-   * The Class MoveDownAction.
-   * 
-   * @author Manuel Laggner
-   */
   private class MoveDownAction extends AbstractAction {
+    private static final long serialVersionUID = 8986131051527422410L;
 
-    /** The Constant serialVersionUID. */
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * Instantiates a new move down action.
-     */
     public MoveDownAction() {
-      putValue(LARGE_ICON_KEY, new ImageIcon(getClass().getResource("/org/tinymediamanager/ui/images/Button_Down.png")));
+      putValue(LARGE_ICON_KEY, IconManager.ARROW_DOWN);
       putValue(SHORT_DESCRIPTION, BUNDLE.getString("movieset.movie.movedown")); //$NON-NLS-1$
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-     */
+    @Override
     public void actionPerformed(ActionEvent e) {
       int row = tableMovies.getSelectedRow();
       if (row < moviesInSet.size() - 1) {
@@ -381,39 +430,39 @@ public class MovieSetEditorDialog extends JDialog {
     }
   }
 
-  /**
-   * The Class OkAction.
-   * 
-   * @author Manuel Laggner
-   */
   private class OkAction extends AbstractAction {
+    private static final long serialVersionUID = -7322270015667230646L;
 
-    /** The Constant serialVersionUID. */
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * Instantiates a new ok action.
-     */
     public OkAction() {
       putValue(NAME, BUNDLE.getString("Button.save")); //$NON-NLS-1$);
       putValue(SHORT_DESCRIPTION, BUNDLE.getString("Button.save")); //$NON-NLS-1$
+      putValue(SMALL_ICON, IconManager.APPLY);
+      putValue(LARGE_ICON_KEY, IconManager.APPLY);
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-     */
+    @Override
     public void actionPerformed(ActionEvent e) {
       movieSetToEdit.setTitle(tfName.getText());
       movieSetToEdit.setPlot(tpOverview.getText());
 
       // image changes
       if (StringUtils.isNotEmpty(lblPoster.getImageUrl()) && !lblPoster.getImageUrl().equals(movieSetToEdit.getPosterUrl())) {
-        movieSetToEdit.setPosterUrl(lblPoster.getImageUrl());
+        movieSetToEdit.setArtworkUrl(lblPoster.getImageUrl(), MediaFileType.POSTER);
       }
       if (StringUtils.isNotEmpty(lblFanart.getImageUrl()) && !lblFanart.getImageUrl().equals(movieSetToEdit.getFanartUrl())) {
-        movieSetToEdit.setFanartUrl(lblFanart.getImageUrl());
+        movieSetToEdit.setArtworkUrl(lblFanart.getImageUrl(), MediaFileType.FANART);
+      }
+
+      if (!StringUtils.isEmpty(lblLogo.getImageUrl()) && !lblLogo.getImageUrl().equals(movieSetToEdit.getArtworkUrl(MediaFileType.LOGO))) {
+        movieSetToEdit.setArtworkUrl(lblLogo.getImageUrl(), MediaFileType.LOGO);
+      }
+
+      if (!StringUtils.isEmpty(lblBanner.getImageUrl()) && !lblBanner.getImageUrl().equals(movieSetToEdit.getArtworkUrl(MediaFileType.BANNER))) {
+        movieSetToEdit.setArtworkUrl(lblBanner.getImageUrl(), MediaFileType.BANNER);
+      }
+
+      if (!StringUtils.isEmpty(lblClearart.getImageUrl()) && !lblClearart.getImageUrl().equals(movieSetToEdit.getArtworkUrl(MediaFileType.CLEARART))) {
+        movieSetToEdit.setArtworkUrl(lblClearart.getImageUrl(), MediaFileType.CLEARART);
       }
 
       // delete movies
@@ -459,66 +508,39 @@ public class MovieSetEditorDialog extends JDialog {
       movieSetToEdit.saveToDb();
 
       setVisible(false);
-      dispose();
     }
   }
 
-  /**
-   * The Class CancelAction.
-   * 
-   * @author Manuel Laggner
-   */
   private class CancelAction extends AbstractAction {
+    private static final long serialVersionUID = -6214112833170817002L;
 
-    /** The Constant serialVersionUID. */
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * Instantiates a new cancel action.
-     */
     public CancelAction() {
       putValue(NAME, BUNDLE.getString("Button.cancel")); //$NON-NLS-1$
       putValue(SHORT_DESCRIPTION, BUNDLE.getString("edit.discard")); //$NON-NLS-1$
+      putValue(SMALL_ICON, IconManager.CANCEL);
+      putValue(LARGE_ICON_KEY, IconManager.CANCEL);
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-     */
+    @Override
     public void actionPerformed(ActionEvent e) {
       setVisible(false);
-      dispose();
     }
   }
 
-  /**
-   * The Class AbortAction.
-   * 
-   * @author Manuel Laggner
-   */
   private class AbortAction extends AbstractAction {
+    private static final long serialVersionUID = 1215596133205394653L;
 
-    /** The Constant serialVersionUID. */
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * Instantiates a new cancel action.
-     */
     public AbortAction() {
       putValue(NAME, BUNDLE.getString("Button.abortqueue")); //$NON-NLS-1$
       putValue(SHORT_DESCRIPTION, BUNDLE.getString("Button.abortqueue")); //$NON-NLS-1$
+      putValue(SMALL_ICON, IconManager.PROCESS_STOP);
+      putValue(LARGE_ICON_KEY, IconManager.PROCESS_STOP);
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-     */
+    @Override
     public void actionPerformed(ActionEvent e) {
       continueQueue = false;
       setVisible(false);
-      dispose();
     }
   }
 
@@ -541,29 +563,15 @@ public class MovieSetEditorDialog extends JDialog {
     jTableBinding.bind();
   }
 
-  /**
-   * The Class SwingAction.
-   * 
-   * @author Manuel Laggner
-   */
   private class SwingAction extends AbstractAction {
+    private static final long serialVersionUID = -8980803676368394987L;
 
-    /** The Constant serialVersionUID. */
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * Instantiates a new swing action.
-     */
     public SwingAction() {
       putValue(NAME, BUNDLE.getString("movieset.tmdb.find")); //$NON-NLS-1$
       putValue(SHORT_DESCRIPTION, BUNDLE.getString("movieset.tmdb.desc")); //$NON-NLS-1$
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-     */
+    @Override
     public void actionPerformed(ActionEvent e) {
       // search for a tmdbId
       try {
@@ -573,8 +581,9 @@ public class MovieSetEditorDialog extends JDialog {
           if (Utils.isValidImdbId(movie.getImdbId()) || movie.getTmdbId() > 0) {
             options.setTmdbId(movie.getTmdbId());
             options.setImdbId(movie.getImdbId());
-            options.setLanguage(Globals.settings.getMovieSettings().getScraperLanguage());
-            options.setCountry(Globals.settings.getMovieSettings().getCertificationCountry());
+            options.setLanguage(MovieModuleManager.MOVIE_SETTINGS.getScraperLanguage());
+            options.setCountry(MovieModuleManager.MOVIE_SETTINGS.getCertificationCountry());
+            options.setScrapeImdbForeignLanguage(MovieModuleManager.MOVIE_SETTINGS.isImdbScrapeForeignLanguage());
             MediaMetadata md = tmdb.getMetadata(options);
             if (md.getIntegerValue(MediaMetadata.TMDBID_SET) > 0) {
               tfTmdbId.setText(String.valueOf(md.getIntegerValue(MediaMetadata.TMDBID_SET)));
@@ -596,8 +605,12 @@ public class MovieSetEditorDialog extends JDialog {
    * @return true, if successful
    */
   public boolean showDialog() {
-    setLocationRelativeTo(MainWindow.getActiveInstance());
     setVisible(true);
     return continueQueue;
+  }
+
+  @Override
+  public void pack() {
+    // do not let it pack - it looks weird
   }
 }

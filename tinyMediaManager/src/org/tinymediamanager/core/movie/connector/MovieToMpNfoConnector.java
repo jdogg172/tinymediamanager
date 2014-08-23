@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,10 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
@@ -50,20 +53,21 @@ import org.apache.commons.lang3.SystemUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
-import org.tinymediamanager.core.MediaFile;
 import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
-import org.tinymediamanager.core.movie.Movie;
-import org.tinymediamanager.core.movie.MovieActor;
+import org.tinymediamanager.core.entities.MediaFile;
 import org.tinymediamanager.core.movie.MovieList;
+import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.core.movie.MovieNfoNaming;
-import org.tinymediamanager.core.movie.MovieProducer;
-import org.tinymediamanager.core.movie.MovieSet;
 import org.tinymediamanager.core.movie.connector.MovieToMpNfoConnector.Actor;
 import org.tinymediamanager.core.movie.connector.MovieToMpNfoConnector.MovieSets;
 import org.tinymediamanager.core.movie.connector.MovieToMpNfoConnector.Producer;
+import org.tinymediamanager.core.movie.entities.Movie;
+import org.tinymediamanager.core.movie.entities.MovieActor;
+import org.tinymediamanager.core.movie.entities.MovieProducer;
+import org.tinymediamanager.core.movie.entities.MovieSet;
 import org.tinymediamanager.scraper.Certification;
 import org.tinymediamanager.scraper.MediaGenres;
 
@@ -75,7 +79,7 @@ import org.tinymediamanager.scraper.MediaGenres;
 @XmlRootElement(name = "movie")
 @XmlSeeAlso({ Actor.class, MovieSets.class, Producer.class })
 @XmlType(propOrder = { "title", "originaltitle", "sorttitle", "sets", "rating", "year", "votes", "outline", "plot", "tagline", "runtime", "thumb",
-    "fanart", "mpaa", "id", "genres", "studio", "country", "premiered", "credits", "director", "actors", "producers" })
+    "fanart", "mpaa", "id", "ids", "genres", "studio", "country", "premiered", "credits", "director", "actors", "producers" })
 public class MovieToMpNfoConnector {
 
   private static final Logger LOGGER        = LoggerFactory.getLogger(MovieToMpNfoConnector.class);
@@ -118,6 +122,9 @@ public class MovieToMpNfoConnector {
 
   private List<MovieSets>     sets;
 
+  @XmlElementWrapper(name = "ids")
+  private Map<String, Object> ids;
+
   private static JAXBContext initContext() {
     try {
       return JAXBContext.newInstance(MovieToMpNfoConnector.class, Actor.class);
@@ -138,6 +145,7 @@ public class MovieToMpNfoConnector {
     genres = new ArrayList<String>();
     fanart = new ArrayList<String>();
     sets = new ArrayList<MovieSets>();
+    ids = new HashMap<String, Object>();
   }
 
   /**
@@ -208,6 +216,7 @@ public class MovieToMpNfoConnector {
       mp.addFanart(FilenameUtils.getName(movie.getFanart()));
     }
     mp.setId(movie.getImdbId());
+    mp.ids.putAll(movie.getIds());
     mp.setStudio(movie.getProductionCompany());
     mp.setCountry(movie.getCountry());
 
@@ -252,7 +261,7 @@ public class MovieToMpNfoConnector {
       nfonames.add(MovieNfoNaming.FILENAME_NFO);
     }
     else {
-      nfonames = Globals.settings.getMovieSettings().getMovieNfoFilenames();
+      nfonames = MovieModuleManager.MOVIE_SETTINGS.getMovieNfoFilenames();
     }
     for (MovieNfoNaming name : nfonames) {
 
@@ -334,7 +343,19 @@ public class MovieToMpNfoConnector {
         LOGGER.warn("could not parse runtime: " + mp.getRuntime());
       }
 
-      movie.setImdbId(mp.getId());
+      for (Entry<String, Object> entry : mp.ids.entrySet()) {
+        try {
+          movie.setId(entry.getKey(), entry.getValue());
+        }
+        catch (Exception e) {
+          LOGGER.warn("could not set ID: " + entry.getKey() + " ; " + entry.getValue());
+        }
+      }
+
+      if (StringUtils.isBlank(movie.getImdbId())) {
+        movie.setImdbId(mp.id);
+      }
+
       movie.setDirector(mp.getDirector());
       movie.setWriter(mp.getCredits());
       movie.setProductionCompany(mp.getStudio());

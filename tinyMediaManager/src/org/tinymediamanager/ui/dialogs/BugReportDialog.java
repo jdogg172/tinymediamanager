@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,6 @@ import java.util.zip.ZipOutputStream;
 
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -45,19 +44,19 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.mime.HttpMultipartMode;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.StringBody;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
 import org.tinymediamanager.ReleaseInfo;
-import org.tinymediamanager.core.Utils;
+import org.tinymediamanager.scraper.util.TmmHttpClient;
 import org.tinymediamanager.ui.EqualsLayout;
-import org.tinymediamanager.ui.TmmWindowSaver;
+import org.tinymediamanager.ui.IconManager;
 import org.tinymediamanager.ui.UTF8Control;
 
 import com.jgoodies.forms.factories.FormFactory;
@@ -70,7 +69,7 @@ import com.jgoodies.forms.layout.RowSpec;
  * 
  * @author Manuel Laggner
  */
-public class BugReportDialog extends JDialog {
+public class BugReportDialog extends TmmDialog {
   private static final long           serialVersionUID = 1992385114573899815L;
   private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
   private static final Logger         LOGGER           = LoggerFactory.getLogger(BugReportDialog.class);
@@ -80,19 +79,13 @@ public class BugReportDialog extends JDialog {
   private JTextField                  tfEmail;
   private JCheckBox                   chckbxLogs;
   private JCheckBox                   chckbxConfigxml;
-  private JCheckBox                   chckbxDatabase;
 
   /**
    * Instantiates a new feedback dialog.
    */
   public BugReportDialog() {
-    setTitle(BUNDLE.getString("BugReport")); //$NON-NLS-1$
-    setName("bugReport");
-    setIconImage(Globals.logo);
-    setModal(true);
-
+    super(BUNDLE.getString("BugReport"), "bugReport"); //$NON-NLS-1$
     setBounds(100, 100, 532, 453);
-    TmmWindowSaver.loadSettings(this);
 
     getContentPane().setLayout(
         new FormLayout(
@@ -103,10 +96,10 @@ public class BugReportDialog extends JDialog {
     JPanel panelContent = new JPanel();
     getContentPane().add(panelContent, "2, 2, fill, fill");
     panelContent.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
-        FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), }, new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC,
-        FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
-        FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("default:grow"), FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
-        FormFactory.DEFAULT_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
+        FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), FormFactory.RELATED_GAP_COLSPEC, }, new RowSpec[] {
+        FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
+        FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("default:grow"), FormFactory.RELATED_GAP_ROWSPEC,
+        FormFactory.DEFAULT_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
 
     JLabel lblName = new JLabel(BUNDLE.getString("BugReport.name")); //$NON-NLS-1$
     panelContent.add(lblName, "2, 2, right, default");
@@ -145,14 +138,12 @@ public class BugReportDialog extends JDialog {
     chckbxConfigxml = new JCheckBox("config.xml");
     panelContent.add(chckbxConfigxml, "4, 10");
 
-    // chckbxDatabase = new JCheckBox("Database");
-    // panelContent.add(chckbxDatabase, "4, 8");
-
     JPanel panelButtons = new JPanel();
     panelButtons.setLayout(new EqualsLayout(5));
     getContentPane().add(panelButtons, "2, 4, fill, fill");
 
     JButton btnSend = new JButton(BUNDLE.getString("BugReport.send")); //$NON-NLS-1$
+    btnSend.setIcon(IconManager.APPLY);
     btnSend.addActionListener(new ActionListener() {
       @Override
       public void actionPerformed(ActionEvent arg0) {
@@ -163,14 +154,17 @@ public class BugReportDialog extends JDialog {
         }
 
         // send bug report
-        DefaultHttpClient client = Utils.getHttpClient();
+        HttpClient client = TmmHttpClient.getHttpClient();
         HttpPost post = new HttpPost("https://script.google.com/macros/s/AKfycbzrhTmZiHJb1bdCqyeiVOqLup8zK4Dbx6kAtHYsgzBVqHTaNJqj/exec");
         try {
           StringBuilder message = new StringBuilder("Bug report from ");
           message.append(tfName.getText());
           message.append("\nEmail:");
           message.append(tfEmail.getText());
-          message.append("\n\nVersion: ");
+          message.append("\n");
+          message.append("\nis Donator?: ");
+          message.append(Globals.isDonator());
+          message.append("\nVersion: ");
           message.append(ReleaseInfo.getRealVersion());
           message.append("\nBuild: ");
           message.append(ReleaseInfo.getRealBuildDate());
@@ -183,10 +177,6 @@ public class BugReportDialog extends JDialog {
           message.append("\n\n");
           message.append(textArea.getText());
 
-          // String message = new String("Bug report from " +
-          // textField.getText() + "\n\n");
-          // message += textArea.getText();
-
           BugReportDialog.this.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
           MultipartEntity mpEntity = new MultipartEntity(HttpMultipartMode.STRICT);
@@ -197,8 +187,6 @@ public class BugReportDialog extends JDialog {
                                                                        * || chckbxDatabase . isSelected ()
                                                                        */) {
             try {
-              // byte[] buffer = new byte[1024];
-
               // build zip with selected files in it
               ByteArrayOutputStream os = new ByteArrayOutputStream();
               ZipOutputStream zos = new ZipOutputStream(os);
@@ -219,39 +207,50 @@ public class BugReportDialog extends JDialog {
                 });
                 if (logs != null) {
                   for (File logFile : logs) {
-                    ZipEntry ze = new ZipEntry(logFile.getName());
-                    zos.putNextEntry(ze);
-                    FileInputStream in = new FileInputStream(logFile);
+                    try {
+                      ZipEntry ze = new ZipEntry(logFile.getName());
+                      zos.putNextEntry(ze);
+                      FileInputStream in = new FileInputStream(logFile);
 
-                    IOUtils.copy(in, zos);
-                    in.close();
-                    zos.closeEntry();
+                      IOUtils.copy(in, zos);
+                      in.close();
+                      zos.closeEntry();
+                    }
+                    catch (Exception e) {
+                      LOGGER.warn("unable to attach " + logFile.getName() + ": " + e.getMessage());
+                    }
                   }
+                }
+
+                try {
+                  ZipEntry ze = new ZipEntry("launcher.log");
+                  zos.putNextEntry(ze);
+                  FileInputStream in = new FileInputStream("launcher.log");
+
+                  IOUtils.copy(in, zos);
+                  in.close();
+                  zos.closeEntry();
+                }
+                catch (Exception e) {
+                  LOGGER.warn("unable to attach launcher.log: " + e.getMessage());
                 }
               }
 
               // attach config file
               if (chckbxConfigxml.isSelected()) {
-                ZipEntry ze = new ZipEntry("config.xml");
-                zos.putNextEntry(ze);
-                FileInputStream in = new FileInputStream("config.xml");
+                try {
+                  ZipEntry ze = new ZipEntry("config.xml");
+                  zos.putNextEntry(ze);
+                  FileInputStream in = new FileInputStream("config.xml");
 
-                IOUtils.copy(in, zos);
-                in.close();
-                zos.closeEntry();
+                  IOUtils.copy(in, zos);
+                  in.close();
+                  zos.closeEntry();
+                }
+                catch (Exception e) {
+                  LOGGER.warn("unable to attach config.xml: " + e.getMessage());
+                }
               }
-
-              // // attach database
-              // ToDo
-              // if (chckbxDatabase.isSelected()) {
-              // ZipEntry ze = new ZipEntry(Constants.DB);
-              // zos.putNextEntry(ze);
-              // FileInputStream in = new FileInputStream(Constants.DB);
-              //
-              // IOUtils.copy(in, zos);
-              // in.close();
-              // zos.closeEntry();
-              // }
 
               zos.close();
 
@@ -284,17 +283,16 @@ public class BugReportDialog extends JDialog {
 
         JOptionPane.showMessageDialog(null, BUNDLE.getObject("BugReport.send.ok")); //$NON-NLS-1$
         setVisible(false);
-        dispose();
       }
     });
     panelButtons.add(btnSend);
 
     JButton btnCacnel = new JButton(BUNDLE.getString("Button.cancel")); //$NON-NLS-1$
+    btnCacnel.setIcon(IconManager.CANCEL);
     btnCacnel.addActionListener(new ActionListener() {
       @Override
       public void actionPerformed(ActionEvent e) {
         setVisible(false);
-        dispose();
       }
     });
     panelButtons.add(btnCacnel);

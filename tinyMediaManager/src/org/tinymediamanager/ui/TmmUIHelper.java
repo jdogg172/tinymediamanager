@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,16 +19,23 @@ import java.awt.Desktop;
 import java.awt.FileDialog;
 import java.awt.Window;
 import java.io.File;
+import java.lang.reflect.Method;
 import java.net.URI;
+import java.util.HashSet;
+import java.util.Set;
 
 import javax.swing.JFileChooser;
+import javax.swing.LookAndFeel;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 import javax.transaction.NotSupportedException;
 
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tinymediamanager.Globals;
 import org.tinymediamanager.ui.components.JNativeFileChooser;
 
 import chrriis.dj.nativeswing.swtimpl.components.JDirectoryDialog;
@@ -73,7 +80,7 @@ public class TmmUIHelper {
     }
 
     // on mac try to take the AWT FileDialog
-    if (SystemUtils.IS_OS_MAC || SystemUtils.IS_OS_MAC_OSX) {
+    if ((SystemUtils.IS_OS_MAC || SystemUtils.IS_OS_MAC_OSX) && SystemUtils.IS_JAVA_1_6) {
       try {
         // open directory chooser
         return openDirectoryDialog(title);
@@ -96,6 +103,49 @@ public class TmmUIHelper {
   }
 
   private static File openJFileChooser(int mode, String dialogTitle) {
+    if (SystemUtils.IS_OS_MAC || SystemUtils.IS_OS_MAC_OSX) {
+      // in OSX set the Quaqua laf
+      LookAndFeel old = UIManager.getLookAndFeel();
+      try {
+        Set includes = new HashSet();
+        includes.add("ColorChooser");
+        includes.add("FileChooser");
+        includes.add("Component");
+        includes.add("Browser");
+        includes.add("Tree");
+        includes.add("SplitPane");
+        // QuaquaManager.setIncludedUIs(includes);
+        // call via reflection to get rid of a direct dependency
+        Class<?> c = Class.forName("ch.randelshofer.quaqua.QuaquaManager");
+        Method method = c.getDeclaredMethod("setIncludedUIs", Set.class);
+        method.invoke(null, includes);
+        UIManager.setLookAndFeel("ch.randelshofer.quaqua.QuaquaLookAndFeel");
+        JNativeFileChooser fileChooser = new JNativeFileChooser();
+        fileChooser.setFileSelectionMode(mode);
+        fileChooser.setDialogTitle(dialogTitle);
+
+        int result = fileChooser.showOpenDialog(MainWindow.getFrame());
+
+        if (old != null) {
+          try {
+            UIManager.setLookAndFeel(old);
+          }
+          catch (Exception ignored) {
+          } // shouldn't get here
+        }
+
+        if (result == JFileChooser.APPROVE_OPTION) {
+          return fileChooser.getSelectedFile();
+        }
+        else {
+          return null;
+        }
+      }
+      catch (Throwable ex) {
+      }
+    }
+
+    // fallback
     JNativeFileChooser fileChooser = new JNativeFileChooser();
     fileChooser.setFileSelectionMode(mode);
     fileChooser.setDialogTitle(dialogTitle);
@@ -163,7 +213,7 @@ public class TmmUIHelper {
     }
 
     // try to open AWT dialog on OSX
-    if (SystemUtils.IS_OS_MAC || SystemUtils.IS_OS_MAC_OSX) {
+    if ((SystemUtils.IS_OS_MAC || SystemUtils.IS_OS_MAC_OSX) && SystemUtils.IS_JAVA_1_6) {
       try {
         // open file chooser
         return openFileDialog(title);
@@ -211,7 +261,16 @@ public class TmmUIHelper {
   }
 
   public static void openFile(File file) throws Exception {
-    if (SystemUtils.IS_OS_WINDOWS) {
+    String fileType = "." + FilenameUtils.getExtension(file.getName());
+    if (StringUtils.isNotBlank(Globals.settings.getMediaPlayer()) && Globals.settings.getAllSupportedFileTypes().contains(fileType)) {
+      if (SystemUtils.IS_OS_MAC_OSX) {
+        Runtime.getRuntime().exec(new String[] { "open", Globals.settings.getMediaPlayer(), file.getAbsolutePath() });
+      }
+      else {
+        Runtime.getRuntime().exec(new String[] { Globals.settings.getMediaPlayer(), file.getAbsolutePath() });
+      }
+    }
+    else if (SystemUtils.IS_OS_WINDOWS) {
       // use explorer directly - ship around access exceptions and the unresolved network bug
       // http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6780505
       Runtime.getRuntime().exec(new String[] { "explorer", file.getAbsolutePath() });

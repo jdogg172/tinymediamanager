@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import java.util.Comparator;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.TreeNode;
 
-import org.tinymediamanager.core.movie.MovieSet;
+import org.tinymediamanager.core.movie.entities.MovieSet;
 
 /**
  * The Class MovieSetRootTreeNode.
@@ -46,7 +46,7 @@ public class MovieSetRootTreeNode extends DefaultMutableTreeNode {
     nodeComparator = new Comparator<TreeNode>() {
       @Override
       public int compare(TreeNode o1, TreeNode o2) {
-        if (o1 instanceof MovieTreeNode && o2 instanceof MovieTreeNode) {
+        if (o1 instanceof MovieSetTreeNode && o2 instanceof MovieSetTreeNode) {
           MovieSetTreeNode node1 = (MovieSetTreeNode) o1;
           MovieSet movieSet1 = (MovieSet) node1.getUserObject();
           MovieSetTreeNode node2 = (MovieSetTreeNode) o2;

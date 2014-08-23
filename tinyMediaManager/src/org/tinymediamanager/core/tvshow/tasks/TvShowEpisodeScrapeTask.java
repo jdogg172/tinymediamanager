@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,19 +15,26 @@
  */
 package org.tinymediamanager.core.tvshow.tasks;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
-import org.tinymediamanager.core.tvshow.TvShowEpisode;
+import org.tinymediamanager.core.threading.TmmTask;
+import org.tinymediamanager.core.threading.TmmTaskManager;
 import org.tinymediamanager.core.tvshow.TvShowList;
+import org.tinymediamanager.core.tvshow.entities.TvShow;
+import org.tinymediamanager.core.tvshow.entities.TvShowEpisode;
 import org.tinymediamanager.scraper.ITvShowMetadataProvider;
 import org.tinymediamanager.scraper.MediaMetadata;
 import org.tinymediamanager.scraper.MediaScrapeOptions;
 import org.tinymediamanager.scraper.MediaType;
+import org.tinymediamanager.scraper.trakttv.SyncTraktTvTask;
 
 /**
  * The Class TvShowEpisodeScrapeTask.
@@ -50,11 +57,6 @@ public class TvShowEpisodeScrapeTask implements Runnable {
     this.episodes = episodes;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see java.lang.Runnable#run()
-   */
   @Override
   public void run() {
     for (TvShowEpisode episode : episodes) {
@@ -65,16 +67,16 @@ public class TvShowEpisodeScrapeTask implements Runnable {
       }
 
       MediaScrapeOptions options = new MediaScrapeOptions();
-      options.setLanguage(Globals.settings.getMovieSettings().getScraperLanguage());
-      options.setCountry(Globals.settings.getMovieSettings().getCertificationCountry());
+      options.setLanguage(Globals.settings.getTvShowSettings().getScraperLanguage());
+      options.setCountry(Globals.settings.getTvShowSettings().getCertificationCountry());
 
       for (Entry<String, Object> entry : episode.getTvShow().getIds().entrySet()) {
         options.setId(entry.getKey(), entry.getValue().toString());
       }
 
       options.setType(MediaType.TV_EPISODE);
-      options.setId("seasonNr", String.valueOf(episode.getSeason()));
-      options.setId("episodeNr", String.valueOf(episode.getEpisode()));
+      options.setId(MediaMetadata.SEASON_NR, String.valueOf(episode.getSeason()));
+      options.setId(MediaMetadata.EPISODE_NR, String.valueOf(episode.getEpisode()));
 
       try {
         MediaMetadata metadata = metadataProvider.getEpisodeMetadata(options);
@@ -85,6 +87,15 @@ public class TvShowEpisodeScrapeTask implements Runnable {
       catch (Exception e) {
         LOGGER.warn("Error getting metadata " + e.getMessage());
       }
+    }
+
+    if (Globals.settings.getTvShowSettings().getSyncTrakt()) {
+      Set<TvShow> tvShows = new HashSet<TvShow>();
+      for (TvShowEpisode episode : episodes) {
+        tvShows.add(episode.getTvShow());
+      }
+      TmmTask task = new SyncTraktTvTask(null, new ArrayList<TvShow>(tvShows));
+      TmmTaskManager.getInstance().addUnnamedTask(task);
     }
   }
 

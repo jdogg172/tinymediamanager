@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
@@ -30,44 +34,37 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
+import org.apache.http.HttpHeaders;
+import org.apache.http.StatusLine;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DecompressingHttpClient;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.protocol.BasicHttpContext;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tinymediamanager.core.Utils;
 
 /**
- * The Class Url.
+ * The Class Url. Used to make simple, blocking URL requests. The request is temporarily streamed into a ByteArrayInputStream, before the InputStream
+ * is passed to the caller.
  * 
  * @author Manuel Laggner / Myron Boyle
  */
 public class Url {
-  /** The log. */
-  private static final Logger LOGGER          = LoggerFactory.getLogger(Url.class);
+  private static final Logger          LOGGER          = LoggerFactory.getLogger(Url.class);
+  protected static CloseableHttpClient client;
 
-  /** The client. */
-  private static HttpClient   client;
-
-  protected int               responseCode    = 0;
-
-  /** The url. */
-  protected String            url             = null;
-
-  /** the headers sent from server. */
-  protected Header[]          headersResponse = null;
-
-  /** The headers request. */
-  protected List<Header>      headersRequest  = new ArrayList<Header>();
-
-  /** The entity sent from server. */
-  protected HttpEntity        entity          = null;
+  protected StatusLine                 responseStatus  = null;
+  protected String                     url             = null;
+  protected Header[]                   headersResponse = null;
+  protected List<Header>               headersRequest  = new ArrayList<Header>();
+  protected HttpEntity                 entity          = null;
+  protected URI                        uri             = null;
 
   /**
    * gets the specified header value from this connection<br>
@@ -90,16 +87,59 @@ public class Url {
   }
 
   /**
-   * Instantiates a new url.
+   * get all response headers
+   * 
+   * @return the response headers
+   */
+  public Header[] getHeadersResponse() {
+    return headersResponse;
+  }
+
+  /**
+   * Instantiates a new url / httpclient with default user-agent.
    * 
    * @param url
    *          the url
    */
-  public Url(String url) {
+  public Url(String url) throws MalformedURLException {
     if (client == null) {
-      client = new DecompressingHttpClient(Utils.getHttpClient());
+      client = TmmHttpClient.getHttpClient();
     }
     this.url = url;
+
+    // morph to URI to check syntax of the url
+    try {
+      this.uri = morphStringToUri(url);
+    }
+    catch (URISyntaxException e) {
+      throw new MalformedURLException(url);
+    }
+
+    // default user agent
+    addHeader(HttpHeaders.USER_AGENT, UrlUtil.generateUA());
+  }
+
+  /**
+   * morph the url (string) to an URI to check the syntax and escape the path
+   * 
+   * @param urlToMorph
+   *          the url to morph
+   * @return the morphed URI
+   * @throws MalformedURLException
+   * @throws URISyntaxException
+   */
+  private URI morphStringToUri(String urlToMorph) throws MalformedURLException, URISyntaxException {
+    URL url = new URL(urlToMorph);
+    return new URI(url.getProtocol(), url.getUserInfo(), url.getHost(), url.getPort(), url.getPath(), url.getQuery(), url.getRef());
+  }
+
+  /**
+   * set a specified User-Agent
+   * 
+   * @param userAgent
+   */
+  public void setUserAgent(String userAgent) {
+    addHeader(HttpHeaders.USER_AGENT, userAgent);
   }
 
   /**
@@ -109,7 +149,7 @@ public class Url {
    * @throws IOException
    *           Signals that an I/O exception has occurred.
    */
-  public URL getUrl() throws IOException {
+  public URL getUrl() throws IOException, InterruptedException {
     return new URL(url);
   }
 
@@ -122,7 +162,21 @@ public class Url {
    *          the value
    */
   public void addHeader(String key, String value) {
-    LOGGER.debug("add HTTP header: " + key + "=" + value);
+    if (StringUtils.isBlank(key)) {
+      return;
+    }
+
+    // LOGGER.debug("add HTTP header: " + key + "=" + value);
+
+    // check for duplicates
+    for (int i = headersRequest.size() - 1; i >= 0; i--) {
+      Header header = headersRequest.get(i);
+      if (key.equals(header.getName())) {
+        headersRequest.remove(i);
+      }
+    }
+
+    // and add the new one
     headersRequest.add(new BasicHeader(key, value));
   }
 
@@ -153,7 +207,7 @@ public class Url {
    * @throws IOException
    *           Signals that an I/O exception has occurred.
    */
-  public InputStream getInputStream() throws IOException {
+  public InputStream getInputStream() throws IOException, InterruptedException {
     // workaround for local files
     if (url.startsWith("file:")) {
       String newUrl = url.replace("file:", "");
@@ -161,29 +215,35 @@ public class Url {
       return new FileInputStream(file);
     }
 
-    HttpClient httpclient = getHttpClient();
     BasicHttpContext localContext = new BasicHttpContext();
-
     ByteArrayInputStream is = null;
 
     // replace our API keys for logging...
     String logUrl = url.replaceAll("api_key=\\w+", "api_key=<API_KEY>").replaceAll("api/\\d+\\w+", "api/<API_KEY>");
     LOGGER.debug("getting " + logUrl);
-    HttpGet httpget = new HttpGet(url);
+    HttpGet httpget = new HttpGet(uri);
+    RequestConfig requestConfig = RequestConfig.custom().setSocketTimeout(10000).setConnectTimeout(10000).build();
+    httpget.setConfig(requestConfig);
 
     // set custom headers
     for (Header header : headersRequest) {
       httpget.addHeader(header);
     }
 
+    CloseableHttpResponse response = null;
     try {
-      HttpResponse response = httpclient.execute(httpget, localContext);
+      response = client.execute(httpget, localContext);
       headersResponse = response.getAllHeaders();
       entity = response.getEntity();
-      responseCode = response.getStatusLine().getStatusCode();
+      responseStatus = response.getStatusLine();
       if (entity != null) {
         is = new ByteArrayInputStream(EntityUtils.toByteArray(entity));
       }
+      EntityUtils.consume(entity);
+    }
+    catch (InterruptedIOException e) {
+      LOGGER.info("aborted request: " + logUrl);
+      throw new InterruptedException();
     }
     catch (UnknownHostException e) {
       LOGGER.error("proxy or host not found/reachable", e);
@@ -192,7 +252,9 @@ public class Url {
       LOGGER.error("Exception getting url " + logUrl, e);
     }
     finally {
-      EntityUtils.consume(entity);
+      if (response != null) {
+        response.close();
+      }
     }
     return is;
   }
@@ -203,7 +265,21 @@ public class Url {
    * @return true/false
    */
   public boolean isFault() {
-    return responseCode >= 400 ? true : false;
+    return (responseStatus != null && responseStatus.getStatusCode() >= 400) ? true : false;
+  }
+
+  /**
+   * http status code
+   */
+  public int getStatusCode() {
+    return responseStatus != null ? responseStatus.getStatusCode() : 0;
+  }
+
+  /**
+   * http status string
+   */
+  public String getStatusLine() {
+    return responseStatus != null ? responseStatus.toString() : "";
   }
 
   /**
@@ -213,29 +289,11 @@ public class Url {
    * @throws IOException
    *           Signals that an I/O exception has occurred.
    */
-  public byte[] getBytes() throws IOException {
+  public byte[] getBytes() throws IOException, InterruptedException {
     InputStream is = getInputStream();
     byte[] bytes = IOUtils.toByteArray(is);
     is.close();
     return bytes;
-  }
-
-  /**
-   * Gets the http client.
-   * 
-   * @return the http client
-   */
-  protected HttpClient getHttpClient() {
-    return client;
-  }
-
-  /*
-   * (non-Javadoc)
-   * 
-   * @see java.lang.Object#toString()
-   */
-  public String toString() {
-    return url;
   }
 
   /**
@@ -295,5 +353,10 @@ public class Url {
     }
 
     return entity.getContentLength();
+  }
+
+  @Override
+  public String toString() {
+    return url;
   }
 }

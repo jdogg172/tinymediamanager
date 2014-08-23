@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,19 +18,20 @@ package org.tinymediamanager.scraper;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.net.URISyntaxException;
 
 import javax.persistence.Embeddable;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.core.AbstractModelObject;
 import org.tinymediamanager.scraper.util.Url;
 import org.tinymediamanager.scraper.util.UrlUtil;
+import org.tinymediamanager.scraper.util.YoutubeLinkExtractor;
 
 /**
  * The Class Trailer.
@@ -231,7 +232,12 @@ public class MediaTrailer extends AbstractModelObject implements Comparable<Medi
    */
   @Override
   public String toString() {
-    return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
+    return (new ReflectionToStringBuilder(this, ToStringStyle.SHORT_PREFIX_STYLE) {
+      @Override
+      protected boolean accept(Field f) {
+        return super.accept(f) && !f.getName().equals("propertyChangeSupport");
+      }
+    }).toString();
   }
 
   /**
@@ -243,16 +249,42 @@ public class MediaTrailer extends AbstractModelObject implements Comparable<Medi
    *           if url is not valid or network error
    * @throws URISyntaxException
    *           if url is not valid
+   * @throws InterruptedException
    */
-  public void downloadTo(String file) throws IOException, URISyntaxException {
+  public void downloadTo(String file) throws IOException, URISyntaxException, InterruptedException {
     LOGGER.info("Downloading " + this.getUrl() + " to " + file);
 
-    Url u = new Url(UrlUtil.getURIEncoded(this.getUrl()).toASCIIString());
+    Url u = new Url(UrlUtil.getURIEncoded(this.getDownloadUrl()).toASCIIString());
+    if ("apple".equalsIgnoreCase(getProvider())) {
+      u.setUserAgent("QuickTime");
+    }
     FileOutputStream outputStream = new FileOutputStream(file);
     InputStream is = u.getInputStream();
     IOUtils.copy(is, outputStream);
     outputStream.close();
     is.close();
+  }
+
+  /**
+   * gets the real download url - provider based implementation
+   * 
+   * @return real url
+   */
+  public String getDownloadUrl() {
+    String url = getUrl();
+
+    if ("youtube".equalsIgnoreCase(getProvider())) {
+      try {
+        url = YoutubeLinkExtractor.extractVideoUrl(url);
+      }
+      catch (IOException e) {
+        LOGGER.error("Error extracting Youtube url: " + e.getMessage());
+      }
+      catch (InterruptedException e) {
+      }
+    }
+
+    return url;
   }
 
   @Override
@@ -272,5 +304,4 @@ public class MediaTrailer extends AbstractModelObject implements Comparable<Medi
   public int hashCode() {
     return this.getUrl().hashCode();
   }
-
 }

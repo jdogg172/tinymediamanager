@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tinymediamanager.core.Constants;
 import org.tinymediamanager.scraper.IMediaMetadataProvider;
 import org.tinymediamanager.scraper.MediaCastMember;
 import org.tinymediamanager.scraper.MediaCastMember.CastType;
@@ -41,25 +42,17 @@ import org.tinymediamanager.scraper.moviemeternl.model.FilmDetail.Director;
 import org.tinymediamanager.scraper.moviemeternl.model.FilmDetail.Genre;
 
 /**
- * The Class OfdbMetadataProvider.
+ * The Class MoviemeterMetadataProvider. A meta data provider for the site moviemeter.nl
  * 
  * @author Myron Boyle (myron0815@gmx.net)
  */
 public class MoviemeterMetadataProvider implements IMediaMetadataProvider {
-
-  /** The Constant LOGGER. */
   private static final Logger      LOGGER       = LoggerFactory.getLogger(MoviemeterMetadataProvider.class);
 
   private static MoviemeterApi     mmapi;
-
-  private static MediaProviderInfo providerInfo = new MediaProviderInfo("moviemeter", "moviemeter.nl",
+  private static MediaProviderInfo providerInfo = new MediaProviderInfo(Constants.MOVIEMETERID, "moviemeter.nl",
                                                     "Scraper for moviemeter.nl which is able to scrape movie metadata");
 
-  /**
-   * Instantiates a new ofdb metadata provider.
-   * 
-   * @throws Exception
-   */
   public MoviemeterMetadataProvider() throws Exception {
     if (mmapi == null) {
       try {
@@ -154,6 +147,7 @@ public class MoviemeterMetadataProvider implements IMediaMetadataProvider {
     List<MediaSearchResult> resultList = new ArrayList<MediaSearchResult>();
     String imdb = query.get(MediaSearchOptions.SearchParam.IMDBID);
     String searchString = "";
+    String myear = query.get(MediaSearchOptions.SearchParam.YEAR);
 
     // check type
     if (query.getMediaType() != MediaType.MOVIE) {
@@ -214,7 +208,16 @@ public class MoviemeterMetadataProvider implements IMediaMetadataProvider {
       sr.setTitle(film.getTitle());
       sr.setUrl(film.getUrl());
       sr.setYear(film.getYear());
-      sr.setScore(MetadataUtil.calculateScore(searchString, film.getTitle()));
+
+      // compare score based on names
+      float score = MetadataUtil.calculateScore(searchString, film.getTitle());
+
+      if (myear != null && !myear.isEmpty() && !myear.equals("0") && !myear.equals(sr.getYear())) {
+        LOGGER.debug("parsed year does not match search result year - downgrading score by 0.01");
+        score = score - 0.01f;
+      }
+      sr.setScore(score);
+
       resultList.add(sr);
     }
     Collections.sort(resultList);
@@ -223,12 +226,8 @@ public class MoviemeterMetadataProvider implements IMediaMetadataProvider {
     return resultList;
   }
 
-  /**
+  /*
    * Maps scraper Genres to internal TMM genres
-   * 
-   * @param genre
-   *          as stinr
-   * @return TMM genre
    */
   private MediaGenres getTmmGenre(String genre) {
     MediaGenres g = null;

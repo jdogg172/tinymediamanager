@@ -5,7 +5,7 @@
   <outfile>../dist/tinyMediaManagerCMD.exe</outfile>
   <errTitle></errTitle>
   <cmdLine></cmdLine>
-  <chdir></chdir>
+  <chdir>.</chdir>
   <priority>normal</priority>
   <downloadUrl>http://java.com/download</downloadUrl>
   <supportUrl></supportUrl>
@@ -13,20 +13,20 @@
   <manifest></manifest>
   <icon>tmm.ico</icon>
   <jre>
-    <path></path>
     <minVersion>1.6.0</minVersion>
-    <maxVersion></maxVersion>
     <jdkPreference>preferJre</jdkPreference>
     <initialHeapSize>128</initialHeapSize>
     <maxHeapSize>512</maxHeapSize>
+    <opt>-Dfoo=bar</opt>
     <opt>-Xss512k</opt>
     <opt>-Djava.awt.headless=true</opt>
     <opt>-Djava.net.preferIPv4Stack=true</opt>
+    <opt>-Dfile.encoding=UTF-8</opt>
   </jre>
   <versionInfo>
     <fileVersion>2.0.0.0</fileVersion>
     <txtFileVersion>text</txtFileVersion>
-    <fileDescription>tinyMediaManager is a media management tool written in Java/Swing. It is written to provide metadata for the XBOX Media Center (XBMC).</fileDescription>
+    <fileDescription>tinyMediaManager is a media management tool written in Java/Swing. It is written to provide metadata for Kodi (XBMC).</fileDescription>
     <copyright>(c) 2012-2014 Manuel Laggner</copyright>
     <productVersion>2.0.0.0</productVersion>
     <txtProductVersion>text</txtProductVersion>

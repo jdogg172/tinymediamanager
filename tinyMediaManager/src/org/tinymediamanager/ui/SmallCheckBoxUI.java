@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,9 +55,8 @@ public class SmallCheckBoxUI extends BaseCheckBoxUI {
 
   private static class CheckBoxIcon implements Icon {
     private static final Color MENU_ITEM_BACKGROUND = new Color(248, 248, 248);
-    private static Icon        checkIcon            = new LazyImageIcon("icons/CheckSymbol.gif");
-    private static Icon        checkIconDisabled    = new LazyImageIcon("icons/CheckSymbolDisabled.gif");
-    private static Icon        checkPressedIcon     = new LazyImageIcon("icons/CheckPressedSymbol.gif");
+    private static Icon        checkIcon            = new LazyImageIcon("icons/small/check_symbol_10x10.png");
+    private static Icon        checkIconDisabled    = new LazyImageIcon("icons/small/check_symbol_disabled_10x10.png");
     private static final int   WIDTH                = 12;
     private static final int   HEIGHT               = 12;
 
@@ -119,7 +118,12 @@ public class SmallCheckBoxUI extends BaseCheckBoxUI {
       int xi = x + ((WIDTH - checkIcon.getIconWidth()) / 2) + 1;
       int yi = y + ((HEIGHT - checkIcon.getIconHeight()) / 2) + 1;
       if (model.isPressed() && model.isArmed()) {
-        checkPressedIcon.paintIcon(c, g, xi, yi);
+        Color bc = AbstractLookAndFeel.getTheme().getSelectionBackgroundColor();
+        Color fc = ColorHelper.darker(bc, 40);
+        g.setColor(fc);
+        g.drawRect(x + 2, y + 2, WIDTH - 4, HEIGHT - 4);
+        g.setColor(bc);
+        g.fillRect(x + 3, y + 3, WIDTH - 6, HEIGHT - 6);
       }
       else if (model.isSelected()) {
         if (b.isEnabled()) {

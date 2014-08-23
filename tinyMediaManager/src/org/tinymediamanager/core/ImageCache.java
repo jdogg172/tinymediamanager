@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,8 +45,9 @@ import org.imgscalr.Scalr;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
+import org.tinymediamanager.core.entities.MediaEntity;
+import org.tinymediamanager.core.entities.MediaFile;
 import org.tinymediamanager.scraper.util.Url;
-import org.tinymediamanager.ui.components.ImageLabel;
 
 /**
  * The Class ImageCache - used to build a local image cache (scaled down versions & thumbnails - also for offline access).
@@ -106,8 +107,9 @@ public class ImageCache {
    * @return the input stream
    * @throws IOException
    *           Signals that an I/O exception has occurred.
+   * @throws InterruptedException
    */
-  public static InputStream scaleImage(String imageUrl, int width) throws IOException {
+  public static InputStream scaleImage(String imageUrl, int width) throws IOException, InterruptedException {
     Url url = new Url(imageUrl);
     Image image = Toolkit.getDefaultToolkit().createImage(url.getBytes());
     BufferedImage originalImage = com.bric.image.ImageLoader.createImage(image);
@@ -120,25 +122,39 @@ public class ImageCache {
     BufferedImage scaledImage = Scalr.resize(originalImage, Scalr.Method.QUALITY, Scalr.Mode.AUTOMATIC, size.x, size.y, Scalr.OP_ANTIALIAS);
     originalImage = null;
 
-    // convert to rgb
-    BufferedImage rgb = new BufferedImage(scaledImage.getWidth(), scaledImage.getHeight(), BufferedImage.TYPE_INT_RGB);
+    ImageWriter imgWrtr = null;
+    ImageWriteParam imgWrtrPrm = null;
 
-    ColorConvertOp xformOp = new ColorConvertOp(null);
-    xformOp.filter(scaledImage, rgb);
-    scaledImage = null;
+    // here we have two different ways to create our thumb
+    // a) a scaled down jpg/png (without transparency) which we have to modify since OpenJDK cannot call native jpg encoders
+    // b) a scaled down png (with transparency) which we can store without any more modifying as png
+    if (hasTransparentPixels(scaledImage)) {
+      // transparent image -> png
+      imgWrtr = ImageIO.getImageWritersByFormatName("png").next();
+      imgWrtrPrm = imgWrtr.getDefaultWriteParam();
 
-    ImageWriter imgWrtr = ImageIO.getImageWritersByFormatName("jpg").next();
-    ImageWriteParam jpgWrtPrm = imgWrtr.getDefaultWriteParam();
-    jpgWrtPrm.setCompressionMode(JPEGImageWriteParam.MODE_EXPLICIT);
-    jpgWrtPrm.setCompressionQuality(0.8f);
+    }
+    else {
+      // non transparent image -> jpg
+      // convert to rgb
+      BufferedImage rgb = new BufferedImage(scaledImage.getWidth(), scaledImage.getHeight(), BufferedImage.TYPE_INT_RGB);
+      ColorConvertOp xformOp = new ColorConvertOp(null);
+      xformOp.filter(scaledImage, rgb);
+      imgWrtr = ImageIO.getImageWritersByFormatName("jpg").next();
+      imgWrtrPrm = imgWrtr.getDefaultWriteParam();
+      imgWrtrPrm.setCompressionMode(JPEGImageWriteParam.MODE_EXPLICIT);
+      imgWrtrPrm.setCompressionQuality(0.80f);
+
+      scaledImage = rgb;
+    }
 
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     ImageOutputStream output = ImageIO.createImageOutputStream(baos);
     imgWrtr.setOutput(output);
-    IIOImage outputImage = new IIOImage(rgb, null, null);
-    imgWrtr.write(null, outputImage, jpgWrtPrm);
+    IIOImage outputImage = new IIOImage(scaledImage, null, null);
+    imgWrtr.write(null, outputImage, imgWrtrPrm);
     imgWrtr.dispose();
-    rgb = null;
+    scaledImage = null;
 
     byte[] bytes = baos.toByteArray();
 
@@ -159,6 +175,11 @@ public class ImageCache {
    */
   public static File cacheImage(MediaFile mf) throws Exception {
     File originalFile = mf.getFile();
+
+    if (FileUtils.sizeOf(originalFile) == 0) {
+      throw new EmptyFileException(originalFile);
+    }
+
     String cacheFilename = ImageCache.getCachedFileName(originalFile.getPath());
     File cachedFile = new File(ImageCache.getCacheDir(), cacheFilename + ".jpg");
     if (!cachedFile.exists()) {
@@ -207,47 +228,53 @@ public class ImageCache {
         }
       }
 
-      Point size = ImageLabel.calculateSize(desiredWidth, (int) (originalImage.getHeight() / 1.5), originalImage.getWidth(),
-          originalImage.getHeight(), true);
+      Point size = calculateSize(desiredWidth, (int) (originalImage.getHeight() / 1.5), originalImage.getWidth(), originalImage.getHeight(), true);
       BufferedImage scaledImage = null;
 
       if (Globals.settings.getImageCacheType() == CacheType.FAST) {
         // scale fast
-        // scaledImage = Scaling.scale(originalImage, size.x, size.y);
         scaledImage = Scalr.resize(originalImage, Scalr.Method.BALANCED, Scalr.Mode.FIT_EXACT, size.x, size.y);
       }
       else {
         // scale with good quality
-        // scaledImage = new BufferedImage(size.x, size.y, BufferedImage.TYPE_INT_RGB);
-        // scaledImage.getGraphics().drawImage(originalImage.getScaledInstance(size.x, size.y, Image.SCALE_SMOOTH), 0, 0, null);
         scaledImage = Scalr.resize(originalImage, Scalr.Method.QUALITY, Scalr.Mode.FIT_EXACT, size.x, size.y);
       }
       originalImage = null;
 
-      // convert to rgb
-      BufferedImage rgb = new BufferedImage(size.x, size.y, BufferedImage.TYPE_INT_RGB);
+      ImageWriter imgWrtr = null;
+      ImageWriteParam imgWrtrPrm = null;
 
-      ColorConvertOp xformOp = new ColorConvertOp(null);
-      xformOp.filter(scaledImage, rgb);
-      scaledImage = null;
+      // here we have two different ways to create our thumb
+      // a) a scaled down jpg/png (without transparency) which we have to modify since OpenJDK cannot call native jpg encoders
+      // b) a scaled down png (with transparency) which we can store without any more modifying as png
+      if (hasTransparentPixels(scaledImage)) {
+        // transparent image -> png
+        imgWrtr = ImageIO.getImageWritersByFormatName("png").next();
+        imgWrtrPrm = imgWrtr.getDefaultWriteParam();
 
-      ImageWriter imgWrtr = ImageIO.getImageWritersByFormatName("jpg").next();
-      ImageWriteParam jpgWrtPrm = imgWrtr.getDefaultWriteParam();
-      jpgWrtPrm.setCompressionMode(JPEGImageWriteParam.MODE_EXPLICIT);
-      jpgWrtPrm.setCompressionQuality(0.80f);
+      }
+      else {
+        // non transparent image -> jpg
+        // convert to rgb
+        BufferedImage rgb = new BufferedImage(scaledImage.getWidth(), scaledImage.getHeight(), BufferedImage.TYPE_INT_RGB);
+        ColorConvertOp xformOp = new ColorConvertOp(null);
+        xformOp.filter(scaledImage, rgb);
+        imgWrtr = ImageIO.getImageWritersByFormatName("jpg").next();
+        imgWrtrPrm = imgWrtr.getDefaultWriteParam();
+        imgWrtrPrm.setCompressionMode(JPEGImageWriteParam.MODE_EXPLICIT);
+        imgWrtrPrm.setCompressionQuality(0.80f);
+
+        scaledImage = rgb;
+      }
 
       FileImageOutputStream output = new FileImageOutputStream(cachedFile);
       imgWrtr.setOutput(output);
-      IIOImage image = new IIOImage(rgb, null, null);
-      imgWrtr.write(null, image, jpgWrtPrm);
+      IIOImage image = new IIOImage(scaledImage, null, null);
+      imgWrtr.write(null, image, imgWrtrPrm);
       imgWrtr.dispose();
       output.flush();
       output.close();
-      rgb = null;
-      // }
-      // else {
-      // FileUtils.copyFile(originalFile, cachedFile);
-      // }
+      scaledImage = null;
     }
 
     if (!cachedFile.exists()) {
@@ -255,6 +282,18 @@ public class ImageCache {
     }
 
     return cachedFile;
+  }
+
+  private static boolean hasTransparentPixels(BufferedImage image) {
+    for (int x = 0; x < image.getWidth(); x++) {
+      for (int y = 0; y < image.getHeight(); y++) {
+        int pixel = image.getRGB(x, y);
+        if ((pixel >> 24) == 0x00) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /**
@@ -296,6 +335,9 @@ public class ImageCache {
       MediaFile mf = new MediaFile(new File(path));
       return ImageCache.cacheImage(mf);
     }
+    catch (EmptyFileException e) {
+      LOGGER.warn("failed to cache file (file is empty): " + path);
+    }
     catch (FileNotFoundException e) {
       LOGGER.warn(e.getMessage());
     }
@@ -323,5 +365,25 @@ public class ImageCache {
         }
       }
     }
+  }
+
+  public static Point calculateSize(int maxWidth, int maxHeight, int originalWidth, int originalHeight, boolean respectFactor) {
+    Point size = new Point();
+    if (respectFactor) {
+      // calculate on available height
+      size.y = maxHeight;
+      size.x = (int) (size.y * (double) originalWidth / (double) originalHeight);
+
+      if (size.x > maxWidth) {
+        // calculate on available height
+        size.x = maxWidth;
+        size.y = (int) (size.x * (double) originalHeight / (double) originalWidth);
+      }
+    }
+    else {
+      size.x = maxWidth;
+      size.y = maxHeight;
+    }
+    return size;
   }
 }

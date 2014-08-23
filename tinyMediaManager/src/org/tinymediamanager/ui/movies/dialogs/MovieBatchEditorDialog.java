@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,22 +26,24 @@ import java.awt.event.WindowEvent;
 import java.util.List;
 import java.util.ResourceBundle;
 
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
-import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 
-import org.tinymediamanager.Globals;
-import org.tinymediamanager.core.movie.Movie;
 import org.tinymediamanager.core.movie.MovieList;
-import org.tinymediamanager.core.movie.MovieSet;
+import org.tinymediamanager.core.movie.MovieModuleManager;
+import org.tinymediamanager.core.movie.entities.Movie;
+import org.tinymediamanager.core.movie.entities.MovieSet;
+import org.tinymediamanager.core.threading.TmmTask;
+import org.tinymediamanager.core.threading.TmmTaskManager;
 import org.tinymediamanager.scraper.MediaGenres;
-import org.tinymediamanager.ui.TmmWindowSaver;
+import org.tinymediamanager.scraper.trakttv.SyncTraktTvTask;
+import org.tinymediamanager.ui.IconManager;
 import org.tinymediamanager.ui.UTF8Control;
 import org.tinymediamanager.ui.components.AutocompleteComboBox;
+import org.tinymediamanager.ui.dialogs.TmmDialog;
 
 import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
@@ -53,7 +55,7 @@ import com.jgoodies.forms.layout.RowSpec;
  * 
  * @author Manuel Laggner
  */
-public class MovieBatchEditorDialog extends JDialog {
+public class MovieBatchEditorDialog extends TmmDialog {
   private static final long           serialVersionUID = -8515248604267310279L;
   private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
 
@@ -73,12 +75,8 @@ public class MovieBatchEditorDialog extends JDialog {
    *          the movies
    */
   public MovieBatchEditorDialog(final List<Movie> movies) {
-    setModal(true);
-    setIconImage(Globals.logo);
-    setTitle(BUNDLE.getString("movie.edit")); //$NON-NLS-1$
-    setName("movieBatchEditor");
+    super(BUNDLE.getString("movie.edit"), "movieBatchEditor"); //$NON-NLS-1$
     setBounds(5, 5, 350, 230);
-    TmmWindowSaver.loadSettings(this);
     getContentPane().setLayout(new BorderLayout(0, 0));
 
     {
@@ -99,7 +97,7 @@ public class MovieBatchEditorDialog extends JDialog {
       panelContent.add(cbGenres, "4, 2, fill, default");
 
       JButton btnAddGenre = new JButton("");
-      btnAddGenre.setIcon(new ImageIcon(MovieEditorDialog.class.getResource("/org/tinymediamanager/ui/images/Add.png")));
+      btnAddGenre.setIcon(IconManager.LIST_ADD);
       btnAddGenre.setMargin(new Insets(2, 2, 2, 2));
       btnAddGenre.addActionListener(new ActionListener() {
         @Override
@@ -130,7 +128,7 @@ public class MovieBatchEditorDialog extends JDialog {
       panelContent.add(btnAddGenre, "6, 2");
 
       JButton btnRemoveGenre = new JButton("");
-      btnRemoveGenre.setIcon(new ImageIcon(MovieEditorDialog.class.getResource("/org/tinymediamanager/ui/images/Remove.png")));
+      btnRemoveGenre.setIcon(IconManager.LIST_REMOVE);
       btnRemoveGenre.setMargin(new Insets(2, 2, 2, 2));
       btnRemoveGenre.addActionListener(new ActionListener() {
         @Override
@@ -154,7 +152,7 @@ public class MovieBatchEditorDialog extends JDialog {
       panelContent.add(cbTags, "4, 4, fill, default");
 
       JButton btnAddTag = new JButton("");
-      btnAddTag.setIcon(new ImageIcon(MovieEditorDialog.class.getResource("/org/tinymediamanager/ui/images/Add.png")));
+      btnAddTag.setIcon(IconManager.LIST_ADD);
       btnAddTag.setMargin(new Insets(2, 2, 2, 2));
       btnAddTag.addActionListener(new ActionListener() {
         @Override
@@ -171,7 +169,7 @@ public class MovieBatchEditorDialog extends JDialog {
       panelContent.add(btnAddTag, "6, 4");
 
       JButton btnRemoveTag = new JButton("");
-      btnRemoveTag.setIcon(new ImageIcon(MovieEditorDialog.class.getResource("/org/tinymediamanager/ui/images/Remove.png")));
+      btnRemoveTag.setIcon(IconManager.LIST_REMOVE);
       btnRemoveTag.setMargin(new Insets(2, 2, 2, 2));
       btnRemoveTag.addActionListener(new ActionListener() {
         @Override
@@ -195,7 +193,7 @@ public class MovieBatchEditorDialog extends JDialog {
 
       JButton btnSetMovieSet = new JButton("");
       btnSetMovieSet.setMargin(new Insets(2, 2, 2, 2));
-      btnSetMovieSet.setIcon(new ImageIcon(MovieBatchEditorDialog.class.getResource("/org/tinymediamanager/ui/images/Checkmark_big.png")));
+      btnSetMovieSet.setIcon(IconManager.APPLY);
       btnSetMovieSet.addActionListener(new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
@@ -236,7 +234,7 @@ public class MovieBatchEditorDialog extends JDialog {
 
       JButton btnWatched = new JButton("");
       btnWatched.setMargin(new Insets(2, 2, 2, 2));
-      btnWatched.setIcon(new ImageIcon(MovieBatchEditorDialog.class.getResource("/org/tinymediamanager/ui/images/Checkmark_big.png")));
+      btnWatched.setIcon(IconManager.APPLY);
       btnWatched.addActionListener(new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
@@ -258,6 +256,7 @@ public class MovieBatchEditorDialog extends JDialog {
       getContentPane().add(panelButtons, BorderLayout.SOUTH);
 
       JButton btnClose = new JButton(BUNDLE.getString("Button.close")); //$NON-NLS-1$
+      btnClose.setIcon(IconManager.APPLY);
       btnClose.addActionListener(new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent arg0) {
@@ -271,7 +270,6 @@ public class MovieBatchEditorDialog extends JDialog {
             setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
           }
           setVisible(false);
-          dispose();
         }
       });
       panelButtons.add(btnClose);
@@ -287,6 +285,11 @@ public class MovieBatchEditorDialog extends JDialog {
               movie.saveToDb();
               movie.writeNFO();
             }
+            // if configured - sync with trakt.tv
+            if (MovieModuleManager.MOVIE_SETTINGS.getSyncTrakt()) {
+              TmmTask task = new SyncTraktTvTask(moviesToEdit, null);
+              TmmTaskManager.getInstance().addUnnamedTask(task);
+            }
           }
         }
       });
@@ -295,7 +298,7 @@ public class MovieBatchEditorDialog extends JDialog {
     {
       cbMovieSet.addItem("");
 
-      for (MovieSet movieSet : movieList.getMovieSetList()) {
+      for (MovieSet movieSet : movieList.getSortedMovieSetList()) {
         cbMovieSet.addItem(movieSet);
       }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The Class CachedUrl.
+ * The Class CachedUrl. Used for caching URL requests. The requests will get cached into the cache folder for a short period (making recurring calls
+ * faster).
  * 
  * @author Manuel Laggner
  */
@@ -102,7 +103,7 @@ public class CachedUrl extends Url {
    *          the url
    * @return the cached file name
    */
-  private String getCachedFileName(String url) {
+  private static String getCachedFileName(String url) {
     try {
       if (url == null)
         return null;
@@ -225,36 +226,47 @@ public class CachedUrl extends Url {
     return new File(props.getProperty("file"));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.tinymediamanager.scraper.util.Url#getInputStream()
-   */
   @Override
-  public InputStream getInputStream() throws IOException {
-    URL u = getUrl();
-    return u.openStream();
+  public InputStream getInputStream() throws IOException, InterruptedException {
+    try {
+      URL u = getUrl();
+      return u.openStream();
+    }
+    catch (IOException e) {
+      removeCachedFile();
+      throw e;
+    }
+    catch (InterruptedException e) {
+      removeCachedFile();
+      throw e;
+    }
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.tinymediamanager.scraper.util.Url#getUrl()
-   */
-  public URL getUrl() throws IOException {
-    File f = getCachedFile();
-    if (!f.exists() || f.length() == 0) {
-      cache();
+  @Override
+  public URL getUrl() throws IOException, InterruptedException {
+    try {
+      File f = getCachedFile();
+      if (!f.exists() || f.length() == 0) {
+        cache();
+      }
+      else {
+        LOGGER.debug("Cached File exists: " + f.getAbsolutePath() + " so we'll just use it.");
+      }
+      // check if its still empty (maybe broken download)
+      if (!f.exists() || f.length() == 0) {
+        // return URI without caching
+        return new URL(url);
+      }
+      return f.toURI().toURL();
     }
-    else {
-      LOGGER.debug("Cached File exists: " + f.getAbsolutePath() + " so we'll just use it.");
+    catch (IOException e) {
+      removeCachedFile();
+      throw e;
     }
-    // check if its still empty (maybe broken download)
-    if (!f.exists() || f.length() == 0) {
-      // return URI without caching
-      return new URL(url);
+    catch (InterruptedException e) {
+      removeCachedFile();
+      throw e;
     }
-    return f.toURI().toURL();
   }
 
   /**
@@ -262,8 +274,9 @@ public class CachedUrl extends Url {
    * 
    * @throws IOException
    *           Signals that an I/O exception has occurred.
+   * @throws InterruptedException
    */
-  private void cache() throws IOException {
+  private void cache() throws IOException, InterruptedException {
     LOGGER.debug("Caching Url: " + url);
     long sizeHttp = -1;
     // workaround for local files
@@ -363,6 +376,77 @@ public class CachedUrl extends Url {
   }
 
   /**
+   * Clear the cache for one specific host
+   * 
+   * @param host
+   */
+  public static void cleanupCacheForSpecificHost(String host) {
+    // filter all .properties
+    FilenameFilter filter = new FilenameFilter() {
+      public boolean accept(File dir, String name) {
+        // do not start with .
+        if (name.toLowerCase().startsWith("."))
+          return false;
+
+        if (name.toLowerCase().endsWith(".properties")) {
+          return true;
+        }
+
+        return false;
+      }
+    };
+
+    File urlCacheDir = new File(CACHE_DIR);
+    if (!urlCacheDir.exists())
+      return;
+
+    File[] cachedFiles = urlCacheDir.listFiles(filter);
+
+    // check all cached files
+    for (File propFile : cachedFiles) {
+      Properties props = new Properties();
+      try {
+        PropertiesUtils.load(props, propFile);
+        if (props.containsKey("url") && props.getProperty("url").contains(host)) {
+          File f = getCachedFile(props);
+
+          // cleanup expired cache file
+          if (f.exists()) {
+            f.delete();
+            propFile.delete();
+          }
+        }
+      }
+      catch (Exception e) {
+        LOGGER.warn(e.getMessage());
+      }
+    }
+  }
+
+  /**
+   * Remove a specific URL from the cache
+   * 
+   * @param url
+   */
+  public static void removeCachedFileForUrl(String url) {
+    try {
+      String cachedFilename = getCachedFileName(url);
+      File propFile = new File(CACHE_DIR, cachedFilename + ".properties");
+      Properties props = new Properties();
+      if (propFile.exists()) {
+        PropertiesUtils.load(props, propFile);
+        File f = getCachedFile(props);
+        if (f.exists()) {
+          f.delete();
+          propFile.delete();
+        }
+      }
+    }
+    catch (Exception e) {
+    }
+  }
+
+  /**
    * Gets the charset.
    * 
    * @return the charset
@@ -371,10 +455,11 @@ public class CachedUrl extends Url {
   public Charset getCharset() {
     Charset charset = null;
 
-    // take the charset from the cached file
-    Charset.forName(props.getProperty("encoding"));
-
-    if (charset == null) {
+    try {
+      // take the charset from the cached file
+      charset = Charset.forName(props.getProperty("encoding"));
+    }
+    catch (Exception e) {
       charset = Charset.defaultCharset();
     }
 

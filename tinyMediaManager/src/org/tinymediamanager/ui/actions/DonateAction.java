@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,16 +41,10 @@ public class DonateAction extends AbstractAction {
   private static final Logger         LOGGER           = LoggerFactory.getLogger(DonateAction.class);
 
   public DonateAction() {
-    //    putValue(NAME, BUNDLE.getString("Feedback")); //$NON-NLS-1$
     putValue(SHORT_DESCRIPTION, BUNDLE.getString("tmm.donate")); //$NON-NLS-1$
     putValue(SMALL_ICON, new ImageIcon(getClass().getResource("/org/tinymediamanager/ui/images/btn_donate_SM.gif")));
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-   */
   @Override
   public void actionPerformed(ActionEvent e) {
     String url = StringEscapeUtils

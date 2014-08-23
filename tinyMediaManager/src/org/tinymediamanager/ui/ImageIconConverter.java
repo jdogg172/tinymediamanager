@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,7 @@
  */
 package org.tinymediamanager.ui;
 
-import javax.swing.ImageIcon;
-
 import org.jdesktop.beansbinding.Converter;
-import org.tinymediamanager.ui.movies.MoviePanel;
 
 /**
  * The Class ImageIconConverter.
@@ -26,35 +23,17 @@ import org.tinymediamanager.ui.movies.MoviePanel;
  * @author Manuel Laggner
  */
 public class ImageIconConverter extends Converter<Object, Object> {
-
-  /** The Constant checkIcon. */
-  public final static ImageIcon checkIcon = new ImageIcon(MoviePanel.class.getResource("/org/tinymediamanager/ui/images/Checkmark.png"));
-
-  /** The Constant crossIcon. */
-  public final static ImageIcon crossIcon = new ImageIcon(MoviePanel.class.getResource("/org/tinymediamanager/ui/images/Cross.png"));
-
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.jdesktop.beansbinding.Converter#convertForward(java.lang.Object)
-   */
   @Override
   public Object convertForward(Object arg0) {
     if (arg0 instanceof Boolean && arg0 == Boolean.TRUE) {
-      return checkIcon;
+      return IconManager.CHECKMARK;
     }
 
-    return crossIcon;
+    return IconManager.CROSS;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.jdesktop.beansbinding.Converter#convertReverse(java.lang.Object)
-   */
   @Override
   public Object convertReverse(Object arg0) {
     return null;
   }
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,6 @@ import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
@@ -40,6 +39,7 @@ import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
+import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
@@ -54,15 +54,20 @@ import org.jdesktop.swingbinding.JTableBinding;
 import org.jdesktop.swingbinding.SwingBindings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tinymediamanager.Globals;
-import org.tinymediamanager.core.movie.Movie;
-import org.tinymediamanager.core.movie.MovieSet;
+import org.tinymediamanager.core.MediaFileType;
+import org.tinymediamanager.core.movie.MovieModuleManager;
+import org.tinymediamanager.core.movie.entities.Movie;
+import org.tinymediamanager.core.movie.entities.MovieSet;
+import org.tinymediamanager.scraper.MediaSearchOptions;
+import org.tinymediamanager.scraper.MediaSearchOptions.SearchParam;
+import org.tinymediamanager.scraper.MediaType;
 import org.tinymediamanager.scraper.tmdb.TmdbMetadataProvider;
 import org.tinymediamanager.ui.EqualsLayout;
-import org.tinymediamanager.ui.MainWindow;
-import org.tinymediamanager.ui.TmmWindowSaver;
+import org.tinymediamanager.ui.IconManager;
+import org.tinymediamanager.ui.TmmFontHelper;
 import org.tinymediamanager.ui.UTF8Control;
 import org.tinymediamanager.ui.components.ImageLabel;
+import org.tinymediamanager.ui.dialogs.TmmDialog;
 import org.tinymediamanager.ui.moviesets.MovieSetChooserModel;
 import org.tinymediamanager.ui.moviesets.MovieSetChooserModel.MovieInSet;
 
@@ -77,7 +82,7 @@ import com.omertron.themoviedbapi.model.Collection;
  * 
  * @author Manuel Laggner
  */
-public class MovieSetChooserDialog extends JDialog implements ActionListener {
+public class MovieSetChooserDialog extends TmmDialog implements ActionListener {
 
   private static final long           serialVersionUID = -1023959850452480592L;
   private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control());                    //$NON-NLS-1$
@@ -105,12 +110,8 @@ public class MovieSetChooserDialog extends JDialog implements ActionListener {
    *          the movie set
    */
   public MovieSetChooserDialog(MovieSet movieSet, boolean inQueue) {
-    setTitle(BUNDLE.getString("movieset.search")); //$NON-NLS-1$
-    setName("movieSetChooser");
+    super(BUNDLE.getString("movieset.search"), "movieSetChooser"); //$NON-NLS-1$
     setBounds(5, 5, 865, 578);
-    TmmWindowSaver.loadSettings(this);
-    setIconImage(Globals.logo);
-    setModal(true);
 
     movieSetToScrape = movieSet;
 
@@ -181,13 +182,13 @@ public class MovieSetChooserDialog extends JDialog implements ActionListener {
         panelSearchDetail.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("left:150px"),
             FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("max(300px;default):grow"), FormFactory.RELATED_GAP_COLSPEC, }, new RowSpec[] {
             FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("250px"), FormFactory.PARAGRAPH_GAP_ROWSPEC,
-            RowSpec.decode("top:default:grow"), FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
+            RowSpec.decode("top:default:grow"), FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC }));
         {
           lblMovieSetName = new JTextArea("");
           lblMovieSetName.setLineWrap(true);
           lblMovieSetName.setOpaque(false);
           lblMovieSetName.setWrapStyleWord(true);
-          lblMovieSetName.setFont(new Font("Dialog", Font.BOLD, 14));
+          TmmFontHelper.changeFont(lblMovieSetName, 1.166, Font.BOLD);
           panelSearchDetail.add(lblMovieSetName, "2, 1, 3, 1, fill, top");
         }
         {
@@ -226,7 +227,7 @@ public class MovieSetChooserDialog extends JDialog implements ActionListener {
       {
         bottomPane.setLayout(new FormLayout(new ColumnSpec[] { ColumnSpec.decode("2dlu"), ColumnSpec.decode("185px"),
             FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("18px:grow"), FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
-            ColumnSpec.decode("2dlu"), }, new RowSpec[] { FormFactory.LINE_GAP_ROWSPEC, RowSpec.decode("25px"), }));
+            ColumnSpec.decode("2dlu"), }, new RowSpec[] { FormFactory.LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.LINE_GAP_ROWSPEC }));
         {
           progressBar = new JProgressBar();
           bottomPane.add(progressBar, "2, 2, fill, center");
@@ -239,18 +240,21 @@ public class MovieSetChooserDialog extends JDialog implements ActionListener {
           JPanel buttonPane = new JPanel();
           bottomPane.add(buttonPane, "6, 2, fill, fill");
           EqualsLayout layout = new EqualsLayout(5);
+          buttonPane.setBorder(new EmptyBorder(4, 4, 4, 4));
           layout.setMinWidth(100);
           buttonPane.setLayout(layout);
 
           btnOk = new JButton(BUNDLE.getString("Button.ok")); //$NON-NLS-1$
           btnOk.setActionCommand("Save");
           btnOk.setToolTipText(BUNDLE.getString("Button.ok")); //$NON-NLS-1$
+          btnOk.setIcon(IconManager.APPLY);
           btnOk.addActionListener(this);
           buttonPane.add(btnOk);
 
           JButton btnCancel = new JButton(BUNDLE.getString("Button.cancel")); //$NON-NLS-1$
           btnCancel.setActionCommand("Cancel");
           btnCancel.setToolTipText(BUNDLE.getString("Button.cancel")); //$NON-NLS-1$
+          btnCancel.setIcon(IconManager.CANCEL);
           btnCancel.addActionListener(this);
           buttonPane.add(btnCancel);
 
@@ -258,7 +262,8 @@ public class MovieSetChooserDialog extends JDialog implements ActionListener {
             JButton btnAbort = new JButton(BUNDLE.getString("Button.abortqueue")); //$NON-NLS-1$
             btnAbort.setActionCommand("Abort");
             btnAbort.setToolTipText(BUNDLE.getString("Button.abortqueue")); //$NON-NLS-1$
-            btnCancel.addActionListener(this);
+            btnAbort.setIcon(IconManager.PROCESS_STOP);
+            btnAbort.addActionListener(this);
             buttonPane.add(btnAbort, "6, 1, fill, top");
           }
         }
@@ -271,54 +276,33 @@ public class MovieSetChooserDialog extends JDialog implements ActionListener {
     tableMovies.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
 
     tableMovieSets.getColumnModel().getColumn(0).setHeaderValue(BUNDLE.getString("chooser.searchresult"));
-    {
-      tfMovieSetName.setText(movieSet.getTitle());
-      searchMovie();
-    }
+    tfMovieSetName.setText(movieSet.getTitle());
+    searchMovie();
 
   }
 
-  /**
-   * Search movie.
-   * 
-   */
   private void searchMovie() {
     SearchTask task = new SearchTask(tfMovieSetName.getText());
     task.execute();
   }
 
-  /**
-   * The Class SearchTask.
-   * 
-   * @author Manuel Laggner
-   */
   private class SearchTask extends SwingWorker<Void, Void> {
-
-    /** The search term. */
     private String searchTerm;
 
-    /**
-     * Instantiates a new search task.
-     * 
-     * @param searchTerm
-     *          the search term
-     */
     public SearchTask(String searchTerm) {
       this.searchTerm = searchTerm;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.SwingWorker#doInBackground()
-     */
     @Override
     public Void doInBackground() {
       startProgressBar(BUNDLE.getString("chooser.searchingfor") + " " + searchTerm); //$NON-NLS-1$
       TmdbMetadataProvider mp;
       try {
         mp = new TmdbMetadataProvider();
-        List<Collection> movieSets = mp.searchMovieSets(searchTerm);
+        MediaSearchOptions options = new MediaSearchOptions(MediaType.MOVIE_SET);
+        options.set(SearchParam.TITLE, searchTerm);
+        options.set(SearchParam.LANGUAGE, MovieModuleManager.MOVIE_SETTINGS.getScraperLanguage().name());
+        List<Collection> movieSets = mp.searchMovieSets(options);
         movieSetsFound.clear();
         if (movieSets.size() == 0) {
           movieSetsFound.add(MovieSetChooserModel.emptyResult);
@@ -337,59 +321,33 @@ public class MovieSetChooserDialog extends JDialog implements ActionListener {
       return null;
     }
 
-    /*
-     * Executed in event dispatching thread
-     */
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.SwingWorker#done()
-     */
     @Override
     public void done() {
       stopProgressBar();
     }
   }
 
-  /**
-   * The Class SearchAction.
-   * 
-   * @author Manuel Laggner
-   */
   private class SearchAction extends AbstractAction {
+    private static final long serialVersionUID = -6561883838396668177L;
 
-    /** The Constant serialVersionUID. */
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * Instantiates a new search action.
-     */
     public SearchAction() {
       putValue(NAME, BUNDLE.getString("Button.search")); //$NON-NLS-1$
       putValue(SHORT_DESCRIPTION, BUNDLE.getString("movieset.search")); //$NON-NLS-1$
+      putValue(SMALL_ICON, IconManager.SEARCH);
+      putValue(LARGE_ICON_KEY, IconManager.SEARCH);
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-     */
+    @Override
     public void actionPerformed(ActionEvent e) {
       searchMovie();
     }
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-   */
   @Override
   public void actionPerformed(ActionEvent arg0) {
     if ("Cancel".equals(arg0.getActionCommand())) {
       // cancel
       setVisible(false);
-      dispose();
     }
 
     if ("Save".equals(arg0.getActionCommand())) {
@@ -406,8 +364,8 @@ public class MovieSetChooserDialog extends JDialog implements ActionListener {
           else {
             movieSetToScrape.setPlot("");
           }
-          movieSetToScrape.setPosterUrl(model.getPosterUrl());
-          movieSetToScrape.setFanartUrl(model.getFanartUrl());
+          movieSetToScrape.setArtworkUrl(model.getPosterUrl(), MediaFileType.POSTER);
+          movieSetToScrape.setArtworkUrl(model.getFanartUrl(), MediaFileType.FANART);
           movieSetToScrape.setTmdbId(model.getTmdbId());
           movieSetToScrape.saveToDb();
 
@@ -442,43 +400,23 @@ public class MovieSetChooserDialog extends JDialog implements ActionListener {
 
         }
         setVisible(false);
-        dispose();
       }
     }
 
     // Abort queue
     if ("Abort".equals(arg0.getActionCommand())) {
       continueQueue = false;
-      this.setVisible(false);
-      dispose();
+      setVisible(false);
     }
   }
 
-  /**
-   * The Class ScrapeTask.
-   * 
-   * @author Manuel Laggner
-   */
   private class ScrapeTask extends SwingWorker<Void, Void> {
-
-    /** The model. */
     private MovieSetChooserModel model;
 
-    /**
-     * Instantiates a new scrape task.
-     * 
-     * @param model
-     *          the model
-     */
     public ScrapeTask(MovieSetChooserModel model) {
       this.model = model;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.SwingWorker#doInBackground()
-     */
     @Override
     public Void doInBackground() {
       startProgressBar(BUNDLE.getString("chooser.scrapeing") + " " + model.getName()); //$NON-NLS-1$
@@ -491,26 +429,12 @@ public class MovieSetChooserDialog extends JDialog implements ActionListener {
       return null;
     }
 
-    /*
-     * Executed in event dispatching thread
-     */
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.SwingWorker#done()
-     */
     @Override
     public void done() {
       stopProgressBar();
     }
   }
 
-  /**
-   * Start progress bar.
-   * 
-   * @param description
-   *          the description
-   */
   private void startProgressBar(final String description) {
     SwingUtilities.invokeLater(new Runnable() {
       @Override
@@ -522,9 +446,6 @@ public class MovieSetChooserDialog extends JDialog implements ActionListener {
     });
   }
 
-  /**
-   * Stop progress bar.
-   */
   private void stopProgressBar() {
     SwingUtilities.invokeLater(new Runnable() {
       @Override
@@ -579,9 +500,12 @@ public class MovieSetChooserDialog extends JDialog implements ActionListener {
    * @return true, if successful
    */
   public boolean showDialog() {
-    // pack();
-    setLocationRelativeTo(MainWindow.getActiveInstance());
     setVisible(true);
     return continueQueue;
+  }
+
+  @Override
+  public void pack() {
+    // do not let it pack - it looks weird
   }
 }

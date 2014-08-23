@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import java.util.ResourceBundle;
 
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
@@ -41,14 +40,15 @@ import org.jdesktop.swingbinding.JListBinding;
 import org.jdesktop.swingbinding.SwingBindings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tinymediamanager.Globals;
 import org.tinymediamanager.core.ExportTemplate;
-import org.tinymediamanager.core.movie.Movie;
+import org.tinymediamanager.core.MediaEntityExporter.TemplateType;
 import org.tinymediamanager.core.movie.MovieExporter;
+import org.tinymediamanager.core.movie.entities.Movie;
 import org.tinymediamanager.ui.EqualsLayout;
+import org.tinymediamanager.ui.IconManager;
 import org.tinymediamanager.ui.TmmUIHelper;
-import org.tinymediamanager.ui.TmmWindowSaver;
 import org.tinymediamanager.ui.UTF8Control;
+import org.tinymediamanager.ui.dialogs.TmmDialog;
 
 import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
@@ -60,7 +60,7 @@ import com.jgoodies.forms.layout.RowSpec;
  * 
  * @author Manuel Laggner
  */
-public class MovieExporterDialog extends JDialog {
+public class MovieExporterDialog extends TmmDialog {
 
   private static final long           serialVersionUID = 4085262825778794266L;
   private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
@@ -83,12 +83,9 @@ public class MovieExporterDialog extends JDialog {
    *          the movies to export
    */
   public MovieExporterDialog(List<Movie> moviesToExport) {
-    setTitle(BUNDLE.getString("movie.export")); //$NON-NLS-1$
-    setName("movieExporter");
+    super(BUNDLE.getString("movie.export"), "movieExporter"); //$NON-NLS-1$
     setBounds(5, 5, 600, 300);
-    TmmWindowSaver.loadSettings(this);
-    setIconImage(Globals.logo);
-    setModal(true);
+
     getContentPane().setLayout(
         new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), FormFactory.RELATED_GAP_COLSPEC,
             FormFactory.DEFAULT_COLSPEC, FormFactory.RELATED_GAP_COLSPEC, }, new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC,
@@ -152,6 +149,7 @@ public class MovieExporterDialog extends JDialog {
     getContentPane().add(panelButtons, "2, 6, 3, 1, fill, fill");
 
     JButton btnExport = new JButton("Export");
+    btnExport.setIcon(IconManager.EXPORT);
     btnExport.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent arg0) {
         if (StringUtils.isBlank(tfExportDir.getText())) {
@@ -166,29 +164,29 @@ public class MovieExporterDialog extends JDialog {
         ExportTemplate selectedTemplate = templatesFound.get(index);
         if (selectedTemplate != null) {
           try {
-            MovieExporter.export(movies, selectedTemplate.getPath(), tfExportDir.getText());
+            MovieExporter exporter = new MovieExporter(selectedTemplate.getPath());
+            exporter.export(movies, tfExportDir.getText());
           }
           catch (Exception e) {
             LOGGER.error("Error exporting movies: " + e.getMessage());
           }
-          MovieExporterDialog.this.setVisible(false);
-          dispose();
+          setVisible(false);
         }
       }
     });
     panelButtons.add(btnExport);
 
     JButton btnCancel = new JButton(BUNDLE.getString("Button.cancel")); //$NON-NLS-1$
+    btnCancel.setIcon(IconManager.CANCEL);
     btnCancel.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent arg0) {
-        MovieExporterDialog.this.setVisible(false);
-        dispose();
+        setVisible(false);
       }
     });
     panelButtons.add(btnCancel);
 
     movies = moviesToExport;
-    templatesFound = MovieExporter.findTemplates();
+    templatesFound = MovieExporter.findTemplates(TemplateType.MOVIE);
     initDataBindings();
   }
 

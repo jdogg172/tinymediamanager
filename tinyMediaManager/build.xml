@@ -1,7 +1,7 @@
 <project default="create_tmm_jar" name="Tiny Media Manager">
 
     <!-- software revision number -->
-    <property name="version" value="2.5.5" />
+    <property name="version" value="2.6" />
 
     <!-- build directories -->
     <property name="lib.dir" value="lib" />
@@ -93,7 +93,7 @@
             <manifest>
                 <attribute name="Main-Class" value="org.tinymediamanager.TinyMediaManager" />
                 <attribute name="SplashScreen-Image" value="org/tinymediamanager/ui/images/splashscreen.png" />
-                <attribute name="Class-Path" value=". locale/ ${jar.classpath}" />
+                <attribute name="Class-Path" value=". locale/ ${jar.classpath} lib/swt.jar" />
                 <attribute name="Implementation-Title" value="tinyMediaManager"/>
                 <attribute name="Implementation-Version" value="${version} (r${svn.info.revision})"/> 
                 <attribute name="Build-Date" value="${DSTAMP}-${TSTAMP}"/>
@@ -137,16 +137,46 @@
         <antcall target="downloadLocale"><param name="lang" value="ru"/></antcall>
         <antcall target="downloadLocale"><param name="lang" value="sk"/></antcall>
         <antcall target="downloadLocale"><param name="lang" value="vi"/></antcall>
+        <antcall target="downloadLocale"><param name="lang" value="zh"/></antcall>
     </target>
 
     <target name='package-app' description="builds the packages" depends='create_tmm_jar'>
         <!-- default files, to include in dist -->
         <copy file="objectdb.conf" todir="${build.dir}" />
-    	  <copy file="changelog.txt" todir="${build.dir}"/>
+        <copy file="changelog.txt" todir="${build.dir}"/>
         <copy file="AppBundler/getdown.jar" todir="${build.dir}" />
         <copy file="AppBundler/${getdown}" tofile="${build.dir}/getdown.txt" />
         <replace file="${build.dir}/getdown.txt" token="%SVNREV%" value="${svn.info.revision}"/>
-        <copy file="AppBundler/LICENSE" todir="${build.dir}" />
+
+        <pathconvert property="gd.code" refid="classpath.default" pathsep="">
+            <mapper>
+                <chainedmapper>
+                    <flattenmapper /> <!-- remove absolute path -->
+                    <!-- add GD + lib/ prefix + newline ;) -->
+                    <globmapper from="*" to="code = lib/*${line.separator}" />
+                </chainedmapper>
+            </mapper>
+        </pathconvert>
+        <!-- echo message="${gd.code}" /-->
+        <replace file="${build.dir}/getdown.txt" token="%CODELIBS%" value="${gd.code}"/>
+
+        <pathconvert property="gd.locale" pathsep="">
+            <mapper>
+                <chainedmapper>
+                    <flattenmapper />
+                    <globmapper from="*" to="resource = locale/*${line.separator}" />
+                </chainedmapper>
+            </mapper>
+            <path>
+                <fileset dir="locale">
+                    <include name="**/*.properties" />
+                </fileset>
+            </path>
+        </pathconvert>
+        <!-- echo message="${gd.locale}" /-->
+        <replace file="${build.dir}/getdown.txt" token="%LOCALES%" value="${gd.locale}"/>
+
+    	<copy file="AppBundler/LICENSE" todir="${build.dir}" />
         <copy file="AppBundler/splashscreen.png" todir="${build.dir}" />
         <copy file="AppBundler/tmm.png" todir="${build.dir}" />
         <copy file="AppBundler/env.txt" todir="${build.dir}" />
@@ -158,27 +188,28 @@
                     mainclass="com.threerings.getdown.launcher.Getdown" arguments="." 
                     bundleid="org.tinyMediaManager.tinymediamanager" infostring="tinyMediaManager" 
                     jvmversion="1.6+" shortname="tMM" workingdirectory="$JAVAROOT" 
-                    vmoptions="-Dapple.awt.graphics.UseQuartz=true">
+                    vmoptions="">
             <jarfileset dir="${build.dir}">
                 <include name="**/*" />
             </jarfileset>
         </jarbundler>
-        <copy file="AppBundler/JavaApplicationStub" todir="${dist.dir}/mac/tinyMediaManager.app/Contents/MacOS" />
+        <copy file="AppBundler/JavaApplicationStub.new" tofile="${dist.dir}/mac/tinyMediaManager.app/Contents/MacOS/JavaApplicationStub" />
         <chmod file="${dist.dir}/mac/tinyMediaManager.app/Contents/MacOS/JavaApplicationStub" perm="ugo+rx" />
+    	<copy file="AppBundler/tinyMediaManagerOSX.sh" tofile="${dist.dir}/mac/tinyMediaManager.app/Contents/Resources/Java/tinyMediaManagerOSX.sh" />
+    	<chmod file="${dist.dir}/mac/tinyMediaManager.app/Contents/Resources/Java/tinyMediaManagerOSX.sh" perm="ugo+rx" />
         <zip destfile="${dist.dir}/tmm_${version}_r${svn.info.revision}_mac.zip" level="9">
             <zipfileset filemode="755" dir="${dist.dir}/mac" includes="tinyMediaManager.app/**/*" />
         </zip>
 
         <!-- Windows -->
-        <!-- do not generate everytime - use exitsing ones
         <taskdef name="launch4j" classname="net.sf.launch4j.ant.Launch4jTask" 
-                 classpath="AppBundler/launch4j/launch4j.jar:AppBundler/launch4j/xstream.jar" />
-        <launch4j configFile="AppBundler/launch4j.xml" txtProductVersion="${version}_r${svn.info.revision}"
+                 classpath="AppBundler/launch4j/launch4j.jar:AppBundler/launch4j/lib/xstream.jar" />
+        <launch4j configFile="./AppBundler/launch4j.xml" txtProductVersion="${version}_r${svn.info.revision}"
                   outfile="${dist.dir}/tinyMediaManager.exe"/>
-        <launch4j configFile="AppBundler/launch4jcmd.xml" txtProductVersion="${version}_r${svn.info.revision}"
-                  outfile="${dist.dir}/tinyMediaManagerCMD.exe"/-->
-        <copy file="AppBundler/tinyMediaManager.exe" tofile="${dist.dir}/tinyMediaManager.exe" />
-        <copy file="AppBundler/tinyMediaManagerCMD.exe" tofile="${dist.dir}/tinyMediaManagerCMD.exe" />
+    	<launch4j configFile="./AppBundler/launch4jUpdater.xml" txtProductVersion="${version}_r${svn.info.revision}"
+    	                  outfile="${dist.dir}/tinyMediaManagerUpd.exe"/>
+        <launch4j configFile="./AppBundler/launch4jcmd.xml" txtProductVersion="${version}_r${svn.info.revision}"
+                  outfile="${dist.dir}/tinyMediaManagerCMD.exe"/>
         <zip destfile="${dist.dir}/tmm_${version}_r${svn.info.revision}_win.zip" level="9">
             <zipfileset filemode="755" dir="${build.dir}" excludes="env.txt" />
             <zipfileset filemode="755" dir="${dist.dir}" includes="*.exe"/>
@@ -186,8 +217,10 @@
 
         <!-- Linux -->
         <copy file="AppBundler/tinyMediaManager.sh" todir="${dist.dir}" />
+    	<copy file="AppBundler/tinyMediaManagerUpdater.sh" todir="${dist.dir}" />
         <copy file="AppBundler/tinyMediaManagerCMD.sh" todir="${dist.dir}" />
         <chmod file="${dist.dir}/tinyMediaManager.sh" perm="ugo+rx" />
+    	<chmod file="${dist.dir}/tinyMediaManagerUpdater.sh" perm="ugo+rx" />
         <chmod file="${dist.dir}/tinyMediaManagerCMD.sh" perm="ugo+rx" />
         <tar destfile="${dist.dir}/tmm_${version}_r${svn.info.revision}_linux.tar" >
             <tarfileset dir="${build.dir}" excludes="env.txt"/>
@@ -205,10 +238,14 @@
         <copy todir="${build.dir}/locale">
             <fileset dir="locale"/>
         </copy>
-        <copy file="AppBundler/tinyMediaManager.exe" tofile="${build.dir}/tinyMediaManager.new" />
-        <copy file="AppBundler/tinyMediaManagerCMD.exe" tofile="${build.dir}/tinyMediaManagerCMD.new" />
+        <copy file="${dist.dir}/tinyMediaManager.exe" tofile="${build.dir}/tinyMediaManager.new" />
+    	  <copy file="${dist.dir}/tinyMediaManagerUpd.exe" tofile="${build.dir}/tinyMediaManagerUpd.new" />
+        <copy file="${dist.dir}/tinyMediaManagerCMD.exe" tofile="${build.dir}/tinyMediaManagerCMD.new" />
         <copy file="${dist.dir}/tinyMediaManager.sh" tofile="${build.dir}/tinyMediaManager.sh" />
+    	  <copy file="${dist.dir}/tinyMediaManagerUpdater.sh" tofile="${build.dir}/tinyMediaManagerUpdater.sh" />
         <copy file="${dist.dir}/tinyMediaManagerCMD.sh" tofile="${build.dir}/tinyMediaManagerCMD.sh" />
+    	  <copy file="AppBundler/tinyMediaManagerOSX.sh" tofile="${build.dir}/tinyMediaManagerOSX.sh" />
+    	  <copy file="AppBundler/JavaApplicationStub.new" tofile="${build.dir}/JavaApplicationStub.new" />
         <copy file="AppBundler/getdown.jar" tofile="${build.dir}/getdown-new.jar" />
 
         <!-- finally create checksums -->

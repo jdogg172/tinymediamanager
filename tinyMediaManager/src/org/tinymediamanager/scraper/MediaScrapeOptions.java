@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import java.util.HashMap;
 
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.tinymediamanager.core.Constants;
 import org.tinymediamanager.scraper.MediaArtwork.MediaArtworkType;
 
 /**
@@ -30,12 +31,13 @@ import org.tinymediamanager.scraper.MediaArtwork.MediaArtworkType;
 public class MediaScrapeOptions {
   private MediaSearchResult       result;
   private MediaMetadata           metadata;
-  private HashMap<String, String> ids                  = new HashMap<String, String>();
+  private HashMap<String, String> ids                       = new HashMap<String, String>();
   private MediaType               type;
-  private MediaArtworkType        artworkType          = MediaArtworkType.ALL;
-  private MediaLanguages          language             = MediaLanguages.en;
-  private CountryCode             country              = CountryCode.US;
-  private boolean                 scrapeCollectionInfo = false;
+  private MediaArtworkType        artworkType               = MediaArtworkType.ALL;
+  private MediaLanguages          language                  = MediaLanguages.en;
+  private CountryCode             country                   = CountryCode.US;
+  private boolean                 scrapeCollectionInfo      = false;
+  private boolean                 scrapeImdbForeignLanguage = false;
 
   public MediaSearchResult getResult() {
     return result;
@@ -54,7 +56,7 @@ public class MediaScrapeOptions {
   }
 
   public String getImdbId() {
-    Object obj = ids.get("imdbId");
+    Object obj = ids.get(Constants.IMDBID);
     if (obj == null) {
       return "";
     }
@@ -64,7 +66,7 @@ public class MediaScrapeOptions {
   public int getTmdbId() {
     int id = 0;
     try {
-      id = Integer.parseInt(ids.get("tmdbId"));
+      id = Integer.parseInt(ids.get(Constants.TMDBID));
     }
     catch (Exception e) {
       return 0;
@@ -73,11 +75,11 @@ public class MediaScrapeOptions {
   }
 
   public void setImdbId(String imdbId) {
-    ids.put("imdbId", imdbId);
+    ids.put(Constants.IMDBID, imdbId);
   }
 
   public void setTmdbId(int tmdbId) {
-    ids.put("tmdbId", String.valueOf(tmdbId));
+    ids.put(Constants.TMDBID, String.valueOf(tmdbId));
   }
 
   public MediaArtworkType getArtworkType() {
@@ -126,6 +128,14 @@ public class MediaScrapeOptions {
 
   public void setScrapeCollectionInfo(boolean scrapeCollectionInfo) {
     this.scrapeCollectionInfo = scrapeCollectionInfo;
+  }
+
+  public boolean isScrapeImdbForeignLanguage() {
+    return scrapeImdbForeignLanguage;
+  }
+
+  public void setScrapeImdbForeignLanguage(boolean scrapeImdbForeignLanguage) {
+    this.scrapeImdbForeignLanguage = scrapeImdbForeignLanguage;
   }
 
   /**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -36,15 +38,17 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tinymediamanager.Globals;
+import org.tinymediamanager.core.Constants;
 import org.tinymediamanager.core.Utils;
 import org.tinymediamanager.scraper.Certification;
+import org.tinymediamanager.scraper.CountryCode;
 import org.tinymediamanager.scraper.IMediaMetadataProvider;
 import org.tinymediamanager.scraper.MediaArtwork;
 import org.tinymediamanager.scraper.MediaArtwork.MediaArtworkType;
 import org.tinymediamanager.scraper.MediaCastMember;
 import org.tinymediamanager.scraper.MediaCastMember.CastType;
 import org.tinymediamanager.scraper.MediaGenres;
+import org.tinymediamanager.scraper.MediaLanguages;
 import org.tinymediamanager.scraper.MediaMetadata;
 import org.tinymediamanager.scraper.MediaProviderInfo;
 import org.tinymediamanager.scraper.MediaScrapeOptions;
@@ -56,47 +60,36 @@ import org.tinymediamanager.scraper.tmdb.TmdbMetadataProvider;
 import org.tinymediamanager.scraper.util.CachedUrl;
 
 /**
- * The Class ImdbMetadataProvider.
+ * The Class ImdbMetadataProvider. A meta data provider for the site imdb.com
  * 
  * @author Manuel Laggner
  */
+@SuppressWarnings("PMD")
 public class ImdbMetadataProvider implements IMediaMetadataProvider {
 
-  private static MediaProviderInfo providerInfo  = new MediaProviderInfo("imdb", "imdb.com",
-                                                     "Scraper for imdb which is able to scrape movie metadata");
-  private static final Logger      LOGGER        = LoggerFactory.getLogger(ImdbMetadataProvider.class);
+  private static MediaProviderInfo     providerInfo  = new MediaProviderInfo(Constants.IMDBID, "imdb.com",
+                                                         "Scraper for imdb which is able to scrape movie metadata");
+  private static final Logger          LOGGER        = LoggerFactory.getLogger(ImdbMetadataProvider.class);
+  private static final ExecutorService executor      = Executors.newFixedThreadPool(4);
 
-  public static final String       CAT_ALL       = "&s=all";
-  public static final String       CAT_TITLE     = "&s=tt";
-  public static final String       CAT_MOVIES    = "&s=tt&ttype=ft&ref_=fn_ft";
-  public static final String       CAT_TV        = "&s=tt&ttype=tv&ref_=fn_tv";
-  public static final String       CAT_EPISODE   = "&s=tt&ttype=ep&ref_=fn_ep";
-  public static final String       CAT_VIDEOGAME = "&s=tt&ttype=vg&ref_=fn_vg";
+  public static final String           CAT_ALL       = "&s=all";
+  public static final String           CAT_TITLE     = "&s=tt";
+  public static final String           CAT_MOVIES    = "&s=tt&ttype=ft&ref_=fn_ft";
+  public static final String           CAT_TV        = "&s=tt&ttype=tv&ref_=fn_tv";
+  public static final String           CAT_EPISODE   = "&s=tt&ttype=ep&ref_=fn_ep";
+  public static final String           CAT_VIDEOGAME = "&s=tt&ttype=vg&ref_=fn_vg";
 
-  private ImdbSiteDefinition       imdbSite;
+  private ImdbSiteDefinition           imdbSite;
 
-  /**
-   * Instantiates a new imdb metadata provider.
-   */
   public ImdbMetadataProvider() {
     imdbSite = ImdbSiteDefinition.IMDB_COM;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.tinymediamanager.scraper.IMediaMetadataProvider#getInfo()
-   */
   @Override
   public MediaProviderInfo getProviderInfo() {
     return providerInfo;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.tinymediamanager.scraper.IMediaMetadataProvider#getMetadata(org. tinymediamanager.scraper.MediaScrapeOptions)
-   */
   @Override
   public MediaMetadata getMetadata(MediaScrapeOptions options) throws Exception {
     LOGGER.debug("getMetadata() " + options.toString());
@@ -126,8 +119,8 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
     LOGGER.debug("IMDB: getMetadata(imdbId): " + imdbId);
     md.setId(MediaMetadata.IMDBID, imdbId);
 
-    ExecutorCompletionService<Document> compSvcImdb = new ExecutorCompletionService<Document>(Globals.executor);
-    ExecutorCompletionService<MediaMetadata> compSvcTmdb = new ExecutorCompletionService<MediaMetadata>(Globals.executor);
+    ExecutorCompletionService<Document> compSvcImdb = new ExecutorCompletionService<Document>(executor);
+    ExecutorCompletionService<MediaMetadata> compSvcTmdb = new ExecutorCompletionService<MediaMetadata>(executor);
 
     // worker for imdb request (/combined) (everytime from akas.imdb.com)
     // StringBuilder sb = new StringBuilder(imdbSite.getSite());
@@ -150,8 +143,8 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
 
     // worker for tmdb request
     Future<MediaMetadata> futureTmdb = null;
-    if (Globals.settings.getMovieSettings().isImdbScrapeForeignLanguage() || options.isScrapeCollectionInfo()) {
-      Callable<MediaMetadata> worker2 = new TmdbWorker(imdbId);
+    if (options.isScrapeImdbForeignLanguage() || options.isScrapeCollectionInfo()) {
+      Callable<MediaMetadata> worker2 = new TmdbWorker(imdbId, options.getLanguage(), options.getCountry());
       futureTmdb = compSvcTmdb.submit(worker2);
     }
 
@@ -328,10 +321,7 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
          * more</a>&nbsp;&raquo; </div></div>
          */
         // tagline
-        // if (h5Title.matches("(?i)" + imdbSite.getTagline() + ".*") &&
-        // !Globals.settings.isImdbScrapeForeignLanguage()) {
-        if (h5Title.matches("(?i)" + ImdbSiteDefinition.IMDB_COM.getTagline() + ".*")
-            && !Globals.settings.getMovieSettings().isImdbScrapeForeignLanguage()) {
+        if (h5Title.matches("(?i)" + ImdbSiteDefinition.IMDB_COM.getTagline() + ".*") && !options.isScrapeImdbForeignLanguage()) {
           Elements div = element.getElementsByClass("info-content");
           if (div.size() > 0) {
             Element taglineElement = div.first();
@@ -348,7 +338,6 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
          * "(new Image()).src='/rg/title-tease/keywords/images/b.gif?link=/title/tt0472033/keywords';" > See more</a>&nbsp;&raquo; </div>
          */
         // genres are only scraped from akas.imdb.com
-        // if (imdbSite == ImdbSiteDefinition.IMDB_COM) {
         if (h5Title.matches("(?i)" + imdbSite.getGenre() + "(.*)")) {
           Elements div = element.getElementsByClass("info-content");
           if (div.size() > 0) {
@@ -433,25 +422,6 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
           md.storeMetadata(MediaMetadata.SPOKEN_LANGUAGES, spokenLanguages);
         }
 
-        // /*
-        // * <div class="info"> <h5>Writers:</h5> <div class="info-content"> <a href="/name/nm0152312/" onclick=
-        // * "(new Image()).src='/rg/writerlist/position-1/images/b.gif?link=name/nm0152312/';" >Brenda Chapman</a> (story)<br/> <a
-        // * href="/name/nm0028764/" onclick= "(new Image()).src='/rg/writerlist/position-2/images/b.gif?link=name/nm0028764/';" >Mark Andrews</a>
-        // * (screenplay) ...<br/> <a href="fullcredits#writers">(more)</a> </div> </div>
-        // */
-        // // writer
-        // // if (h5Title.matches("(?i)" + imdbSite.getWriter() + ".*")) {
-        // if (h5Title.matches("(?i)" + ImdbSiteDefinition.IMDB_COM.getWriter() + ".*")) {
-        // Elements a = element.getElementsByTag("a");
-        // for (Element anchor : a) {
-        // if (anchor.attr("href").matches("/name/nm.*")) {
-        // MediaCastMember cm = new MediaCastMember(CastType.WRITER);
-        // cm.setName(anchor.ownText());
-        // md.addCastMember(cm);
-        // }
-        // }
-        // }
-
         /*
          * <div class="info"><h5>Certification:</h5><div class="info-content"><a href="/search/title?certificates=us:pg">USA:PG</a> <i>(certificate
          * #47489)</i> | <a href="/search/title?certificates=ca:pg">Canada:PG</a> <i>(Ontario)</i> | <a
@@ -464,14 +434,13 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
           Elements a = element.getElementsByTag("a");
           for (Element anchor : a) {
             // certification for the right country
-            if (anchor.attr("href").matches(
-                "(?i)/search/title\\?certificates=" + Globals.settings.getMovieSettings().getCertificationCountry().getAlpha2() + ".*")) {
+            if (anchor.attr("href").matches("(?i)/search/title\\?certificates=" + options.getCountry().getAlpha2() + ".*")) {
               Pattern certificationPattern = Pattern.compile(".*:(.*)");
               Matcher matcher = certificationPattern.matcher(anchor.ownText());
               Certification certification = null;
               while (matcher.find()) {
                 if (matcher.group(1) != null) {
-                  certification = Certification.getCertification(Globals.settings.getMovieSettings().getCertificationCountry(), matcher.group(1));
+                  certification = Certification.getCertification(options.getCountry(), matcher.group(1));
                 }
               }
 
@@ -620,7 +589,6 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
      * plot from /plotsummary
      */
     // build the url
-    // if (!Globals.settings.getMovieSettings().isImdbScrapeForeignLanguage()) {
     doc = null;
     doc = futurePlotsummary.get();
 
@@ -660,14 +628,15 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
     // }
 
     // get data from tmdb?
-    if (Globals.settings.getMovieSettings().isImdbScrapeForeignLanguage() || options.isScrapeCollectionInfo()) {
+    if (options.isScrapeImdbForeignLanguage() || options.isScrapeCollectionInfo()) {
       MediaMetadata tmdbMd = futureTmdb.get();
-      if (Globals.settings.getMovieSettings().isImdbScrapeForeignLanguage() && tmdbMd != null
-          && StringUtils.isNotBlank(tmdbMd.getStringValue(MediaMetadata.PLOT))) {
+      if (options.isScrapeImdbForeignLanguage() && tmdbMd != null && StringUtils.isNotBlank(tmdbMd.getStringValue(MediaMetadata.PLOT))) {
         // tmdbid
         md.setId(MediaMetadata.TMDBID, tmdbMd.getId(MediaMetadata.TMDBID));
         // title
         md.storeMetadata(MediaMetadata.TITLE, tmdbMd.getStringValue(MediaMetadata.TITLE));
+        // original title
+        md.storeMetadata(MediaMetadata.ORIGINAL_TITLE, tmdbMd.getStringValue(MediaMetadata.ORIGINAL_TITLE));
         // tagline
         md.storeMetadata(MediaMetadata.TAGLINE, tmdbMd.getStringValue(MediaMetadata.TAGLINE));
         // plot
@@ -682,23 +651,14 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
       }
     }
 
+    // if we have still no original title, take the title
+    if (StringUtils.isBlank(md.getStringValue(MediaMetadata.ORIGINAL_TITLE))) {
+      md.storeMetadata(MediaMetadata.ORIGINAL_TITLE, md.getStringValue(MediaMetadata.TITLE));
+    }
+
     return md;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.tinymediamanager.scraper.IMediaMetadataProvider#search(org.tinymediamanager .scraper.SearchQuery)
-   */
-  /**
-   * Search.
-   * 
-   * @param query
-   *          the query
-   * @return the list
-   * @throws Exception
-   *           the exception
-   */
   @Override
   public List<MediaSearchResult> search(MediaSearchOptions query) throws Exception {
     LOGGER.debug("search() " + query.toString());
@@ -740,7 +700,7 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
     // parse out language and coutry from the scraper options
     String language = query.get(SearchParam.LANGUAGE);
     String myear = query.get(SearchParam.YEAR);
-    String country = ""; // we do not have a country in the search params
+    String country = query.get(SearchParam.COUNTRY); // for passing the country to the scrape
 
     searchTerm = MetadataUtil.removeNonSearchCharacters(searchTerm);
 
@@ -768,6 +728,10 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
     }
     catch (Exception e) {
       LOGGER.debug("tried to fetch search response", e);
+
+      // clear Cache
+      CachedUrl.removeCachedFileForUrl(sb.toString());
+
       return result;
     }
 
@@ -791,9 +755,10 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
       if (!StringUtils.isEmpty(movieId)) {
         MediaScrapeOptions options = new MediaScrapeOptions();
         options.setImdbId(movieId);
-        options.setLanguage(Globals.settings.getMovieSettings().getScraperLanguage());
-        options.setCountry(Globals.settings.getMovieSettings().getCertificationCountry());
-        options.setScrapeCollectionInfo(Globals.settings.getMovieScraperMetadataConfig().isCollection());
+        options.setLanguage(MediaLanguages.valueOf(language));
+        options.setCountry(CountryCode.valueOf(country));
+        options.setScrapeCollectionInfo(Boolean.parseBoolean(query.get(SearchParam.COLLECTION_INFO)));
+        options.setScrapeImdbForeignLanguage(Boolean.parseBoolean(query.get(SearchParam.IMDB_FOREIGN_LANGUAGE)));
         md = getMetadata(options);
         if (!StringUtils.isEmpty(md.getStringValue(MediaMetadata.TITLE))) {
           movieName = md.getStringValue(MediaMetadata.TITLE);
@@ -958,10 +923,8 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
     return result;
   }
 
-  /**
+  /*
    * generates the accept-language http header for imdb
-   * 
-   * @return the header to set
    */
   public static String getAcceptLanguage(String language, String country) {
     List<String> languageString = new ArrayList<String>();
@@ -1022,18 +985,6 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
     return languages.toString().toLowerCase();
   }
 
-  /**
-   * Process media art.
-   * 
-   * @param md
-   *          the md
-   * @param type
-   *          the type
-   * @param label
-   *          the label
-   * @param image
-   *          the image
-   */
   private void processMediaArt(MediaMetadata md, MediaArtworkType type, String label, String image) {
     MediaArtwork ma = new MediaArtwork();
     ma.setPreviewUrl(image);
@@ -1042,13 +993,6 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
     md.addMediaArt(ma);
   }
 
-  /**
-   * Clean string.
-   * 
-   * @param oldString
-   *          the old string
-   * @return the string
-   */
   private String cleanString(String oldString) {
     if (StringUtils.isEmpty(oldString)) {
       return "";
@@ -1059,6 +1003,9 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
     return StringUtils.trim(newString);
   }
 
+  /****************************************************************************
+   * local helper classes
+   ****************************************************************************/
   private class ImdbWorker implements Callable<Document> {
     private String   url;
     private String   language;
@@ -1071,11 +1018,6 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
       this.country = country;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.util.concurrent.Callable#call()
-     */
     @Override
     public Document call() throws Exception {
       doc = null;
@@ -1086,16 +1028,23 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
       }
       catch (Exception e) {
         LOGGER.debug("tried to fetch imdb movie page " + url, e);
+
+        // clear Cache
+        CachedUrl.removeCachedFileForUrl(url);
       }
       return doc;
     }
   }
 
   private class TmdbWorker implements Callable<MediaMetadata> {
-    private String imdbId;
+    private String         imdbId;
+    private MediaLanguages language;
+    private CountryCode    certificationCountry;
 
-    public TmdbWorker(String imdbId) {
+    public TmdbWorker(String imdbId, MediaLanguages language, CountryCode certificationCountry) {
       this.imdbId = imdbId;
+      this.language = language;
+      this.certificationCountry = certificationCountry;
     }
 
     @Override
@@ -1103,8 +1052,8 @@ public class ImdbMetadataProvider implements IMediaMetadataProvider {
       try {
         TmdbMetadataProvider tmdb = new TmdbMetadataProvider();
         MediaScrapeOptions options = new MediaScrapeOptions();
-        options.setLanguage(Globals.settings.getMovieSettings().getScraperLanguage());
-        options.setCountry(Globals.settings.getMovieSettings().getCertificationCountry());
+        options.setLanguage(language);
+        options.setCountry(certificationCountry);
         options.setImdbId(imdbId);
         return tmdb.getLocalizedContent(options, null);
       }

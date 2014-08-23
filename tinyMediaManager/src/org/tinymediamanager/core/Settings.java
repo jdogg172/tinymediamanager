@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,9 @@ import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlElementWrapper;
 import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -87,6 +89,7 @@ public class Settings extends AbstractModelObject {
   private final static String         IMAGE_CACHE_BACKGROUND      = "imageCacheBackground";
   private final static String         LANGUAGE                    = "language";
   private final static String         WOL_DEVICES                 = "wolDevices";
+  private final static String         SHOW_NOTIFICATIONS          = "showNotifications";
 
   @XmlElementWrapper(name = TITLE_PREFIX)
   @XmlElement(name = PREFIX)
@@ -115,6 +118,15 @@ public class Settings extends AbstractModelObject {
   private String                      proxyUsername;
   private String                      proxyPassword;
   private int                         logLevel                    = Level.DEBUG_INT;
+
+  private String                      traktUsername               = "";
+  private String                      traktPassword               = "";
+  private String                      traktAPI                    = "";
+
+  private String                      xbmcHost                    = "";
+  private String                      xbmcUsername                = "";
+  private String                      xbmcPassword                = "";
+
   private boolean                     imageCache                  = true;
   private CacheType                   imageCacheType              = CacheType.SMOOTH;
   private boolean                     imageCacheBackground        = false;
@@ -124,9 +136,16 @@ public class Settings extends AbstractModelObject {
   private TvShowSettings              tvShowSettings              = null;
   private MovieScraperMetadataConfig  movieScraperMetadataConfig  = null;
   private TvShowScraperMetadataConfig tvShowScraperMetadataConfig = null;
-  private WindowConfig                windowConfig                = null;
+
   // language 2 char - saved to config
   private String                      language;
+  private boolean                     showNotifications           = true;
+  private String                      mediaPlayer                 = "";
+
+  private int                         fontSize                    = 12;
+  private String                      fontFamily                  = "Dialog";
+
+  private boolean                     deleteTrashOnExit           = false;
 
   private PropertyChangeListener      propertyChangeListener;
 
@@ -151,8 +170,6 @@ public class Settings extends AbstractModelObject {
     movieScraperMetadataConfig.addPropertyChangeListener(propertyChangeListener);
     tvShowScraperMetadataConfig = new TvShowScraperMetadataConfig();
     tvShowScraperMetadataConfig.addPropertyChangeListener(propertyChangeListener);
-    windowConfig = new WindowConfig();
-    windowConfig.addPropertyChangeListener(propertyChangeListener);
   }
 
   /**
@@ -160,7 +177,7 @@ public class Settings extends AbstractModelObject {
    * 
    * @return single instance of Settings
    */
-  public static Settings getInstance() {
+  public synchronized static Settings getInstance() {
     if (Settings.instance == null) {
       // try to parse XML
       JAXBContext context;
@@ -172,18 +189,16 @@ public class Settings extends AbstractModelObject {
           Settings.instance = (Settings) um.unmarshal(in);
         }
         catch (Exception e) {
-          // e.printStackTrace();
+          LOGGER.warn("could not load settings - creating default ones...");
           Settings.instance = new Settings();
           Settings.instance.writeDefaultSettings();
         }
+        Settings.instance.clearDirty();
       }
       catch (Exception e) {
         LOGGER.error("getInstance", e);
         MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, "tmm.settings", "message.config.loadsettingserror"));
       }
-
-      Settings.instance.clearDirty();
-
     }
     return Settings.instance;
   }
@@ -263,6 +278,9 @@ public class Settings extends AbstractModelObject {
    *          the type
    */
   public void addVideoFileTypes(String type) {
+    if (!type.startsWith(".")) {
+      type = "." + type;
+    }
     if (!videoFileTypes.contains(type)) {
       videoFileTypes.add(type);
       firePropertyChange(VIDEO_FILE_TYPE, null, videoFileTypes);
@@ -296,6 +314,9 @@ public class Settings extends AbstractModelObject {
    *          the type
    */
   public void addAudioFileTypes(String type) {
+    if (!type.startsWith(".")) {
+      type = "." + type;
+    }
     if (!audioFileTypes.contains(type)) {
       audioFileTypes.add(type);
       firePropertyChange(AUDIO_FILE_TYPE, null, audioFileTypes);
@@ -329,6 +350,9 @@ public class Settings extends AbstractModelObject {
    *          the type
    */
   public void addSubtitleFileTypes(String type) {
+    if (!type.startsWith(".")) {
+      type = "." + type;
+    }
     if (!subtitleFileTypes.contains(type)) {
       subtitleFileTypes.add(type);
       firePropertyChange(SUBTITLE_FILE_TYPE, null, subtitleFileTypes);
@@ -353,6 +377,20 @@ public class Settings extends AbstractModelObject {
    */
   public List<String> getSubtitleFileType() {
     return subtitleFileTypes;
+  }
+
+  /**
+   * Convenience method to get all supported file extensions
+   * 
+   * @return list
+   */
+  public List<String> getAllSupportedFileTypes() {
+    List<String> list = new ArrayList<String>();
+    list.addAll(getAudioFileType());
+    list.addAll(getVideoFileType());
+    list.addAll(getSubtitleFileType());
+    list.add(".nfo");
+    return list;
   }
 
   /**
@@ -538,6 +576,8 @@ public class Settings extends AbstractModelObject {
     movieSettings.addMovieFanartFilename(MovieFanartNaming.FANART_JPG);
     movieSettings.addMovieFanartFilename(MovieFanartNaming.FANART_PNG);
 
+    setProxyFromSystem();
+
     saveSettings();
   }
 
@@ -613,6 +653,7 @@ public class Settings extends AbstractModelObject {
    * @return the proxy password
    */
   @XmlElement(name = PROXY_PASSWORD)
+  @XmlJavaTypeAdapter(EncryptedStringXmlAdapter.class)
   public String getProxyPassword() {
     return StringEscapeUtils.unescapeXml(proxyPassword);
   }
@@ -631,7 +672,34 @@ public class Settings extends AbstractModelObject {
   }
 
   /**
-   * Sets the proxy.
+   * Sets the proxy from system settings, if empty
+   */
+  public void setProxyFromSystem() {
+    String val = "";
+
+    String[] proxyEnvs = { "http.proxyHost", "https.proxyHost", "proxyHost", "socksProxyHost" };
+    for (String pe : proxyEnvs) {
+      if (StringUtils.isEmpty(getProxyHost())) {
+        val = System.getProperty(pe, "");
+        if (!val.isEmpty()) {
+          setProxyHost(val);
+        }
+      }
+    }
+
+    String[] proxyPortEnvs = { "http.proxyPort", "https.proxyPort", "proxyPort", "socksProxyPort" };
+    for (String ppe : proxyPortEnvs) {
+      if (StringUtils.isEmpty(getProxyPort())) {
+        val = System.getProperty(ppe, "");
+        if (!val.isEmpty()) {
+          setProxyPort(val);
+        }
+      }
+    }
+  }
+
+  /**
+   * Sets the TMM proxy.
    */
   public void setProxy() {
     if (useProxy()) {
@@ -793,26 +861,6 @@ public class Settings extends AbstractModelObject {
   }
 
   /**
-   * Gets the window config.
-   * 
-   * @return the window config
-   */
-  public WindowConfig getWindowConfig() {
-    return windowConfig;
-  }
-
-  /**
-   * Sets the window config.
-   * 
-   * @param windowConfig
-   *          the new window config
-   */
-  public void setWindowConfig(WindowConfig windowConfig) {
-    this.windowConfig = windowConfig;
-    this.windowConfig.addPropertyChangeListener(propertyChangeListener);
-  }
-
-  /**
    * Checks if is image cache.
    * 
    * @return true, if is image cache
@@ -912,5 +960,135 @@ public class Settings extends AbstractModelObject {
 
   public List<WolDevice> getWolDevices() {
     return wolDevices;
+  }
+
+  public void setShowNotifications(boolean newValue) {
+    boolean oldValue = showNotifications;
+    showNotifications = newValue;
+    firePropertyChange(SHOW_NOTIFICATIONS, oldValue, newValue);
+  }
+
+  public boolean isShowNotifications() {
+    return showNotifications;
+  }
+
+  public String getTraktUsername() {
+    return traktUsername;
+  }
+
+  public void setTraktUsername(String newValue) {
+    String oldValue = this.traktUsername;
+    this.traktUsername = newValue;
+    firePropertyChange("traktUsername", oldValue, newValue);
+  }
+
+  /**
+   * Password is SHA1 encoded!
+   * 
+   * @return trakt sha1 password
+   */
+  public String getTraktPassword() {
+    return traktPassword;
+  }
+
+  /**
+   * sets the password as SHA1
+   * 
+   * @param newValue
+   *          the password; either plaintext or already sha1
+   */
+  @XmlJavaTypeAdapter(EncryptedStringXmlAdapter.class)
+  public void setTraktPassword(String newValue) {
+    String oldValue = this.traktPassword;
+    if (newValue != null && !newValue.matches("[a-fA-F0-9]{40}")) {
+      // plaintext - convert to sha1
+      this.traktPassword = DigestUtils.shaHex(newValue);
+    }
+    else {
+      // already sha1 - set it 1:1
+      this.traktPassword = newValue;
+    }
+    firePropertyChange("traktPassword", oldValue, newValue);
+  }
+
+  public String getTraktAPI() {
+    return traktAPI;
+  }
+
+  public void setTraktAPI(String newValue) {
+    String oldValue = this.traktAPI;
+    this.traktAPI = newValue;
+    firePropertyChange("traktAPI", oldValue, newValue);
+  }
+
+  public String getXbmcHost() {
+    return xbmcHost;
+  }
+
+  public void setXbmcHost(String newValue) {
+    String oldValue = this.xbmcHost;
+    this.xbmcHost = newValue;
+    firePropertyChange("xbmcHost", oldValue, newValue);
+  }
+
+  public String getXbmcUsername() {
+    return xbmcUsername;
+  }
+
+  public void setXbmcUsername(String newValue) {
+    String oldValue = this.xbmcUsername;
+    this.xbmcUsername = newValue;
+    firePropertyChange("xbmcUsername", oldValue, newValue);
+  }
+
+  @XmlJavaTypeAdapter(EncryptedStringXmlAdapter.class)
+  public String getXbmcPassword() {
+    return xbmcPassword;
+  }
+
+  public void setXbmcPassword(String newValue) {
+    String oldValue = this.xbmcPassword;
+    this.xbmcPassword = newValue;
+    firePropertyChange("xbmcPassword", oldValue, newValue);
+  }
+
+  public void setMediaPlayer(String newValue) {
+    String oldValue = mediaPlayer;
+    mediaPlayer = newValue;
+    firePropertyChange("mediaPlayer", oldValue, newValue);
+  }
+
+  public String getMediaPlayer() {
+    return mediaPlayer;
+  }
+
+  public void setFontSize(int newValue) {
+    int oldValue = this.fontSize;
+    this.fontSize = newValue;
+    firePropertyChange("fontSize", oldValue, newValue);
+  }
+
+  public int getFontSize() {
+    return this.fontSize;
+  }
+
+  public void setFontFamily(String newValue) {
+    String oldValue = this.fontFamily;
+    this.fontFamily = newValue;
+    firePropertyChange("fontFamily", oldValue, newValue);
+  }
+
+  public String getFontFamily() {
+    return this.fontFamily;
+  }
+
+  public void setDeleteTrashOnExit(boolean newValue) {
+    boolean oldValue = deleteTrashOnExit;
+    deleteTrashOnExit = newValue;
+    firePropertyChange("deleteTrashOnExit", oldValue, newValue);
+  }
+
+  public boolean isDeleteTrashOnExit() {
+    return deleteTrashOnExit;
   }
 }

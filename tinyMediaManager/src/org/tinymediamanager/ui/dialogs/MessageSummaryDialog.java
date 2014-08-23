@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,27 +15,29 @@
  */
 package org.tinymediamanager.ui.dialogs;
 
-import java.awt.BorderLayout;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
 
-import javax.swing.JDialog;
 import javax.swing.JList;
 import javax.swing.JScrollPane;
 
 import org.jdesktop.beansbinding.AutoBinding.UpdateStrategy;
 import org.jdesktop.swingbinding.JListBinding;
 import org.jdesktop.swingbinding.SwingBindings;
-import org.tinymediamanager.Globals;
 import org.tinymediamanager.ui.UTF8Control;
+
+import com.jgoodies.forms.factories.FormFactory;
+import com.jgoodies.forms.layout.ColumnSpec;
+import com.jgoodies.forms.layout.FormLayout;
+import com.jgoodies.forms.layout.RowSpec;
 
 /**
  * The MessageSummaryDialog - to display the all messages occured while a main task
  * 
  * @author Manuel Laggner
  */
-public class MessageSummaryDialog extends JDialog {
+public class MessageSummaryDialog extends TmmDialog {
   private static final long           serialVersionUID = -8163687483097098568L;
   private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
 
@@ -43,15 +45,16 @@ public class MessageSummaryDialog extends JDialog {
   private JList                       listMessages;
 
   public MessageSummaryDialog(List<String> messages) {
-    setSize(700, 300);
-    setIconImage(Globals.logo);
-    setTitle(BUNDLE.getString("summarywindow.title")); //$NON-NLS-1$
+    super(BUNDLE.getString("summarywindow.title"), "messageSummary"); //$NON-NLS-1$
+    setBounds(5, 5, 1000, 590);
 
     messageList.addAll(messages);
-    getContentPane().setLayout(new BorderLayout(0, 0));
+    getContentPane().setLayout(
+        new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("684px:grow"), FormFactory.RELATED_GAP_COLSPEC, },
+            new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC, RowSpec.decode("fill:265px:grow"), FormFactory.RELATED_GAP_ROWSPEC, }));
 
     JScrollPane scrollPane = new JScrollPane();
-    getContentPane().add(scrollPane, BorderLayout.CENTER);
+    getContentPane().add(scrollPane, "2, 2, fill, fill");
 
     listMessages = new JList();
     scrollPane.setViewportView(listMessages);
@@ -61,5 +64,10 @@ public class MessageSummaryDialog extends JDialog {
   protected void initDataBindings() {
     JListBinding<String, List<String>, JList> jListBinding = SwingBindings.createJListBinding(UpdateStrategy.READ, messageList, listMessages);
     jListBinding.bind();
+  }
+
+  @Override
+  public void pack() {
+    // do not let it pack - it looks weird
   }
 }

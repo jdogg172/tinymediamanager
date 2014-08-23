@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tinymediamanager.core.Constants;
 import org.tinymediamanager.scraper.IMediaArtworkProvider;
 import org.tinymediamanager.scraper.MediaArtwork;
 import org.tinymediamanager.scraper.MediaArtwork.FanartSizes;
@@ -36,22 +37,16 @@ import com.omertron.fanarttvapi.model.FTArtworkType;
 import com.omertron.fanarttvapi.model.FanartTvArtwork;
 
 /**
- * The Class FanartTvMetadataProvider.
+ * The Class FanartTvMetadataProvider. An artwork provider for the site fanart.tv
  * 
  * @author Myron Boyle, Manuel Laggner
  */
 public class FanartTvMetadataProvider implements IMediaArtworkProvider {
   private static final Logger      LOGGER       = LoggerFactory.getLogger(FanartTvMetadataProvider.class);
-  private static MediaProviderInfo providerInfo = new MediaProviderInfo("fanart", "fanart.tv", "Scraper for fanarts");
+  private static MediaProviderInfo providerInfo = new MediaProviderInfo(Constants.FANARTTVID, "fanart.tv", "Scraper for fanarts");
 
   private FanartTvApi              ftv          = null;
 
-  /**
-   * Instantiates a new FanartTv metadata provider.
-   * 
-   * @throws Exception
-   *           the exception
-   */
   public FanartTvMetadataProvider() throws Exception {
     if (ftv == null) {
       try {
@@ -144,7 +139,7 @@ public class FanartTvMetadataProvider implements IMediaArtworkProvider {
     int tvdbId = 0;
 
     try {
-      tvdbId = Integer.parseInt(options.getId("tvdb"));
+      tvdbId = Integer.parseInt(options.getId(Constants.TVDBID));
     }
     catch (Exception e) {
     }
@@ -211,18 +206,47 @@ public class FanartTvMetadataProvider implements IMediaArtworkProvider {
         }
         break;
 
-      default:
+      case HDMOVIELOGO:
+      case HDTVLOGO:
+      case CLEARLOGO:
+      case MOVIELOGO:
+        if (artworkType == MediaArtworkType.LOGO || artworkType == MediaArtworkType.ALL) {
+          ma = new MediaArtwork();
+          ma.setType(MediaArtworkType.LOGO);
+        }
         break;
+
+      case HDMOVIECLEARART:
+      case CLEARART:
+      case MOVIEART:
+        if (artworkType == MediaArtworkType.CLEARART || artworkType == MediaArtworkType.ALL) {
+          ma = new MediaArtwork();
+          ma.setType(MediaArtworkType.CLEARART);
+        }
+        break;
+
+      case CDART:
+      case MOVIEDISC:
+        if (artworkType == MediaArtworkType.DISC || artworkType == MediaArtworkType.ALL) {
+          ma = new MediaArtwork();
+          ma.setType(MediaArtworkType.DISC);
+        }
+        break;
+
+      default:
+        return null;
     }
 
     if (ma != null) {
       ma.setDefaultUrl(ftvaw.getUrl());
-      ma.setPreviewUrl(ftvaw.getUrl() + "/preview");
+      ma.setPreviewUrl(ftvaw.getUrl().replace("/fanart/", "/preview/"));
+      // System.out.println("***" + ma.getDefaultUrl() + " -> " + ma.getPreviewUrl());
       ma.setProviderId(getProviderInfo().getId());
       ma.setLanguage(ftvaw.getLanguage());
 
       // resolution
       switch (type) {
+        case HDMOVIECLEARART:
         case HDCLEARART:
         case MOVIETHUMB:
           ma.addImageSize(1000, 562, ftvaw.getUrl());
@@ -252,6 +276,29 @@ public class FanartTvMetadataProvider implements IMediaArtworkProvider {
           ma.addImageSize(1000, 185, ftvaw.getUrl());
           ma.setSizeOrder(FanartSizes.LARGE.getOrder());
           break;
+
+        case HDMOVIELOGO:
+        case HDTVLOGO:
+          ma.addImageSize(800, 310, ftvaw.getUrl());
+          ma.setSizeOrder(FanartSizes.LARGE.getOrder());
+          break;
+
+        case CLEARLOGO:
+        case MOVIELOGO:
+          ma.addImageSize(400, 155, ftvaw.getUrl());
+          ma.setSizeOrder(FanartSizes.MEDIUM.getOrder());
+          break;
+
+        case CLEARART:
+        case MOVIEART:
+          ma.addImageSize(500, 281, ftvaw.getUrl());
+          ma.setSizeOrder(FanartSizes.LARGE.getOrder());
+          break;
+
+        case CDART:
+        case MOVIEDISC:
+          ma.addImageSize(1000, 1000, ftvaw.getUrl());
+          ma.setSizeOrder(FanartSizes.LARGE.getOrder());
 
         default:
           break;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,19 @@ package org.tinymediamanager.core.tvshow;
 
 import static org.tinymediamanager.core.Constants.*;
 
+import java.awt.GraphicsEnvironment;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.ResourceBundle;
 
+import javax.persistence.EntityManager;
 import javax.persistence.TypedQuery;
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 
 import org.apache.commons.lang3.StringUtils;
 import org.jdesktop.observablecollections.ObservableCollections;
@@ -31,18 +37,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
 import org.tinymediamanager.core.AbstractModelObject;
-import org.tinymediamanager.core.MediaFile;
+import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
+import org.tinymediamanager.core.entities.MediaFile;
+import org.tinymediamanager.core.entities.MediaFileAudioStream;
+import org.tinymediamanager.core.tvshow.entities.TvShow;
+import org.tinymediamanager.core.tvshow.entities.TvShowEpisode;
 import org.tinymediamanager.scraper.IMediaArtworkProvider;
 import org.tinymediamanager.scraper.ITvShowMetadataProvider;
 import org.tinymediamanager.scraper.MediaSearchOptions;
+import org.tinymediamanager.scraper.MediaSearchOptions.SearchParam;
 import org.tinymediamanager.scraper.MediaSearchResult;
 import org.tinymediamanager.scraper.MediaType;
 import org.tinymediamanager.scraper.anidb.AniDBMetadataProvider;
 import org.tinymediamanager.scraper.fanarttv.FanartTvMetadataProvider;
 import org.tinymediamanager.scraper.thetvdb.TheTvDbMetadataProvider;
+import org.tinymediamanager.ui.UTF8Control;
 
 /**
  * The Class TvShowList.
@@ -50,13 +62,22 @@ import org.tinymediamanager.scraper.thetvdb.TheTvDbMetadataProvider;
  * @author Manuel Laggner
  */
 public class TvShowList extends AbstractModelObject {
-  private static final Logger    LOGGER                = LoggerFactory.getLogger(TvShowList.class);
-  private static TvShowList      instance              = null;
+  private static final Logger         LOGGER                = LoggerFactory.getLogger(TvShowList.class);
+  private static final ResourceBundle BUNDLE                = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
+  private static TvShowList           instance              = null;
 
-  private List<TvShow>           tvShowList            = ObservableCollections.observableList(new ArrayList<TvShow>());
-  private List<String>           tvShowTagsObservable  = ObservableCollections.observableList(new ArrayList<String>());
-  private List<String>           episodeTagsObservable = ObservableCollections.observableList(new ArrayList<String>());
-  private PropertyChangeListener propertyChangeListener;
+  private List<TvShow>                tvShowList            = ObservableCollections.observableList(Collections
+                                                                .synchronizedList(new ArrayList<TvShow>()));
+  private List<String>                tvShowTagsObservable  = ObservableCollections.observableList(Collections
+                                                                .synchronizedList(new ArrayList<String>()));
+  private List<String>                episodeTagsObservable = ObservableCollections.observableList(Collections
+                                                                .synchronizedList(new ArrayList<String>()));
+  private List<String>                videoCodecsObservable = ObservableCollections.observableList(Collections
+                                                                .synchronizedList(new ArrayList<String>()));
+  private List<String>                audioCodecsObservable = ObservableCollections.observableList(Collections
+                                                                .synchronizedList(new ArrayList<String>()));
+
+  private PropertyChangeListener      propertyChangeListener;
 
   /**
    * Instantiates a new TvShowList.
@@ -74,6 +95,11 @@ public class TvShowList extends AbstractModelObject {
         if ("tag".equals(evt.getPropertyName()) && evt.getSource() instanceof TvShowEpisode) {
           TvShowEpisode episode = (TvShowEpisode) evt.getSource();
           updateEpisodeTags(episode);
+        }
+        if ((MEDIA_FILES.equals(evt.getPropertyName()) || MEDIA_INFORMATION.equals(evt.getPropertyName()))
+            && evt.getSource() instanceof TvShowEpisode) {
+          TvShowEpisode episode = (TvShowEpisode) evt.getSource();
+          updateMediaInformationLists(episode);
         }
         if (EPISODE_COUNT.equals(evt.getPropertyName())) {
           firePropertyChange(EPISODE_COUNT, 0, 1);
@@ -149,16 +175,47 @@ public class TvShowList extends AbstractModelObject {
     int oldValue = tvShowList.size();
     tvShow.removeAllEpisodes();
     tvShowList.remove(tvShow);
+
     boolean newTransaction = false;
-    if (!Globals.entityManager.getTransaction().isActive()) {
-      Globals.entityManager.getTransaction().begin();
+    if (!TvShowModuleManager.getInstance().getEntityManager().getTransaction().isActive()) {
+      TvShowModuleManager.getInstance().getEntityManager().getTransaction().begin();
       newTransaction = true;
     }
 
-    Globals.entityManager.remove(tvShow);
+    TvShowModuleManager.getInstance().getEntityManager().remove(tvShow);
 
     if (newTransaction) {
-      Globals.entityManager.getTransaction().commit();
+      TvShowModuleManager.getInstance().getEntityManager().getTransaction().commit();
+    }
+
+    firePropertyChange(TV_SHOWS, null, tvShowList);
+    firePropertyChange(REMOVED_TV_SHOW, null, tvShow);
+    firePropertyChange(TV_SHOW_COUNT, oldValue, tvShowList.size());
+  }
+
+  /**
+   * Removes the tv show from tmm and deletes all files from the data source
+   * 
+   * @param tvShow
+   *          the tvShow
+   */
+  public void deleteTvShow(TvShow tvShow) {
+    int oldValue = tvShowList.size();
+
+    tvShow.deleteFilesSafely();
+    tvShow.removeAllEpisodes();
+    tvShowList.remove(tvShow);
+
+    boolean newTransaction = false;
+    if (!TvShowModuleManager.getInstance().getEntityManager().getTransaction().isActive()) {
+      TvShowModuleManager.getInstance().getEntityManager().getTransaction().begin();
+      newTransaction = true;
+    }
+
+    TvShowModuleManager.getInstance().getEntityManager().remove(tvShow);
+
+    if (newTransaction) {
+      TvShowModuleManager.getInstance().getEntityManager().getTransaction().commit();
     }
 
     firePropertyChange(TV_SHOWS, null, tvShowList);
@@ -193,11 +250,11 @@ public class TvShowList extends AbstractModelObject {
   /**
    * Load tv shows from database.
    */
-  public void loadTvShowsFromDatabase() {
+  public void loadTvShowsFromDatabase(EntityManager entityManager) {
     List<TvShow> tvShows = null;
     try {
       // load tv shows
-      TypedQuery<TvShow> query = Globals.entityManager.createQuery("SELECT tvShow FROM TvShow tvShow", TvShow.class);
+      TypedQuery<TvShow> query = entityManager.createQuery("SELECT tvShow FROM TvShow tvShow", TvShow.class);
       tvShows = query.getResultList();
       if (tvShows != null) {
         LOGGER.info("found " + tvShows.size() + " tv shows in database");
@@ -208,6 +265,7 @@ public class TvShowList extends AbstractModelObject {
             for (TvShowEpisode episode : tvShow.getEpisodes()) {
               episode.initializeAfterLoading();
               updateEpisodeTags(episode);
+              updateMediaInformationLists(episode);
             }
 
             // for performance reasons we add tv shows directly
@@ -220,6 +278,8 @@ public class TvShowList extends AbstractModelObject {
           }
         }
 
+        // check for corrupted media entities
+        checkAndCleanupMediaFiles();
       }
       else {
         LOGGER.debug("found no movies in database");
@@ -258,7 +318,12 @@ public class TvShowList extends AbstractModelObject {
       case TVDB:
       default:
         LOGGER.debug("get instance of TheTvDbMetadataProvider");
-        metadataProvider = new TheTvDbMetadataProvider();
+        try {
+          metadataProvider = new TheTvDbMetadataProvider();
+        }
+        catch (Exception e) {
+          LOGGER.warn("failed to get instance of TheTvDbMetadataProvider", e);
+        }
         break;
 
     }
@@ -279,10 +344,10 @@ public class TvShowList extends AbstractModelObject {
       // default
       return getMetadataProvider(TvShowScrapers.TVDB);
     }
-    if (providerId.equals("anidb")) {
+    if (providerId.equals(ANIDBID)) {
       return getMetadataProvider(TvShowScrapers.ANIDB);
     }
-    else if (providerId.equals("tvdb")) {
+    else if (providerId.equals(TVDBID) || providerId.equals("tvdb")) {
       return getMetadataProvider(TvShowScrapers.TVDB);
     }
     else {
@@ -373,6 +438,8 @@ public class TvShowList extends AbstractModelObject {
         provider = getMetadataProvider();
       }
       MediaSearchOptions options = new MediaSearchOptions(MediaType.TV_SHOW, MediaSearchOptions.SearchParam.QUERY, searchTerm);
+      options.set(SearchParam.LANGUAGE, Globals.settings.getTvShowSettings().getScraperLanguage().name());
+      options.set(SearchParam.COUNTRY, Globals.settings.getTvShowSettings().getCertificationCountry().getAlpha2());
       searchResult = provider.search(options);
 
       // if result is empty, try all scrapers
@@ -456,6 +523,81 @@ public class TvShowList extends AbstractModelObject {
 
   public List<String> getTagsInEpisodes() {
     return episodeTagsObservable;
+  }
+
+  private void updateMediaInformationLists(TvShowEpisode episode) {
+    // video codec
+    for (MediaFile mf : episode.getMediaFiles(MediaFileType.VIDEO)) {
+      String codec = mf.getVideoCodec();
+      boolean codecFound = false;
+
+      for (String mfCodec : videoCodecsObservable) {
+        if (mfCodec.equals(codec)) {
+          codecFound = true;
+          break;
+        }
+      }
+
+      if (!codecFound) {
+        addVideoCodec(codec);
+      }
+    }
+
+    // audio codec
+    for (MediaFile mf : episode.getMediaFiles(MediaFileType.VIDEO)) {
+      for (MediaFileAudioStream audio : mf.getAudioStreams()) {
+        String codec = audio.getCodec();
+        boolean codecFound = false;
+        for (String mfCodec : audioCodecsObservable) {
+          if (mfCodec.equals(codec)) {
+            codecFound = true;
+            break;
+          }
+        }
+
+        if (!codecFound) {
+          addAudioCodec(codec);
+        }
+      }
+    }
+  }
+
+  private void addVideoCodec(String newCodec) {
+    if (StringUtils.isBlank(newCodec)) {
+      return;
+    }
+
+    for (String codec : videoCodecsObservable) {
+      if (codec.equals(newCodec)) {
+        return;
+      }
+    }
+
+    videoCodecsObservable.add(newCodec);
+    firePropertyChange("videoCodec", null, videoCodecsObservable);
+  }
+
+  private void addAudioCodec(String newCodec) {
+    if (StringUtils.isBlank(newCodec)) {
+      return;
+    }
+
+    for (String codec : audioCodecsObservable) {
+      if (codec.equals(newCodec)) {
+        return;
+      }
+    }
+
+    audioCodecsObservable.add(newCodec);
+    firePropertyChange("audioCodec", null, audioCodecsObservable);
+  }
+
+  public List<String> getVideoCodecsInEpisodes() {
+    return videoCodecsObservable;
+  }
+
+  public List<String> getAudioCodecsInEpisodes() {
+    return audioCodecsObservable;
   }
 
   /**
@@ -545,4 +687,32 @@ public class TvShowList extends AbstractModelObject {
     return newEp;
   }
 
+  /**
+   * check if there are movies without (at least) one VIDEO mf
+   */
+  private void checkAndCleanupMediaFiles() {
+    boolean problemsDetected = false;
+    for (TvShow tvShow : tvShowList) {
+      for (TvShowEpisode episode : new ArrayList<TvShowEpisode>(tvShow.getEpisodes())) {
+        List<MediaFile> mfs = episode.getMediaFiles(MediaFileType.VIDEO);
+        if (mfs.isEmpty()) {
+          tvShow.removeEpisode(episode);
+          problemsDetected = true;
+        }
+      }
+    }
+
+    if (problemsDetected) {
+      LOGGER.warn("episodes without VIDEOs detected");
+      // since we have no active UI yet, push a popup message in an own window
+      if (!GraphicsEnvironment.isHeadless()) {
+        SwingUtilities.invokeLater(new Runnable() {
+          @Override
+          public void run() {
+            JOptionPane.showMessageDialog(null, BUNDLE.getString("message.database.corrupteddata"));
+          }
+        });
+      }
+    }
+  }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,10 +29,11 @@ import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreeCellRenderer;
 
 import org.apache.commons.lang3.StringUtils;
-import org.tinymediamanager.core.tvshow.TvShow;
-import org.tinymediamanager.core.tvshow.TvShowEpisode;
-import org.tinymediamanager.core.tvshow.TvShowSeason;
-import org.tinymediamanager.ui.ImageIconConverter;
+import org.tinymediamanager.core.tvshow.entities.TvShow;
+import org.tinymediamanager.core.tvshow.entities.TvShowEpisode;
+import org.tinymediamanager.core.tvshow.entities.TvShowSeason;
+import org.tinymediamanager.ui.IconManager;
+import org.tinymediamanager.ui.TmmFontHelper;
 import org.tinymediamanager.ui.UTF8Control;
 
 import com.jgoodies.forms.factories.FormFactory;
@@ -77,7 +78,7 @@ public class TvShowTreeCellRenderer implements TreeCellRenderer {
         ColumnSpec.decode("center:20px"), ColumnSpec.decode("center:20px"), ColumnSpec.decode("center:20px") }, new RowSpec[] {
         FormFactory.DEFAULT_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
 
-    tvShowTitle.setFont(new Font("Dialog", Font.BOLD, 12));
+    TmmFontHelper.changeFont(tvShowTitle, Font.BOLD);
     tvShowTitle.setHorizontalAlignment(JLabel.LEFT);
     tvShowTitle.setMinimumSize(new Dimension(0, 0));
     tvShowPanel.add(tvShowTitle, "1, 1");
@@ -85,7 +86,7 @@ public class TvShowTreeCellRenderer implements TreeCellRenderer {
     tvShowPanel.add(tvShowNfoLabel, "3, 1, 1, 2");
     tvShowPanel.add(tvShowImageLabel, "4, 1, 1, 2");
 
-    tvShowInfo.setFont(new Font("Dialog", Font.PLAIN, 10));
+    TmmFontHelper.changeFont(tvShowInfo, 0.816);
     tvShowInfo.setHorizontalAlignment(JLabel.LEFT);
     tvShowInfo.setMinimumSize(new Dimension(0, 0));
     tvShowPanel.add(tvShowInfo, "1, 2");
@@ -123,6 +124,10 @@ public class TvShowTreeCellRenderer implements TreeCellRenderer {
         else {
           tvShowTitle.setText(tvShow.getTitleSortable() + " (" + tvShow.getYear() + ")");
         }
+        if (StringUtils.isBlank(tvShowTitle.getText())) {
+          tvShowTitle.setText(BUNDLE.getString("tmm.unknowntitle")); //$NON-NLS-1$
+        }
+
         if (tvShow.isNewlyAdded()) {
           tvShowTitle.setForeground(newlyAddedColor);
         }
@@ -132,10 +137,11 @@ public class TvShowTreeCellRenderer implements TreeCellRenderer {
 
         tvShowInfo.setText(tvShow.getSeasons().size()
             + " " + BUNDLE.getString("metatag.seasons") + " - " + tvShow.getEpisodes().size() + " " + BUNDLE.getString("metatag.episodes")); //$NON-NLS-1$
-        tvShowNfoLabel.setIcon(tvShow.getHasNfoFile() ? ImageIconConverter.checkIcon : ImageIconConverter.crossIcon);
-        tvShowImageLabel.setIcon(tvShow.getHasImages() ? ImageIconConverter.checkIcon : ImageIconConverter.crossIcon);
+        tvShowNfoLabel.setIcon(tvShow.getHasNfoFile() ? IconManager.CHECKMARK : IconManager.CROSS);
+        tvShowImageLabel.setIcon(tvShow.getHasImages() ? IconManager.CHECKMARK : IconManager.CROSS);
 
         tvShowPanel.setEnabled(tree.isEnabled());
+        tvShowPanel.invalidate();
         returnValue = tvShowPanel;
       }
     }
@@ -155,6 +161,7 @@ public class TvShowTreeCellRenderer implements TreeCellRenderer {
           tvShowSeasonTitle.setForeground(defaultColor);
         }
 
+        tvShowSeasonPanel.invalidate();
         returnValue = tvShowSeasonPanel;
       }
     }
@@ -170,6 +177,10 @@ public class TvShowTreeCellRenderer implements TreeCellRenderer {
         else {
           tvShowEpisodeTitle.setText(episode.getTitle());
         }
+        if (StringUtils.isBlank(tvShowTitle.getText())) {
+          tvShowEpisodeTitle.setText(BUNDLE.getString("tmm.unknowntitle")); //$NON-NLS-1$
+        }
+
         if (episode.isNewlyAdded()) {
           tvShowEpisodeTitle.setForeground(newlyAddedColor);
         }
@@ -179,9 +190,11 @@ public class TvShowTreeCellRenderer implements TreeCellRenderer {
 
         tvShowEpisodePanel.setEnabled(tree.isEnabled());
 
-        tvShowEpisodeNfoLabel.setIcon(episode.getHasNfoFile() ? ImageIconConverter.checkIcon : ImageIconConverter.crossIcon);
-        tvShowEpisodeImageLabel.setIcon(episode.getHasImages() ? ImageIconConverter.checkIcon : ImageIconConverter.crossIcon);
-        tvShowEpisodeSubtitleLabel.setIcon(episode.hasSubtitles() ? ImageIconConverter.checkIcon : ImageIconConverter.crossIcon);
+        tvShowEpisodeNfoLabel.setIcon(episode.getHasNfoFile() ? IconManager.CHECKMARK : IconManager.CROSS);
+        tvShowEpisodeImageLabel.setIcon(episode.getHasImages() ? IconManager.CHECKMARK : IconManager.CROSS);
+        tvShowEpisodeSubtitleLabel.setIcon(episode.hasSubtitles() ? IconManager.CHECKMARK : IconManager.CROSS);
+
+        tvShowEpisodePanel.invalidate();
         returnValue = tvShowEpisodePanel;
       }
     }

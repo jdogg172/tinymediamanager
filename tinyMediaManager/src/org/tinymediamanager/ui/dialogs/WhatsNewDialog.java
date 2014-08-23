@@ -23,7 +23,6 @@ import java.awt.event.ActionListener;
 import java.util.ResourceBundle;
 
 import javax.swing.JButton;
-import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -44,23 +43,20 @@ import com.jgoodies.forms.layout.RowSpec;
  * 
  * @author Manuel Laggner
  */
-public class WhatsNewDialog extends JDialog {
+public class WhatsNewDialog extends TmmDialog {
   private static final long           serialVersionUID = -4071143363981892283L;
   private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
 
   public WhatsNewDialog(String changelog) {
-    setSize(700, 250);
-    setIconImage(Globals.logo);
-    setTitle(BUNDLE.getString("whatsnew.title")); //$NON-NLS-1$
+    super(BUNDLE.getString("whatsnew.title"), "whatsnew"); //$NON-NLS-1$
+    setSize(500, 250);
     {
       JScrollPane scrollPane = new JScrollPane();
       getContentPane().add(scrollPane, BorderLayout.CENTER);
       JTextPane textPane = new JTextPane();
-      textPane.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+      textPane.setFont(new Font(Font.MONOSPACED, Font.PLAIN, Globals.settings.getFontSize() + 1));
       scrollPane.setViewportView(textPane);
 
-      // textPane.setContentType("text/html");
-      // textPane.setText(buildHTMLFromChangelog(changelog));
       textPane.setText(changelog);
       textPane.setEditable(false);
       textPane.setCaretPosition(0);
@@ -71,13 +67,14 @@ public class WhatsNewDialog extends JDialog {
       panel.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
           FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC, FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"),
           FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC, FormFactory.RELATED_GAP_COLSPEC, }, new RowSpec[] {
-          FormFactory.LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
+          FormFactory.LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, }));
 
       JLabel lblHint = new JLabel(BUNDLE.getString("whatsnew.hint")); //$NON-NLS-1$
       panel.add(lblHint, "2, 2");
 
       LinkLabel lblLink = new LinkLabel("http://www.tinymediamanager.org");
       lblLink.addActionListener(new ActionListener() {
+        @Override
         public void actionPerformed(ActionEvent arg0) {
           try {
             TmmUIHelper.browseUrl("http://www.tinymediamanager.org/index.php/changelog/");
@@ -88,30 +85,15 @@ public class WhatsNewDialog extends JDialog {
       });
       panel.add(lblLink, "4, 2");
 
-      JButton btnClose = new JButton("Close");
+      JButton btnClose = new JButton(BUNDLE.getString("Button.close")); //$NON-NLS-1$
       btnClose.addActionListener(new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent arg0) {
-          WhatsNewDialog.this.setVisible(false);
-          WhatsNewDialog.this.dispose();
+          setVisible(false);
         }
       });
       panel.add(btnClose, "8, 2");
     }
-  }
-
-  private String buildHTMLFromChangelog(String changelog) {
-    StringBuilder changelogInHTML = new StringBuilder(
-        "<html><head><style type=\"text/css\">p { text-indent: -10px; padding-left: 10px; margin: 0px; }</style></head><body>");
-
-    for (String line : changelog.split("\\r|\\n|\\r\\n")) {
-      changelogInHTML.append("<p>");
-      changelogInHTML.append(line);
-      changelogInHTML.append("</p>");
-    }
-
-    changelogInHTML.append("</body></html>");
-    return changelogInHTML.toString();
   }
 
   @Override
@@ -120,5 +102,4 @@ public class WhatsNewDialog extends JDialog {
     return new Dimension((int) (700 > superPref.getWidth() ? superPref.getWidth() : 700), (int) (500 > superPref.getHeight() ? superPref.getHeight()
         : 500));
   }
-
 }

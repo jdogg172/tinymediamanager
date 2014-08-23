@@ -19,28 +19,35 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.ResourceBundle;
 import java.util.concurrent.Callable;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
-import org.tinymediamanager.TmmThreadPool;
 import org.tinymediamanager.core.ImageCacheTask;
-import org.tinymediamanager.core.MediaFile;
 import org.tinymediamanager.core.MediaFileInformationFetcherTask;
 import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
 import org.tinymediamanager.core.Utils;
-import org.tinymediamanager.core.tvshow.TvShow;
-import org.tinymediamanager.core.tvshow.TvShowEpisode;
+import org.tinymediamanager.core.entities.MediaFile;
+import org.tinymediamanager.core.threading.TmmTask;
+import org.tinymediamanager.core.threading.TmmTaskManager;
+import org.tinymediamanager.core.threading.TmmThreadPool;
 import org.tinymediamanager.core.tvshow.TvShowEpisodeAndSeasonParser;
 import org.tinymediamanager.core.tvshow.TvShowEpisodeAndSeasonParser.EpisodeMatchingResult;
 import org.tinymediamanager.core.tvshow.TvShowList;
+import org.tinymediamanager.core.tvshow.entities.TvShow;
+import org.tinymediamanager.core.tvshow.entities.TvShowEpisode;
+import org.tinymediamanager.scraper.trakttv.SyncTraktTvTask;
 import org.tinymediamanager.scraper.util.ParserUtils;
+import org.tinymediamanager.ui.UTF8Control;
 
 /**
  * The Class TvShowUpdateDataSourcesTask.
@@ -49,28 +56,45 @@ import org.tinymediamanager.scraper.util.ParserUtils;
  */
 
 public class TvShowUpdateDatasourceTask extends TmmThreadPool {
-  private static final Logger       LOGGER                = LoggerFactory.getLogger(TvShowUpdateDatasourceTask.class);
+  private static final Logger         LOGGER                = LoggerFactory.getLogger(TvShowUpdateDatasourceTask.class);
+  private static final ResourceBundle BUNDLE                = ResourceBundle.getBundle("messages", new UTF8Control());            //$NON-NLS-1$
 
   // skip well-known, but unneeded folders (UPPERCASE)
-  private static final List<String> skipFolders           = Arrays.asList(".", "..", "CERTIFICATE", "BACKUP", "PLAYLIST", "CLPINF", "SSIF",
-                                                              "AUXDATA", "AUDIO_TS", "$RECYCLE.BIN", "RECYCLER", "SYSTEM VOLUME INFORMATION",
-                                                              "@EADIR");
+  private static final List<String>   skipFolders           = Arrays.asList(".", "..", "CERTIFICATE", "BACKUP", "PLAYLIST", "CLPINF", "SSIF",
+                                                                "AUXDATA", "AUDIO_TS", "$RECYCLE.BIN", "RECYCLER", "SYSTEM VOLUME INFORMATION",
+                                                                "@EADIR");
 
   // skip folders starting with a SINGLE "." or "._"
-  private static final String       skipFoldersRegex      = "^[.][\\w]+.*";
+  private static final String         skipFoldersRegex      = "^[.][\\w]+.*";
 
   // MacOS ignore
-  private static final String       skipFilesStartingWith = "._";
+  private static final String         skipFilesStartingWith = "._";
 
-  private List<String>              dataSources;
-  private List<File>                tvShowFolders         = new ArrayList<File>();
-  private TvShowList                tvShowList;
+  // regexp patterns for artwork search
+  private static final Pattern        posterPattern1        = Pattern.compile("(?i)(poster|folder)\\..{2,4}");
+  private static final Pattern        posterPattern2        = Pattern.compile("(?i).*-poster\\..{2,4}");
+  private static final Pattern        fanartPattern1        = Pattern.compile("(?i)fanart\\..{2,4}");
+  private static final Pattern        fanartPattern2        = Pattern.compile("(?i).*(-|.)fanart\\..{2,4}");
+  private static final Pattern        bannerPattern1        = Pattern.compile("(?i)banner\\..{2,4}");
+  private static final Pattern        bannerPattern2        = Pattern.compile("(?i).*(-|.)banner\\..{2,4}");
+  private static final Pattern        clearartPattern1      = Pattern.compile("(?i)clearart\\..{2,4}");
+  private static final Pattern        clearartPattern2      = Pattern.compile("(?i).*(-|.)clearart\\..{2,4}");
+  private static final Pattern        logoPattern1          = Pattern.compile("(?i)logo\\..{2,4}");
+  private static final Pattern        logoPattern2          = Pattern.compile("(?i).*(-|.)logo\\..{2,4}");
+  private static final Pattern        thumbPattern1         = Pattern.compile("(?i)thumb\\..{2,4}");
+  private static final Pattern        thumbPattern2         = Pattern.compile("(?i).*(-|.)thumb\\..{2,4}");
+  private static final Pattern        seasonPattern         = Pattern.compile("(?i)season([0-9]{0,2}|-specials)-poster\\..{2,4}");
+
+  private List<String>                dataSources;
+  private List<File>                  tvShowFolders         = new ArrayList<File>();
+  private TvShowList                  tvShowList;
 
   /**
    * Instantiates a new scrape task - to update all datasources
    * 
    */
   public TvShowUpdateDatasourceTask() {
+    super(BUNDLE.getString("update.datasource"));
     tvShowList = TvShowList.getInstance();
     dataSources = new ArrayList<String>(Globals.settings.getTvShowSettings().getTvShowDataSource());
   }
@@ -81,6 +105,7 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
    * @param datasource
    */
   public TvShowUpdateDatasourceTask(String datasource) {
+    super(BUNDLE.getString("update.datasource") + " (" + datasource + ")");
     tvShowList = TvShowList.getInstance();
     dataSources = new ArrayList<String>(1);
     dataSources.add(datasource);
@@ -92,21 +117,17 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
    * @param tvShowFolders
    */
   public TvShowUpdateDatasourceTask(List<File> tvShowFolders) {
+    super(BUNDLE.getString("update.datasource"));
     tvShowList = TvShowList.getInstance();
     dataSources = new ArrayList<String>(0);
     this.tvShowFolders.addAll(tvShowFolders);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.swing.SwingWorker#doInBackground()
-   */
   @Override
-  public Void doInBackground() {
+  public void doInBackground() {
     try {
       long start = System.currentTimeMillis();
-      startProgressBar("prepare scan...");
+      start();
 
       // cleanup just added for a new UDS run
       for (TvShow tvShow : tvShowList.getTvShows()) {
@@ -134,7 +155,6 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
       LOGGER.error("Thread crashed", e);
       MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, "update.datasource", "message.update.threadcrashed"));
     }
-    return null;
   }
 
   /*
@@ -186,7 +206,11 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
       }
 
       // cleanup
-      startProgressBar("database cleanup...");
+      setTaskName(BUNDLE.getString("update.cleanup"));
+      setTaskDescription(null);
+      setProgressDone(0);
+      setWorkUnits(0);
+      publishState();
       LOGGER.info("removing orphaned tv shows/files...");
       for (int i = tvShowList.getTvShows().size() - 1; i >= 0; i--) {
         if (cancel) {
@@ -209,8 +233,10 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
       }
 
       // mediainfo
+      setTaskName(BUNDLE.getString("update.mediainfo"));
+      publishState();
+
       initThreadPool(1, "mediainfo");
-      startProgressBar("getting Mediainfo");
       LOGGER.info("getting Mediainfo...");
       for (int i = tvShowList.getTvShows().size() - 1; i >= 0; i--) {
         if (cancel) {
@@ -253,12 +279,17 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
     }
 
     if (cancel) {
-      cancel(false);// swing cancel
+      return;
     }
 
     if (imageFiles.size() > 0) {
       ImageCacheTask task = new ImageCacheTask(imageFiles);
-      Globals.executor.execute(task);
+      TmmTaskManager.getInstance().addUnnamedTask(task);
+    }
+
+    if (Globals.settings.getTvShowSettings().getSyncTrakt()) {
+      TmmTask task = new SyncTraktTvTask(false, false, true, true);
+      TmmTaskManager.getInstance().addUnnamedTask(task);
     }
   }
 
@@ -286,7 +317,12 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
     waitForCompletionOrCancel();
 
     // cleanup
-    startProgressBar("database cleanup...");
+    setTaskName(BUNDLE.getString("update.cleanup"));
+    setTaskDescription(null);
+    setProgressDone(0);
+    setWorkUnits(0);
+    publishState();
+
     LOGGER.info("removing orphaned movies/files...");
     for (int i = tvShowList.getTvShows().size() - 1; i >= 0; i--) {
       if (cancel) {
@@ -304,7 +340,9 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
     }
 
     // start MI
-    startProgressBar("getting Mediainfo & cleanup...");
+    setTaskName(BUNDLE.getString("update.mediainfo"));
+    publishState();
+
     initThreadPool(1, "mediainfo");
     LOGGER.info("getting Mediainfo...");
     for (int i = tvShowList.getTvShows().size() - 1; i >= 0; i--) {
@@ -324,7 +362,7 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
     waitForCompletionOrCancel();
 
     if (cancel) {
-      cancel(false);// swing cancel
+      return;
     }
 
     // build up the image cache
@@ -356,7 +394,7 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
       }
 
       ImageCacheTask task = new ImageCacheTask(imageFiles);
-      Globals.executor.execute(task);
+      TmmTaskManager.getInstance().addUnnamedTask(task);
     }
   }
 
@@ -510,7 +548,74 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
    */
   private void findAdditionalTvShowFiles(TvShow tvShow, File directory) {
     // find tv show images for this TV show; NOTE: the NFO has been found in TvShow.parseNFO()
-    tvShow.findImages();
+    List<File> completeDirContents = new ArrayList<File>(Arrays.asList(directory.listFiles()));
+
+    // search for poster or download
+    findArtwork(tvShow, completeDirContents, posterPattern1, MediaFileType.POSTER);
+    findArtwork(tvShow, completeDirContents, posterPattern2, MediaFileType.POSTER);
+    downloadArtwork(tvShow, MediaFileType.POSTER);
+
+    // search fanart or download
+    findArtwork(tvShow, completeDirContents, fanartPattern1, MediaFileType.FANART);
+    findArtwork(tvShow, completeDirContents, fanartPattern2, MediaFileType.FANART);
+    downloadArtwork(tvShow, MediaFileType.FANART);
+
+    // search banner or download
+    findArtwork(tvShow, completeDirContents, bannerPattern1, MediaFileType.BANNER);
+    findArtwork(tvShow, completeDirContents, bannerPattern2, MediaFileType.BANNER);
+    downloadArtwork(tvShow, MediaFileType.BANNER);
+
+    // search logo or download
+    findArtwork(tvShow, completeDirContents, logoPattern1, MediaFileType.LOGO);
+    findArtwork(tvShow, completeDirContents, logoPattern2, MediaFileType.LOGO);
+    downloadArtwork(tvShow, MediaFileType.LOGO);
+
+    // search clearart or download
+    findArtwork(tvShow, completeDirContents, clearartPattern1, MediaFileType.CLEARART);
+    findArtwork(tvShow, completeDirContents, clearartPattern2, MediaFileType.CLEARART);
+    downloadArtwork(tvShow, MediaFileType.CLEARART);
+
+    // search thumb or download
+    findArtwork(tvShow, completeDirContents, thumbPattern1, MediaFileType.THUMB);
+    findArtwork(tvShow, completeDirContents, thumbPattern2, MediaFileType.THUMB);
+    downloadArtwork(tvShow, MediaFileType.THUMB);
+
+    // search season posters
+    for (File file : completeDirContents) {
+      Matcher matcher = seasonPattern.matcher(file.getName());
+      if (matcher.matches() && !file.getName().startsWith("._")) { // MacOS ignore
+        LOGGER.debug("found season poster " + file.getPath());
+        try {
+          int season = Integer.parseInt(matcher.group(1));
+          tvShow.setSeasonPoster(season, file);
+        }
+        catch (Exception e) {
+        }
+      }
+      else if (file.getName().startsWith("season-specials-poster")) {
+        LOGGER.debug("found season specials poster " + file.getPath());
+        tvShow.setSeasonPoster(-1, file);
+      }
+    }
+  }
+
+  private void findArtwork(TvShow show, List<File> directoryContents, Pattern searchPattern, MediaFileType type) {
+    for (File file : directoryContents) {
+      Matcher matcher = searchPattern.matcher(file.getName());
+      if (matcher.matches() && !file.getName().startsWith("._")) { // MacOS ignore
+        MediaFile mf = new MediaFile(file, type);
+        show.addToMediaFiles(mf);
+        LOGGER.debug("found " + mf.getType().name().toLowerCase() + ": " + file.getPath());
+        break;
+      }
+    }
+  }
+
+  private void downloadArtwork(TvShow tvShow, MediaFileType type) {
+    if (StringUtils.isBlank(tvShow.getArtworkFilename(type)) && StringUtils.isNotBlank(tvShow.getArtworkUrl(type))) {
+      tvShow.downloadArtwork(type);
+      LOGGER.debug("got " + type.name().toLowerCase() + " url: " + tvShow.getArtworkUrl(type) + " ; try to download this");
+    }
   }
 
   /**
@@ -813,37 +918,9 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
     }
   }
 
-  /*
-   * Executed in event dispatching thread
-   */
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.swing.SwingWorker#done()
-   */
-  @Override
-  public void done() {
-    stopProgressBar();
-  }
-
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.tinymediamanager.ui.TmmSwingWorker#cancel()
-   */
-  @Override
-  public void cancel() {
-    cancel = true;
-    // cancel(false);
-  }
-
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.tinymediamanager.TmmThreadPool#callback(java.lang.Object)
-   */
   @Override
   public void callback(Object obj) {
-    startProgressBar((String) obj, getTaskcount(), getTaskdone());
+    // do not publish task description here, because with different workers the text is never right
+    publishState(progressDone);
   }
 }

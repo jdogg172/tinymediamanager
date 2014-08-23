@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,8 @@ import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tinymediamanager.Globals;
 import org.tinymediamanager.core.Utils;
+import org.tinymediamanager.core.movie.MovieModuleManager;
 
 /**
  * The Class ParserUtils.
@@ -47,12 +47,15 @@ public class ParserUtils {
    * 1. splits string using common delimiters ".- ()"<br>
    * 2. searches for first occurrence of common stopwords<br>
    * 3. if last token is 4 digits, assume year and remove<br>
-   * 4. everything before the first stopword must be the movie name :p
+   * 4. everything before the first stopword must be the movie name :p<br>
+   * <br>
+   * Deprecated in favor of detectCleanMovienameAndYear (avoid possible dupes)
    * 
    * @param filename
    *          the filename to get the title from
    * @return the (hopefully) correct parsed movie name
    */
+  @Deprecated
   public static String detectCleanMoviename(String filename) {
     return detectCleanMovienameAndYear(filename)[0];
   }
@@ -118,7 +121,7 @@ public class ParserUtils {
     for (int i = 0; i < firstFoundStopwordPosition; i++) {
       if (!s[i].isEmpty()) {
         // check for bad words
-        if (!Globals.settings.getMovieSettings().getBadWords().contains(s[i])) {
+        if (!MovieModuleManager.MOVIE_SETTINGS.getBadWords().contains(s[i])) {
           name = name + s[i] + " ";
         }
       }
@@ -156,35 +159,6 @@ public class ParserUtils {
       filename = filename.replaceAll("(?i)\\W" + s, ""); // stopword must start with a non-word (else too global)
     }
     return filename;
-  }
-
-  /**
-   * returns the MediaSource if found in file name
-   * 
-   * @param filename
-   *          the filename
-   * @return Bluray Disc | HDDVD | TV | DVD | VHS
-   */
-  public static String getMediaSource(String filename) {
-    String ms = "";
-    String fn = filename.toLowerCase();
-    // http://wiki.xbmc.org/index.php?title=Media_flags#Media_source
-    if (fn.contains("bluray") || fn.contains("blueray") || fn.contains("bdrip") || fn.contains("bd25") || fn.contains("bd50")) {
-      ms = "Bluray"; // yes!
-    }
-    else if (fn.contains("hddvd")) {
-      ms = "HDDVD";
-    }
-    else if (fn.contains("dvd")) {
-      ms = "DVD";
-    }
-    else if (fn.contains("hdtv") || fn.contains("pdtv") || fn.contains("dsr") || fn.contains("dtv")) {
-      ms = "TV";
-    }
-    else if (fn.contains("vhs")) {
-      ms = "VHS";
-    }
-    return ms;
   }
 
   /**

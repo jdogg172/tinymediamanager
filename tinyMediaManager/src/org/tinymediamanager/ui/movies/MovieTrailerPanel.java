@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package org.tinymediamanager.ui.movies;
 
-import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Point;
 import java.awt.event.MouseEvent;
@@ -27,20 +26,26 @@ import java.util.Comparator;
 import java.util.ResourceBundle;
 
 import javax.swing.DefaultListSelectionModel;
-import javax.swing.JLabel;
+import javax.swing.ImageIcon;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.event.ListSelectionListener;
-import javax.swing.table.DefaultTableCellRenderer;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tinymediamanager.Globals;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
-import org.tinymediamanager.core.movie.Movie;
+import org.tinymediamanager.core.movie.entities.Movie;
+import org.tinymediamanager.core.movie.tasks.MovieTrailerDownloadTask;
+import org.tinymediamanager.core.threading.TmmTaskManager;
 import org.tinymediamanager.scraper.MediaTrailer;
+import org.tinymediamanager.scraper.util.UrlUtil;
+import org.tinymediamanager.ui.IconManager;
 import org.tinymediamanager.ui.TableColumnResizer;
 import org.tinymediamanager.ui.TmmUIHelper;
 import org.tinymediamanager.ui.UTF8Control;
@@ -65,26 +70,13 @@ import com.jgoodies.forms.layout.RowSpec;
  * @author Manuel Laggner
  */
 public class MovieTrailerPanel extends JPanel {
-
-  /** The Constant BUNDLE. */
+  private static final long                    serialVersionUID  = 2506465845096043845L;
   private static final ResourceBundle          BUNDLE            = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
-
-  /** The Constant serialVersionUID. */
-  private static final long                    serialVersionUID  = 1L;
-
-  /** The logger. */
   private static final Logger                  LOGGER            = LoggerFactory.getLogger(MovieTrailerPanel.class);
 
-  /** The movie selection model. */
   private MovieSelectionModel                  movieSelectionModel;
-
-  /** The table. */
   private JTable                               table;
-
-  /** The trailer event list. */
   private EventList<MediaTrailer>              trailerEventList  = null;
-
-  /** The trailer table model. */
   private DefaultEventTableModel<MediaTrailer> trailerTableModel = null;
 
   /**
@@ -109,11 +101,9 @@ public class MovieTrailerPanel extends JPanel {
     add(scrollPane, "2, 2, fill, fill");
     scrollPane.setViewportView(table);
 
-    // make the url clickable
-    URLRenderer renderer = new URLRenderer(table);
-    table.getColumnModel().getColumn(4).setCellRenderer(renderer);
-    table.addMouseListener(renderer);
-    table.addMouseMotionListener(renderer);
+    LinkListener linkListener = new LinkListener();
+    table.addMouseListener(linkListener);
+    table.addMouseMotionListener(linkListener);
 
     // install the propertychangelistener
     PropertyChangeListener propertyChangeListener = new PropertyChangeListener() {
@@ -126,7 +116,7 @@ public class MovieTrailerPanel extends JPanel {
           trailerEventList.clear();
           trailerEventList.addAll(movieSelectionModel.getSelectedMovie().getTrailers());
           try {
-            TableColumnResizer.adjustColumnPreferredWidths(table, 6);
+            TableColumnResizer.adjustColumnPreferredWidths(table, 7);
           }
           catch (Exception e) {
           }
@@ -138,61 +128,41 @@ public class MovieTrailerPanel extends JPanel {
 
   }
 
-  /**
-   * The Class TrailerTableFormat.
-   * 
-   * @author Manuel Laggner
-   */
-  private static class TrailerTableFormat implements AdvancedTableFormat<MediaTrailer> {
-
-    /**
-     * Instantiates a new trailer table format.
-     */
+  private class TrailerTableFormat implements AdvancedTableFormat<MediaTrailer> {
     public TrailerTableFormat() {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see ca.odell.glazedlists.gui.TableFormat#getColumnCount()
-     */
     @Override
     public int getColumnCount() {
-      return 5;
+      return 7;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see ca.odell.glazedlists.gui.TableFormat#getColumnName(int)
-     */
     @Override
     public String getColumnName(int column) {
       switch (column) {
         case 0:
-          return BUNDLE.getString("metatag.nfo"); //$NON-NLS-1$
-
         case 1:
-          return BUNDLE.getString("metatag.name"); //$NON-NLS-1$
+          return "";
 
         case 2:
-          return BUNDLE.getString("metatag.source"); //$NON-NLS-1$
+          return BUNDLE.getString("metatag.nfo"); //$NON-NLS-1$
 
         case 3:
-          return BUNDLE.getString("metatag.quality"); //$NON-NLS-1$
+          return BUNDLE.getString("metatag.name"); //$NON-NLS-1$
 
         case 4:
-          return BUNDLE.getString("metatag.url"); //$NON-NLS-1$
+          return BUNDLE.getString("metatag.source"); //$NON-NLS-1$
+
+        case 5:
+          return BUNDLE.getString("metatag.quality"); //$NON-NLS-1$
+
+        case 6:
+          return BUNDLE.getString("metatag.format"); //$NON-NLS-1$
       }
 
       throw new IllegalStateException();
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see ca.odell.glazedlists.gui.TableFormat#getColumnValue(java.lang.Object, int)
-     */
     @Override
     public Object getColumnValue(MediaTrailer trailer, int column) {
       if (trailer == null) {
@@ -201,51 +171,64 @@ public class MovieTrailerPanel extends JPanel {
 
       switch (column) {
         case 0:
-          return trailer.getInNfo();
+          if (StringUtils.isNotBlank(trailer.getUrl()) && trailer.getUrl().toLowerCase().startsWith("http")) {
+            if (Globals.isDonator()) {
+              return IconManager.DOWNLOAD;
+            }
+            else {
+              return IconManager.DOWNLOAD_DISABLED;
+            }
+          }
+          return null;
 
         case 1:
-          return trailer.getName();
+          return IconManager.PLAY_SMALL;
 
         case 2:
-          return trailer.getProvider();
+          return trailer.getInNfo();
 
         case 3:
-          return trailer.getQuality();
+          return trailer.getName();
 
         case 4:
-          return trailer.getUrl();
+          return trailer.getProvider();
+
+        case 5:
+          return trailer.getQuality();
+
+        case 6:
+          String ext = UrlUtil.getExtension(trailer.getUrl()).toLowerCase();
+          if (!Globals.settings.getVideoFileType().contains("." + ext)) {
+            // .php redirection scripts et all
+            ext = "";
+          }
+          return ext;
       }
 
       throw new IllegalStateException();
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see ca.odell.glazedlists.gui.AdvancedTableFormat#getColumnClass(int)
-     */
     @SuppressWarnings("rawtypes")
     @Override
     public Class getColumnClass(int column) {
       switch (column) {
         case 0:
+        case 1:
+          return ImageIcon.class;
+
+        case 2:
           return Boolean.class;
 
-        case 1:
-        case 2:
         case 3:
         case 4:
+        case 5:
+        case 6:
           return String.class;
       }
 
       throw new IllegalStateException();
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see ca.odell.glazedlists.gui.AdvancedTableFormat#getColumnComparator(int)
-     */
     @SuppressWarnings("rawtypes")
     @Override
     public Comparator getColumnComparator(int arg0) {
@@ -253,51 +236,36 @@ public class MovieTrailerPanel extends JPanel {
     }
   }
 
-  /**
-   * The Class URLRenderer.
-   * 
-   * @author Manuel Laggner
-   */
-  private static class URLRenderer extends DefaultTableCellRenderer implements MouseListener, MouseMotionListener {
-
-    /** The Constant serialVersionUID. */
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * Instantiates a new uRL renderer.
-     * 
-     * @param table
-     *          the table
-     */
-    public URLRenderer(JTable table) {
-    }
-
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.table.DefaultTableCellRenderer#getTableCellRendererComponent (javax.swing.JTable, java.lang.Object, boolean, boolean, int,
-     * int)
-     */
-    @Override
-    public Component getTableCellRendererComponent(JTable table, final Object value, boolean arg2, boolean arg3, int arg4, int arg5) {
-      final JLabel lab = new JLabel("<html><font color=\"#0000CF\"><u>" + value + "</u></font></html>");
-      return lab;
-    }
-
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.MouseListener#mouseClicked(java.awt.event.MouseEvent)
-     */
+  private class LinkListener implements MouseListener, MouseMotionListener {
     @Override
     public void mouseClicked(MouseEvent e) {
       JTable table = (JTable) e.getSource();
       int row = table.rowAtPoint(new Point(e.getX(), e.getY()));
       int col = table.columnAtPoint(new Point(e.getX(), e.getY()));
 
-      if (col == 4) {
+      // click on the download button
+      if (col == 0) {
+        row = table.convertRowIndexToModel(row);
+        MediaTrailer trailer = trailerEventList.get(row);
+
+        if (StringUtils.isNotBlank(trailer.getUrl()) && trailer.getUrl().toLowerCase().startsWith("http")) {
+          if (Globals.isDonator()) {
+            Movie movie = movieSelectionModel.getSelectedMovie();
+            MovieTrailerDownloadTask task = new MovieTrailerDownloadTask(trailer, movie);
+            TmmTaskManager.getInstance().addDownloadTask(task);
+          }
+          else {
+            JOptionPane.showMessageDialog(null, BUNDLE.getString("tmm.donatorfunction.hint"));
+          }
+        }
+      }
+
+      // click on the play button
+      if (col == 1) {
         // try to open the browser
-        String url = (String) table.getModel().getValueAt(row, col);
+        row = table.convertRowIndexToModel(row);
+        MediaTrailer trailer = trailerEventList.get(row);
+        String url = trailer.getUrl();
         try {
           TmmUIHelper.browseUrl(url);
         }
@@ -309,254 +277,136 @@ public class MovieTrailerPanel extends JPanel {
       }
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.MouseListener#mouseEntered(java.awt.event.MouseEvent)
-     */
     @Override
     public void mouseEntered(MouseEvent e) {
       JTable table = (JTable) e.getSource();
       int col = table.columnAtPoint(new Point(e.getX(), e.getY()));
-      if (col == 4) {
+      if (col == 0 || col == 1) {
         table.setCursor(new Cursor(Cursor.HAND_CURSOR));
       }
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.MouseListener#mouseExited(java.awt.event.MouseEvent)
-     */
     @Override
     public void mouseExited(MouseEvent e) {
       JTable table = (JTable) e.getSource();
       int col = table.columnAtPoint(new Point(e.getX(), e.getY()));
-      if (col != 4) {
+      if (col != 0 && col != 1) {
         table.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
       }
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.MouseMotionListener#mouseMoved(java.awt.event.MouseEvent)
-     */
     @Override
     public void mouseMoved(MouseEvent e) {
       JTable table = (JTable) e.getSource();
       int col = table.columnAtPoint(new Point(e.getX(), e.getY()));
-      if (col != 4 && table.getCursor().getType() == Cursor.HAND_CURSOR) {
+      if (col != 0 && col != 1 && table.getCursor().getType() == Cursor.HAND_CURSOR) {
         table.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
       }
-      if (col == 4 && table.getCursor().getType() == Cursor.DEFAULT_CURSOR) {
+      if ((col == 0 || col == 1) && table.getCursor().getType() == Cursor.DEFAULT_CURSOR) {
         table.setCursor(new Cursor(Cursor.HAND_CURSOR));
       }
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.MouseListener#mousePressed(java.awt.event.MouseEvent)
-     */
     @Override
     public void mousePressed(MouseEvent e) {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.MouseListener#mouseReleased(java.awt.event.MouseEvent)
-     */
     @Override
     public void mouseReleased(MouseEvent e) {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.MouseMotionListener#mouseDragged(java.awt.event.MouseEvent )
-     */
     @Override
     public void mouseDragged(MouseEvent arg0) {
     }
-
   }
 
-  /**
-   * The Class NullSelectionModel.
-   * 
-   * @author Manuel Laggner
-   */
-  private static class NullSelectionModel extends DefaultListSelectionModel {
-
-    /** The Constant serialVersionUID. */
+  private class NullSelectionModel extends DefaultListSelectionModel {
     private static final long serialVersionUID = -1956483331520197616L;
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#isSelectionEmpty()
-     */
+    @Override
     public boolean isSelectionEmpty() {
       return true;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#isSelectedIndex(int)
-     */
+    @Override
     public boolean isSelectedIndex(int index) {
       return false;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#getMinSelectionIndex()
-     */
+    @Override
     public int getMinSelectionIndex() {
       return -1;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#getMaxSelectionIndex()
-     */
+    @Override
     public int getMaxSelectionIndex() {
       return -1;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#getLeadSelectionIndex()
-     */
+    @Override
     public int getLeadSelectionIndex() {
       return -1;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#getAnchorSelectionIndex()
-     */
+    @Override
     public int getAnchorSelectionIndex() {
       return -1;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#setSelectionInterval(int, int)
-     */
+    @Override
     public void setSelectionInterval(int index0, int index1) {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#setLeadSelectionIndex(int)
-     */
+    @Override
     public void setLeadSelectionIndex(int index) {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#setAnchorSelectionIndex(int)
-     */
+    @Override
     public void setAnchorSelectionIndex(int index) {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#addSelectionInterval(int, int)
-     */
+    @Override
     public void addSelectionInterval(int index0, int index1) {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#insertIndexInterval(int, int, boolean)
-     */
+    @Override
     public void insertIndexInterval(int index, int length, boolean before) {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#clearSelection()
-     */
+    @Override
     public void clearSelection() {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#removeSelectionInterval(int, int)
-     */
+    @Override
     public void removeSelectionInterval(int index0, int index1) {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#removeIndexInterval(int, int)
-     */
+    @Override
     public void removeIndexInterval(int index0, int index1) {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#setSelectionMode(int)
-     */
+    @Override
     public void setSelectionMode(int selectionMode) {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#getSelectionMode()
-     */
+    @Override
     public int getSelectionMode() {
       return SINGLE_SELECTION;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#addListSelectionListener(javax.swing.event .ListSelectionListener)
-     */
+    @Override
     public void addListSelectionListener(ListSelectionListener lsl) {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#removeListSelectionListener(javax.swing .event.ListSelectionListener)
-     */
+    @Override
     public void removeListSelectionListener(ListSelectionListener lsl) {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#setValueIsAdjusting(boolean)
-     */
+    @Override
     public void setValueIsAdjusting(boolean valueIsAdjusting) {
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.ListSelectionModel#getValueIsAdjusting()
-     */
+    @Override
     public boolean getValueIsAdjusting() {
       return false;
     }

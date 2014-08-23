@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ import org.imgscalr.Scalr;
 import org.tinymediamanager.core.ImageCache;
 import org.tinymediamanager.scraper.util.Url;
 import org.tinymediamanager.ui.MainWindow;
+import org.tinymediamanager.ui.TmmFontHelper;
 import org.tinymediamanager.ui.UTF8Control;
 
 /**
@@ -54,6 +55,7 @@ public class ImageLabel extends JLabel {
 
   private static final long                  serialVersionUID = -2524445544386464158L;
   protected static final ResourceBundle      BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
+  private static Font                        FONT;
 
   protected BufferedImage                    originalImage;
   protected BufferedImage                    scaledImage;
@@ -69,6 +71,17 @@ public class ImageLabel extends JLabel {
 
   protected SwingWorker<BufferedImage, Void> worker           = null;
   protected MouseListener                    lightboxListener = null;
+
+  static {
+    try {
+      JLabel fontLabel = new JLabel("");
+      TmmFontHelper.changeFont(fontLabel, 1.5);
+      FONT = fontLabel.getFont();
+    }
+    catch (Exception e) {
+      FONT = Font.getFont("Dialog").deriveFont(18f);
+    }
+  }
 
   public ImageLabel() {
     super("");
@@ -178,7 +191,7 @@ public class ImageLabel extends JLabel {
       int offsetY = 0;
 
       if (drawBorder && !drawFullWidth) {
-        Point size = calculateSize(this.getWidth() - 8, this.getHeight() - 8, originalWidth, originalHeight, true);
+        Point size = ImageCache.calculateSize(this.getWidth() - 8, this.getHeight() - 8, originalWidth, originalHeight, true);
 
         // calculate offsets
         if (position == Position.TOP_RIGHT || position == Position.BOTTOM_RIGHT) {
@@ -210,7 +223,7 @@ public class ImageLabel extends JLabel {
           size = new Point(this.getWidth(), this.getWidth() * originalHeight / originalWidth);
         }
         else {
-          size = calculateSize(this.getWidth(), this.getHeight(), originalWidth, originalHeight, true);
+          size = ImageCache.calculateSize(this.getWidth(), this.getHeight(), originalWidth, originalHeight, true);
         }
 
         // calculate offsets
@@ -255,7 +268,7 @@ public class ImageLabel extends JLabel {
       else {
         text = BUNDLE.getString("image.nonefound"); //$NON-NLS-1$
       }
-      if (getParent().isOpaque()) {
+      if (!getParent().isOpaque()) {
         text = "";
       }
       Graphics2D g2 = (Graphics2D) g;
@@ -265,8 +278,7 @@ public class ImageLabel extends JLabel {
       at.rotate(this.getWidth(), -this.getHeight());
       g2.setTransform(at);
       g2.setColor(Color.BLACK);
-      Font font = new Font("Arial", Font.PLAIN, 18);
-      g2.setFont(font);
+      g2.setFont(FONT);
 
       FontMetrics fm = g2.getFontMetrics();
       int x = (diagonalSize - fm.stringWidth(text)) / 2;
@@ -277,26 +289,6 @@ public class ImageLabel extends JLabel {
       at.translate(0, -this.getHeight());
       g2.setTransform(orig);
     }
-  }
-
-  public static Point calculateSize(int maxWidth, int maxHeight, int originalWidth, int originalHeight, boolean respectFactor) {
-    Point size = new Point();
-    if (respectFactor) {
-      // calculate on available height
-      size.y = maxHeight;
-      size.x = (int) (size.y * (double) originalWidth / (double) originalHeight);
-
-      if (size.x > maxWidth) {
-        // calculate on available height
-        size.x = maxWidth;
-        size.y = (int) (size.x * (double) originalHeight / (double) originalWidth);
-      }
-    }
-    else {
-      size.x = maxWidth;
-      size.y = maxHeight;
-    }
-    return size;
   }
 
   public void setPosition(Position position) {

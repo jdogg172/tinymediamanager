@@ -28,8 +28,9 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tinymediamanager.Globals;
+import org.tinymediamanager.core.Constants;
 import org.tinymediamanager.scraper.Certification;
+import org.tinymediamanager.scraper.CountryCode;
 import org.tinymediamanager.scraper.IMediaArtworkProvider;
 import org.tinymediamanager.scraper.ITvShowMetadataProvider;
 import org.tinymediamanager.scraper.MediaArtwork;
@@ -38,13 +39,16 @@ import org.tinymediamanager.scraper.MediaCastMember;
 import org.tinymediamanager.scraper.MediaCastMember.CastType;
 import org.tinymediamanager.scraper.MediaEpisode;
 import org.tinymediamanager.scraper.MediaGenres;
+import org.tinymediamanager.scraper.MediaLanguages;
 import org.tinymediamanager.scraper.MediaMetadata;
 import org.tinymediamanager.scraper.MediaProviderInfo;
 import org.tinymediamanager.scraper.MediaScrapeOptions;
 import org.tinymediamanager.scraper.MediaSearchOptions;
+import org.tinymediamanager.scraper.MediaSearchOptions.SearchParam;
 import org.tinymediamanager.scraper.MediaSearchResult;
 import org.tinymediamanager.scraper.MediaType;
 import org.tinymediamanager.scraper.MetadataUtil;
+import org.tinymediamanager.scraper.util.CachedUrl;
 
 import com.omertron.thetvdbapi.TheTVDBApi;
 import com.omertron.thetvdbapi.model.Actor;
@@ -61,12 +65,22 @@ import com.omertron.thetvdbapi.model.Series;
 public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaArtworkProvider {
   private static final Logger      LOGGER       = LoggerFactory.getLogger(TheTvDbMetadataProvider.class);
   private static TheTVDBApi        tvdb;
-  private static MediaProviderInfo providerInfo = new MediaProviderInfo("tvdb", "thetvdb.com",
+  private static MediaProviderInfo providerInfo = new MediaProviderInfo(Constants.TVDBID, "thetvdb.com",
                                                     "Scraper for thetvdb.com which is able to scrape tv series metadata and artwork");
 
-  public TheTvDbMetadataProvider() {
+  public TheTvDbMetadataProvider() throws Exception {
     if (tvdb == null) {
-      tvdb = new TheTVDBApi("1A4971671264D790");
+      try {
+        tvdb = new TheTVDBApi("1A4971671264D790");
+      }
+      catch (Exception e) {
+        LOGGER.error("TheTvDbMetadataProvider", e);
+
+        // remove cached request
+        clearTvdbCache();
+
+        throw e;
+      }
     }
   }
 
@@ -99,17 +113,24 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
       return results;
     }
 
+    String language = options.get(SearchParam.LANGUAGE);
+    String country = options.get(SearchParam.COUNTRY); // for passing the country to the scrape
+
     // search via the api
     List<Series> series = null;
     synchronized (tvdb) {
-      series = tvdb.searchSeries(searchString, Globals.settings.getTvShowSettings().getScraperLanguage().name());
+      series = tvdb.searchSeries(searchString, language);
+    }
+
+    if (series == null || series.isEmpty()) {
+      // maybe broken request - delete cache to be sure
+      clearTvdbCache();
     }
 
     // first add all tv shows in the preferred language
     HashMap<String, MediaSearchResult> storedResults = new HashMap<String, MediaSearchResult>();
     for (Series show : series) {
-      if (show.getLanguage().equalsIgnoreCase(Globals.settings.getTvShowSettings().getScraperLanguage().name())
-          && !storedResults.containsKey(show.getId())) {
+      if (show.getLanguage().equalsIgnoreCase(language) && !storedResults.containsKey(show.getId())) {
         MediaSearchResult sr = createSearchResult(show, options, searchString);
         results.add(sr);
 
@@ -134,8 +155,8 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
       MediaScrapeOptions scrapeOptions = new MediaScrapeOptions();
       scrapeOptions.setId(providerInfo.getId(), searchString);
       scrapeOptions.setType(MediaType.TV_SHOW);
-      scrapeOptions.setLanguage(Globals.settings.getMovieSettings().getScraperLanguage());
-      scrapeOptions.setCountry(Globals.settings.getMovieSettings().getCertificationCountry());
+      scrapeOptions.setLanguage(MediaLanguages.valueOf(language));
+      scrapeOptions.setCountry(CountryCode.valueOf(country));
 
       MediaMetadata md = getTvShowMetadata(scrapeOptions);
 
@@ -195,7 +216,12 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
 
     Series show = null;
     synchronized (tvdb) {
-      show = tvdb.getSeries(id, Globals.settings.getTvShowSettings().getScraperLanguage().name());
+      show = tvdb.getSeries(id, options.getLanguage().name());
+    }
+
+    if (show == null) {
+      // maybe broken request - delete cache to be sure
+      clearTvdbCache();
     }
 
     // populate metadata
@@ -234,6 +260,11 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
     List<Actor> actors = new ArrayList<Actor>();
     synchronized (tvdb) {
       actors.addAll(tvdb.getActors(id));
+    }
+
+    if (actors == null || actors.isEmpty()) {
+      // maybe broken request - delete cache to be sure
+      clearTvdbCache();
     }
 
     for (Actor actor : actors) {
@@ -280,8 +311,8 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
     int episodeNr = -1;
 
     try {
-      seasonNr = Integer.parseInt(options.getId("seasonNr"));
-      episodeNr = Integer.parseInt(options.getId("episodeNr"));
+      seasonNr = Integer.parseInt(options.getId(MediaMetadata.SEASON_NR));
+      episodeNr = Integer.parseInt(options.getId(MediaMetadata.EPISODE_NR));
     }
     catch (Exception e) {
       LOGGER.warn("error parsing season/episode number");
@@ -294,8 +325,12 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
     List<Episode> episodes = new ArrayList<Episode>();
     synchronized (tvdb) {
       // switched to getAllEpisodes for performance - only 1 request needed for scraping multiple episodes of one tv show
-      // episode = tvdb.getEpisode(id, seasonNr, episodeNr, Globals.settings.getScraperLanguage().name());
-      episodes.addAll(tvdb.getAllEpisodes(id, Globals.settings.getTvShowSettings().getScraperLanguage().name()));
+      episodes.addAll(tvdb.getAllEpisodes(id, options.getLanguage().name()));
+    }
+
+    if (episodes.isEmpty()) {
+      // maybe broken request - delete cache to be sure
+      clearTvdbCache();
     }
 
     Episode episode = null;
@@ -311,6 +346,12 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
     if (episode == null) {
       return md;
     }
+
+    md.storeMetadata(MediaMetadata.EPISODE_NR_DVD, episode.getDvdEpisodeNumber());
+    md.storeMetadata(MediaMetadata.SEASON_NR_DVD, episode.getDvdSeason());
+    md.storeMetadata(MediaMetadata.EPISODE_NR_COMBINED, episode.getCombinedEpisodeNumber());
+    md.storeMetadata(MediaMetadata.SEASON_NR_COMBINED, episode.getCombinedSeason());
+    md.storeMetadata(MediaMetadata.ABSOLUTE_NR, episode.getAbsoluteNumber());
 
     md.storeMetadata(MediaMetadata.TITLE, episode.getEpisodeName());
     md.storeMetadata(MediaMetadata.PLOT, episode.getOverview());
@@ -353,11 +394,6 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
     return md;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.tinymediamanager.scraper.IMediaArtworkProvider#getArtwork(org.tinymediamanager.scraper.MediaScrapeOptions)
-   */
   @Override
   public List<MediaArtwork> getArtwork(MediaScrapeOptions options) throws Exception {
     List<MediaArtwork> artwork = new ArrayList<MediaArtwork>();
@@ -383,6 +419,11 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
       banners = tvdb.getBanners(id);
     }
 
+    if (banners == null || banners.getSeriesId() == 0) {
+      // maybe broken request - delete cache to be sure
+      clearTvdbCache();
+    }
+
     List<Banner> bannerList = null;
     switch (options.getArtworkType()) {
       case ALL:
@@ -406,8 +447,10 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
         break;
 
       case BANNER:
-      default:
         bannerList = banners.getSeriesList();
+        break;
+
+      default:
         break;
 
     }
@@ -417,7 +460,7 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
     }
 
     // sort bannerlist
-    Collections.sort(bannerList, new BannerComparator());
+    Collections.sort(bannerList, new BannerComparator(options.getLanguage().name()));
 
     // build output
     for (Banner banner : bannerList) {
@@ -474,45 +517,6 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
     return artwork;
   }
 
-  private static class BannerComparator implements Comparator<Banner> {
-    /*
-     * sort artwork: primary by language: preferred lang (ie de), en, others; then: score
-     */
-    @Override
-    public int compare(Banner arg0, Banner arg1) {
-      String preferredLangu = Globals.settings.getTvShowSettings().getScraperLanguage().name();
-
-      // check if first image is preferred langu
-      if (preferredLangu.equals(arg0.getLanguage()) && !preferredLangu.equals(arg1.getLanguage())) {
-        return -1;
-      }
-
-      // check if second image is preferred langu
-      if (!preferredLangu.equals(arg0.getLanguage()) && preferredLangu.equals(arg1.getLanguage())) {
-        return 1;
-      }
-
-      // check if the first image is en
-      if ("en".equals(arg0.getLanguage()) && !"en".equals(arg1.getLanguage())) {
-        return -1;
-      }
-
-      // check if the second image is en
-      if (!"en".equals(arg0.getLanguage()) && "en".equals(arg1.getLanguage())) {
-        return 1;
-      }
-
-      // if rating is the same, return 0
-      if (arg0.getRating().equals(arg1.getRating())) {
-        return 0;
-      }
-
-      // we did not sort until here; so lets sort with the rating
-      return arg0.getRating() > arg1.getRating() ? -1 : 1;
-    }
-
-  }
-
   @Override
   public List<MediaEpisode> getEpisodeList(MediaScrapeOptions options) throws Exception {
     List<MediaEpisode> episodes = new ArrayList<MediaEpisode>();
@@ -535,14 +539,23 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
     List<Episode> eps = new ArrayList<Episode>();
     synchronized (tvdb) {
       // switched to getAllEpisodes for performance - only 1 request needed for scraping multiple episodes of one tv show
-      // episode = tvdb.getEpisode(id, seasonNr, episodeNr, Globals.settings.getScraperLanguage().name());
-      eps.addAll(tvdb.getAllEpisodes(id, Globals.settings.getTvShowSettings().getScraperLanguage().name()));
+      eps.addAll(tvdb.getAllEpisodes(id, options.getLanguage().name()));
+    }
+
+    if (eps.isEmpty()) {
+      // maybe broken request - delete cache to be sure
+      clearTvdbCache();
     }
 
     for (Episode ep : eps) {
       MediaEpisode episode = new MediaEpisode(providerInfo.getId());
       episode.season = ep.getSeasonNumber();
       episode.episode = ep.getEpisodeNumber();
+      episode.dvdSeason = ep.getDvdSeason();
+      episode.dvdEpisode = ep.getDvdEpisodeNumber();
+      episode.combinedSeason = ep.getCombinedSeason();
+      episode.combinedEpisode = ep.getCombinedEpisodeNumber();
+      episode.absoluteNumber = ep.getAbsoluteNumber();
       episode.title = ep.getEpisodeName();
       episode.plot = ep.getOverview();
 
@@ -589,7 +602,7 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
     return episodes;
   }
 
-  /*
+  /**
    * Maps scraper Genres to internal TMM genres
    */
   private MediaGenres getTmmGenre(String genre) {
@@ -629,5 +642,55 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
       g = MediaGenres.getGenre(genre);
     }
     return g;
+  }
+
+  private void clearTvdbCache() {
+    CachedUrl.cleanupCacheForSpecificHost("thetvdb.com");
+  }
+
+  /**********************************************************************
+   * local helper classes
+   **********************************************************************/
+  private static class BannerComparator implements Comparator<Banner> {
+    private String preferredLangu;
+
+    private BannerComparator(String language) {
+      this.preferredLangu = language;
+    }
+
+    /*
+     * sort artwork: primary by language: preferred lang (ie de), en, others; then: score
+     */
+    @Override
+    public int compare(Banner arg0, Banner arg1) {
+      // check if first image is preferred langu
+      if (preferredLangu.equals(arg0.getLanguage()) && !preferredLangu.equals(arg1.getLanguage())) {
+        return -1;
+      }
+
+      // check if second image is preferred langu
+      if (!preferredLangu.equals(arg0.getLanguage()) && preferredLangu.equals(arg1.getLanguage())) {
+        return 1;
+      }
+
+      // check if the first image is en
+      if ("en".equals(arg0.getLanguage()) && !"en".equals(arg1.getLanguage())) {
+        return -1;
+      }
+
+      // check if the second image is en
+      if (!"en".equals(arg0.getLanguage()) && "en".equals(arg1.getLanguage())) {
+        return 1;
+      }
+
+      // if rating is the same, return 0
+      if (arg0.getRating().equals(arg1.getRating())) {
+        return 0;
+      }
+
+      // we did not sort until here; so lets sort with the rating
+      return arg0.getRating() > arg1.getRating() ? -1 : 1;
+    }
+
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,21 +25,23 @@ import java.util.ResourceBundle;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
-import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import javax.swing.border.TitledBorder;
 
 import org.tinymediamanager.Globals;
 import org.tinymediamanager.core.movie.MovieArtworkScrapers;
+import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.core.movie.MovieScraperMetadataConfig;
 import org.tinymediamanager.core.movie.MovieScrapers;
 import org.tinymediamanager.core.movie.MovieSearchAndScrapeOptions;
 import org.tinymediamanager.core.movie.MovieTrailerScrapers;
 import org.tinymediamanager.ui.EqualsLayout;
-import org.tinymediamanager.ui.TmmWindowSaver;
+import org.tinymediamanager.ui.IconManager;
 import org.tinymediamanager.ui.UTF8Control;
+import org.tinymediamanager.ui.dialogs.TmmDialog;
 import org.tinymediamanager.ui.movies.MovieScraperMetadataPanel;
 
 import com.jgoodies.forms.factories.FormFactory;
@@ -48,40 +50,21 @@ import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.RowSpec;
 
 /**
- * The Class MovieScrapeMetadataDialog.
+ * The Class MovieScrapeMetadataDialog. Rescrape metadata
  * 
  * @author Manuel Laggner
  */
-public class MovieScrapeMetadataDialog extends JDialog {
-
-  /** The Constant BUNDLE. */
+public class MovieScrapeMetadataDialog extends TmmDialog {
+  private static final long           serialVersionUID           = 3826984454317979241L;
   private static final ResourceBundle BUNDLE                     = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
 
-  /** The Constant serialVersionUID. */
-  private static final long           serialVersionUID           = 3826984454317979241L;
-
-  /** The movie search and scrape config. */
   private MovieSearchAndScrapeOptions movieSearchAndScrapeConfig = new MovieSearchAndScrapeOptions();
-
-  /** The cb metadata scraper. */
   private JComboBox                   cbMetadataScraper;
-
-  /** The chckbx the movie db. */
   private JCheckBox                   chckbxTheMovieDb;
-
-  /** The chckbx fanarttv. */
   private JCheckBox                   chckbxFanarttv;
-
-  /** The chckbx the movie db_1. */
   private JCheckBox                   chckbxTheMovieDb_1;
-
-  /** The chckbx hdtrailernet. */
   private JCheckBox                   chckbxHdtrailernet;
-
-  /** The chckbx ofdbde. */
   private JCheckBox                   chckbxOfdbde;
-
-  /** The start scrape. */
   private boolean                     startScrape                = false;
 
   /**
@@ -91,13 +74,9 @@ public class MovieScrapeMetadataDialog extends JDialog {
    *          the title
    */
   public MovieScrapeMetadataDialog(String title) {
-    setTitle(title);
-    setName("updateMetadata");
+    super(title, "updateMetadata");
     setBounds(5, 5, 550, 280);
     setMinimumSize(new Dimension(getWidth(), getHeight()));
-    TmmWindowSaver.loadSettings(this);
-    setIconImage(Globals.logo);
-    setModal(true);
 
     // copy the values
     MovieScraperMetadataConfig settings = Globals.settings.getMovieScraperMetadataConfig();
@@ -126,35 +105,36 @@ public class MovieScrapeMetadataDialog extends JDialog {
     panelContent.add(panelScraper, BorderLayout.NORTH);
     panelScraper.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
         FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC, FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
-        FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), }, new RowSpec[] { FormFactory.DEFAULT_ROWSPEC,
-        FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
+        FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), FormFactory.RELATED_GAP_COLSPEC, }, new RowSpec[] {
+        FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
+        FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, }));
 
     JLabel lblMetadataScraperT = new JLabel(BUNDLE.getString("scraper.metadata")); //$NON-NLS-1$
-    panelScraper.add(lblMetadataScraperT, "2, 1, right, default");
+    panelScraper.add(lblMetadataScraperT, "2, 2, right, default");
 
     cbMetadataScraper = new JComboBox(MovieScrapers.values());
-    panelScraper.add(cbMetadataScraper, "4, 1, 3, 1, fill, default");
+    panelScraper.add(cbMetadataScraper, "4, 2, 3, 1, fill, default");
 
     JLabel lblArtworkScraper = new JLabel(BUNDLE.getString("scraper.artwork")); //$NON-NLS-1$
-    panelScraper.add(lblArtworkScraper, "2, 3, right, default");
+    panelScraper.add(lblArtworkScraper, "2, 4, right, default");
 
     chckbxTheMovieDb = new JCheckBox("The Movie DB");
-    panelScraper.add(chckbxTheMovieDb, "4, 3");
+    panelScraper.add(chckbxTheMovieDb, "4, 4");
 
     chckbxFanarttv = new JCheckBox("Fanart.tv");
-    panelScraper.add(chckbxFanarttv, "6, 3");
+    panelScraper.add(chckbxFanarttv, "6, 4");
 
     JLabel lblTrailerScraper = new JLabel(BUNDLE.getString("scraper.trailer")); //$NON-NLS-1$
-    panelScraper.add(lblTrailerScraper, "2, 5, right, default");
+    panelScraper.add(lblTrailerScraper, "2, 6, right, default");
 
     chckbxTheMovieDb_1 = new JCheckBox("The Movie DB");
-    panelScraper.add(chckbxTheMovieDb_1, "4, 5");
+    panelScraper.add(chckbxTheMovieDb_1, "4, 6");
 
     chckbxHdtrailernet = new JCheckBox("HD-Trailer.net");
-    panelScraper.add(chckbxHdtrailernet, "6, 5");
+    panelScraper.add(chckbxHdtrailernet, "6, 6");
 
     chckbxOfdbde = new JCheckBox("OFDb.de");
-    panelScraper.add(chckbxOfdbde, "8, 5");
+    panelScraper.add(chckbxOfdbde, "8, 6");
 
     {
       JPanel panelCenter = new JPanel();
@@ -171,9 +151,11 @@ public class MovieScrapeMetadataDialog extends JDialog {
 
     JPanel panelButtons = new JPanel();
     panelButtons.setLayout(new EqualsLayout(5));
+    panelButtons.setBorder(new EmptyBorder(4, 4, 4, 4));
     panelContent.add(panelButtons, BorderLayout.SOUTH);
 
     JButton btnStart = new JButton(BUNDLE.getString("scraper.start")); //$NON-NLS-1$
+    btnStart.setIcon(IconManager.APPLY);
     btnStart.addActionListener(new ActionListener() {
       @Override
       public void actionPerformed(ActionEvent e) {
@@ -184,6 +166,7 @@ public class MovieScrapeMetadataDialog extends JDialog {
     panelButtons.add(btnStart);
 
     JButton btnCancel = new JButton(BUNDLE.getString("Button.cancel")); //$NON-NLS-1$
+    btnCancel.setIcon(IconManager.CANCEL);
     btnCancel.addActionListener(new ActionListener() {
       @Override
       public void actionPerformed(ActionEvent e) {
@@ -196,28 +179,28 @@ public class MovieScrapeMetadataDialog extends JDialog {
     // set data
 
     // metadataprovider
-    MovieScrapers defaultScraper = Globals.settings.getMovieSettings().getMovieScraper();
+    MovieScrapers defaultScraper = MovieModuleManager.MOVIE_SETTINGS.getMovieScraper();
     cbMetadataScraper.setSelectedItem(defaultScraper);
 
     // artwork provider
-    if (Globals.settings.getMovieSettings().isImageScraperTmdb()) {
+    if (MovieModuleManager.MOVIE_SETTINGS.isImageScraperTmdb()) {
       chckbxTheMovieDb.setSelected(true);
     }
 
-    if (Globals.settings.getMovieSettings().isImageScraperFanartTv()) {
+    if (MovieModuleManager.MOVIE_SETTINGS.isImageScraperFanartTv()) {
       chckbxFanarttv.setSelected(true);
     }
 
     // trailer provider
-    if (Globals.settings.getMovieSettings().isTrailerScraperTmdb()) {
+    if (MovieModuleManager.MOVIE_SETTINGS.isTrailerScraperTmdb()) {
       chckbxTheMovieDb_1.setSelected(true);
     }
 
-    if (Globals.settings.getMovieSettings().isTrailerScraperHdTrailers()) {
+    if (MovieModuleManager.MOVIE_SETTINGS.isTrailerScraperHdTrailers()) {
       chckbxHdtrailernet.setSelected(true);
     }
 
-    if (Globals.settings.getMovieSettings().isTrailerScraperOfdb()) {
+    if (MovieModuleManager.MOVIE_SETTINGS.isTrailerScraperOfdb()) {
       chckbxOfdbde.setSelected(true);
     }
   }

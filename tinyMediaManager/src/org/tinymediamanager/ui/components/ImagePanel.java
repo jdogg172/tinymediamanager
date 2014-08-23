@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import org.imgscalr.Scalr;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.core.ImageCache;
-import org.tinymediamanager.core.MediaFile;
+import org.tinymediamanager.core.entities.MediaFile;
 import org.tinymediamanager.ui.MainWindow;
 import org.tinymediamanager.ui.WrapLayout;
 
@@ -132,7 +132,7 @@ public class ImagePanel extends JPanel implements HierarchyListener {
             File file = ImageCache.getCachedFile(mediaFile.getFile().getAbsolutePath());
             LOGGER.debug("loading " + file);
             BufferedImage bufferedImage = com.bric.image.ImageLoader.createImage(file);
-            Point size = ImageLabel.calculateSize(300, 100, bufferedImage.getWidth(), bufferedImage.getHeight(), true);
+            Point size = ImageCache.calculateSize(300, 100, bufferedImage.getWidth(), bufferedImage.getHeight(), true);
             // BufferedImage img = Scaling.scale(bufferedImage, size.x, size.y);
             BufferedImage img = Scalr.resize(bufferedImage, Scalr.Method.QUALITY, Scalr.Mode.AUTOMATIC, size.x, size.y, Scalr.OP_ANTIALIAS);
             bufferedImage = null;

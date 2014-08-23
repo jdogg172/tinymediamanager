@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -124,6 +124,11 @@ public class MovieSettings extends AbstractModelObject {
   private boolean                       enableMovieSetArtworkFolder              = false;
   private String                        movieSetArtworkFolder                    = "MoviesetArtwork";
   private boolean                       scrapeBestImage                          = true;
+  private boolean                       imageLogo                                = false;
+  private boolean                       imageBanner                              = false;
+  private boolean                       imageClearart                            = false;
+  private boolean                       imageDiscart                             = false;
+  private boolean                       imageThumb                               = false;
   private boolean                       trailerScraperTmdb                       = true;
   private boolean                       trailerScraperHdTrailers                 = true;
   private boolean                       trailerScraperOfdb                       = true;
@@ -142,6 +147,10 @@ public class MovieSettings extends AbstractModelObject {
   private boolean                       trailerColumnVisible                     = true;
   private boolean                       subtitleColumnVisible                    = true;
   private boolean                       scraperFallback                          = false;
+  private boolean                       useTrailerPreference                     = false;
+  private MovieTrailerQuality           trailerQuality                           = MovieTrailerQuality.HD_720;
+  private MovieTrailerSources           trailerSource                            = MovieTrailerSources.YOUTUBE;
+  private boolean                       syncTrakt                                = false;
 
   public MovieSettings() {
   }
@@ -656,5 +665,95 @@ public class MovieSettings extends AbstractModelObject {
     boolean oldValue = this.scraperFallback;
     this.scraperFallback = newValue;
     firePropertyChange(SCRAPER_FALLBACK, oldValue, newValue);
+  }
+
+  public boolean isImageLogo() {
+    return imageLogo;
+  }
+
+  public boolean isImageBanner() {
+    return imageBanner;
+  }
+
+  public boolean isImageClearart() {
+    return imageClearart;
+  }
+
+  public boolean isImageDiscart() {
+    return imageDiscart;
+  }
+
+  public boolean isImageThumb() {
+    return imageThumb;
+  }
+
+  public void setImageLogo(boolean newValue) {
+    boolean oldValue = this.imageLogo;
+    this.imageLogo = newValue;
+    firePropertyChange("imageLogo", oldValue, newValue);
+  }
+
+  public void setImageBanner(boolean newValue) {
+    boolean oldValue = this.imageBanner;
+    this.imageBanner = newValue;
+    firePropertyChange("imageBanner", oldValue, newValue);
+  }
+
+  public void setImageClearart(boolean newValue) {
+    boolean oldValue = this.imageClearart;
+    this.imageClearart = newValue;
+    firePropertyChange("imageClearart", oldValue, newValue);
+  }
+
+  public void setImageDiscart(boolean newValue) {
+    boolean oldValue = this.imageDiscart;
+    this.imageDiscart = newValue;
+    firePropertyChange("imageDiscart", oldValue, newValue);
+  }
+
+  public void setImageThumb(boolean newValue) {
+    boolean oldValue = this.imageThumb;
+    this.imageThumb = newValue;
+    firePropertyChange("imageThumb", oldValue, newValue);
+  }
+
+  public boolean isUseTrailerPreference() {
+    return useTrailerPreference;
+  }
+
+  public void setUseTrailerPreference(boolean newValue) {
+    boolean oldValue = this.useTrailerPreference;
+    this.useTrailerPreference = newValue;
+    firePropertyChange("useTrailerPreference", oldValue, newValue);
+  }
+
+  public MovieTrailerQuality getTrailerQuality() {
+    return trailerQuality;
+  }
+
+  public void setTrailerQuality(MovieTrailerQuality newValue) {
+    MovieTrailerQuality oldValue = this.trailerQuality;
+    this.trailerQuality = newValue;
+    firePropertyChange("trailerQuality", oldValue, newValue);
+  }
+
+  public MovieTrailerSources getTrailerSource() {
+    return trailerSource;
+  }
+
+  public void setTrailerSource(MovieTrailerSources newValue) {
+    MovieTrailerSources oldValue = this.trailerSource;
+    this.trailerSource = newValue;
+    firePropertyChange("trailerSource", oldValue, newValue);
+  }
+
+  public void setSyncTrakt(boolean newValue) {
+    boolean oldValue = this.syncTrakt;
+    this.syncTrakt = newValue;
+    firePropertyChange("syncTrakt", oldValue, newValue);
+  }
+
+  public boolean getSyncTrakt() {
+    return syncTrakt;
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +20,13 @@ import static org.tinymediamanager.core.Constants.*;
 import java.util.List;
 import java.util.concurrent.Callable;
 
-import javax.persistence.EntityManager;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tinymediamanager.Globals;
 import org.tinymediamanager.core.Message.MessageLevel;
-import org.tinymediamanager.core.movie.Movie;
-import org.tinymediamanager.core.tvshow.TvShowEpisode;
+import org.tinymediamanager.core.entities.MediaEntity;
+import org.tinymediamanager.core.entities.MediaFile;
+import org.tinymediamanager.core.movie.entities.Movie;
+import org.tinymediamanager.core.tvshow.entities.TvShowEpisode;
 
 /**
  * The Class MediaFileInformationFetcherTask.
@@ -83,13 +82,7 @@ public class MediaFileInformationFetcherTask implements Callable<Object> {
     }
 
     if (mediaEntity != null) {
-      EntityManager em = Globals.entityManagerFactory.createEntityManager();
-      // em.getTransaction().begin();
-      // mediaEntity.saveToDb(em);
       mediaEntity.saveToDb();
-      // em.getTransaction().commit();
-      // em.close();
-
       mediaEntity.firePropertyChange(MEDIA_INFORMATION, false, true);
     }
 

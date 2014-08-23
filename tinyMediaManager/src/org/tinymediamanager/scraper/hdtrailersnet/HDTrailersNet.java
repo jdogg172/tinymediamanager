@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package org.tinymediamanager.scraper.hdtrailersnet;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +26,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tinymediamanager.core.Constants;
 import org.tinymediamanager.scraper.IMediaTrailerProvider;
 import org.tinymediamanager.scraper.MediaMetadata;
 import org.tinymediamanager.scraper.MediaProviderInfo;
@@ -36,26 +36,18 @@ import org.tinymediamanager.scraper.util.CachedUrl;
 import org.tinymediamanager.scraper.util.Url;
 
 /**
- * The Class HDTrailersNet.
+ * The Class HDTrailersNet. A trailer provider for the site hd-trailers.net
  * 
  * @author Myron Boyle
  */
 public class HDTrailersNet implements IMediaTrailerProvider {
   private static final Logger      LOGGER       = LoggerFactory.getLogger(HDTrailersNet.class);
-  private static MediaProviderInfo providerInfo = new MediaProviderInfo("hdtrailersnet", "hd-trailers.net",
+  private static MediaProviderInfo providerInfo = new MediaProviderInfo(Constants.HDTRAILERSID, "hd-trailers.net",
                                                     "Scraper for hd-trailers.net which is able to scrape trailers");
 
-  /**
-   * Instantiates a new hD trailers net.
-   */
   public HDTrailersNet() {
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.tinymediamanager.scraper.IMediaTrailerProvider#getTrailers(org. tinymediamanager.scraper.MediaScrapeOptions)
-   */
   @Override
   public List<MediaTrailer> getTrailers(MediaScrapeOptions options) throws Exception {
     LOGGER.debug("getTrailers() " + options.toString());
@@ -74,9 +66,9 @@ public class HDTrailersNet implements IMediaTrailerProvider {
       return trailers;
     }
 
+    // best guess
+    String search = "http://www.hd-trailers.net/movie/" + ot.replaceAll("[^a-zA-Z0-9]", "-").replaceAll("--", "-").toLowerCase() + "/";
     try {
-      // best guess
-      String search = "http://www.hd-trailers.net/movie/" + ot.replaceAll("[^a-zA-Z0-9]", "-").replaceAll("--", "-").toLowerCase() + "/";
       LOGGER.debug("Guessed HD-Trailers Url: " + search);
 
       Url url = new CachedUrl(search);
@@ -148,12 +140,25 @@ public class HDTrailersNet implements IMediaTrailerProvider {
         }
       }
     }
-    catch (IOException e) {
+    catch (Exception e) {
       LOGGER.error("cannot parse HD-Trailers movie: " + ot, e);
+
+      // clear cache
+      CachedUrl.removeCachedFileForUrl(search);
     }
     finally {
     }
     return trailers;
+  }
+
+  public String correctUrlForProvider(String provider, String url) {
+    if (provider.equals("apple")) {
+      // url = url.replace("_h480p", "_480p");
+      // url = url.replace("_h720p", "_720p");
+      // url = url.replace("_h1080p", "_1080p");
+      url = url.replace("//trailers.apple.com", "//movietrailers.apple.com");
+    }
+    return url;
   }
 
   /**
@@ -193,11 +198,6 @@ public class HDTrailersNet implements IMediaTrailerProvider {
     return source;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.tinymediamanager.scraper.IMediaTrailerProvider#getProviderInfo()
-   */
   @Override
   public MediaProviderInfo getProviderInfo() {
     return providerInfo;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,16 +30,16 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.SystemUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tinymediamanager.Globals;
 import org.tinymediamanager.core.ImageCache;
-import org.tinymediamanager.core.MediaFile;
-import org.tinymediamanager.core.MediaFileSubtitle;
 import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
 import org.tinymediamanager.core.Utils;
+import org.tinymediamanager.core.entities.MediaFile;
+import org.tinymediamanager.core.entities.MediaFileSubtitle;
 import org.tinymediamanager.core.movie.connector.MovieConnectors;
+import org.tinymediamanager.core.movie.entities.Movie;
 import org.tinymediamanager.scraper.Certification;
 import org.tinymediamanager.scraper.util.StrgUtils;
 
@@ -49,8 +49,6 @@ import org.tinymediamanager.scraper.util.StrgUtils;
  * @author Manuel Laggner / Myron Boyle
  */
 public class MovieRenamer {
-
-  /** The Constant LOGGER. */
   private final static Logger LOGGER = LoggerFactory.getLogger(MovieRenamer.class);
 
   private static void renameSubtitles(Movie m) {
@@ -181,10 +179,10 @@ public class MovieRenamer {
     if (movie.getMovieSet() != null) {
       LOGGER.debug("movieset: " + movie.getMovieSet().getTitle());
     }
-    LOGGER.debug("path expression: " + Globals.settings.getMovieSettings().getMovieRenamerPathname());
-    LOGGER.debug("file expression: " + Globals.settings.getMovieSettings().getMovieRenamerFilename());
+    LOGGER.debug("path expression: " + MovieModuleManager.MOVIE_SETTINGS.getMovieRenamerPathname());
+    LOGGER.debug("file expression: " + MovieModuleManager.MOVIE_SETTINGS.getMovieRenamerFilename());
 
-    String newPathname = createDestinationForFoldername(Globals.settings.getMovieSettings().getMovieRenamerPathname(), movie);
+    String newPathname = createDestinationForFoldername(MovieModuleManager.MOVIE_SETTINGS.getMovieRenamerPathname(), movie);
     String oldPathname = movie.getPath();
     boolean resetMultidir = false;
 
@@ -232,7 +230,7 @@ public class MovieRenamer {
     }
 
     // if empty, do not rename file, but DO move them to movie root
-    boolean renameFiles = !Globals.settings.getMovieSettings().getMovieRenamerFilename().isEmpty();
+    boolean renameFiles = !MovieModuleManager.MOVIE_SETTINGS.getMovieRenamerFilename().isEmpty();
 
     // cleanup with old movie name
     for (MovieNfoNaming s : MovieNfoNaming.values()) {
@@ -242,12 +240,12 @@ public class MovieRenamer {
     }
     for (MoviePosterNaming s : MoviePosterNaming.values()) {
       // mark all known variants for cleanup
-      MediaFile del = new MediaFile(new File(movie.getPath(), movie.getPosterFilename(s)));
+      MediaFile del = new MediaFile(new File(movie.getPath(), MovieArtworkHelper.getPosterFilename(s, movie)));
       cleanup.add(del);
     }
     for (MovieFanartNaming s : MovieFanartNaming.values()) {
       // mark all known variants for cleanup
-      MediaFile del = new MediaFile(new File(movie.getPath(), movie.getFanartFilename(s)));
+      MediaFile del = new MediaFile(new File(movie.getPath(), MovieArtworkHelper.getFanartFilename(s, movie)));
       cleanup.add(del);
     }
 
@@ -297,13 +295,13 @@ public class MovieRenamer {
           cleanup.add(new MediaFile(vid)); // mark old file for cleanup (clone current)
           if (renameFiles) {
             // create new filename according to template
-            newFilename = createDestinationForFilename(Globals.settings.getMovieSettings().getMovieRenamerFilename(), movie);
+            newFilename = createDestinationForFilename(MovieModuleManager.MOVIE_SETTINGS.getMovieRenamerFilename(), movie);
             // is there any stacking information in the filename?
             // use vid.getStacking() != 0 for custom stacking format?
             String stacking = Utils.getStackingMarker(vid.getFilename());
             String delimiter = " ";
-            if (Globals.settings.getMovieSettings().isMovieRenamerSpaceSubstitution()) {
-              delimiter = Globals.settings.getMovieSettings().getMovieRenamerSpaceReplacement();
+            if (MovieModuleManager.MOVIE_SETTINGS.isMovieRenamerSpaceSubstitution()) {
+              delimiter = MovieModuleManager.MOVIE_SETTINGS.getMovieRenamerSpaceReplacement();
             }
             if (!stacking.isEmpty()) {
               newFilename += delimiter + stacking;
@@ -370,7 +368,7 @@ public class MovieRenamer {
         nfonames.add(MovieNfoNaming.FILENAME_NFO);
       }
       else {
-        nfonames = Globals.settings.getMovieSettings().getMovieNfoFilenames();
+        nfonames = MovieModuleManager.MOVIE_SETTINGS.getMovieNfoFilenames();
       }
       for (MovieNfoNaming name : nfonames) {
         MediaFile newMF = new MediaFile(mf);
@@ -409,10 +407,10 @@ public class MovieRenamer {
         posternames.add(MoviePosterNaming.FILENAME_POSTER_PNG);
       }
       else {
-        posternames = Globals.settings.getMovieSettings().getMoviePosterFilenames();
+        posternames = MovieModuleManager.MOVIE_SETTINGS.getMoviePosterFilenames();
       }
       for (MoviePosterNaming name : posternames) {
-        newFilename = movie.getPosterFilename(name, newMovieFilename);
+        newFilename = MovieArtworkHelper.getPosterFilename(name, movie, newMovieFilename);
         if (newFilename != null && !newFilename.isEmpty()) {
           String curExt = mf.getExtension();
           if (curExt.equalsIgnoreCase("tbn")) {
@@ -467,10 +465,10 @@ public class MovieRenamer {
         fanartnames.add(MovieFanartNaming.FILENAME_FANART_PNG);
       }
       else {
-        fanartnames = Globals.settings.getMovieSettings().getMovieFanartFilenames();
+        fanartnames = MovieModuleManager.MOVIE_SETTINGS.getMovieFanartFilenames();
       }
       for (MovieFanartNaming name : fanartnames) {
-        newFilename = movie.getFanartFilename(name, newMovieFilename);
+        newFilename = MovieArtworkHelper.getFanartFilename(name, movie, newMovieFilename);
         if (newFilename != null && !newFilename.isEmpty()) {
           String curExt = mf.getExtension();
           if (curExt.equalsIgnoreCase("tbn")) {
@@ -508,6 +506,26 @@ public class MovieRenamer {
     }
 
     // ######################################################################
+    // ## rename extra artwork
+    // ## keep all extra artwork - they don't need to be renamed
+    // ######################################################################
+    for (MediaFile artwork : movie.getMediaFiles(MediaFileType.LOGO)) {
+      needed.add(artwork);
+    }
+    for (MediaFile artwork : movie.getMediaFiles(MediaFileType.CLEARART)) {
+      needed.add(artwork);
+    }
+    for (MediaFile artwork : movie.getMediaFiles(MediaFileType.BANNER)) {
+      needed.add(artwork);
+    }
+    for (MediaFile artwork : movie.getMediaFiles(MediaFileType.DISCART)) {
+      needed.add(artwork);
+    }
+    for (MediaFile artwork : movie.getMediaFiles(MediaFileType.THUMB)) {
+      needed.add(artwork);
+    }
+
+    // ######################################################################
     // ## rename TRAILER
     // ######################################################################
     mfl = movie.getMediaFiles(MediaFileType.TRAILER);
@@ -517,7 +535,7 @@ public class MovieRenamer {
       String newFilename = mf.getFilename();
       // String newPath = movie.getPath() + File.separator;
       String fileExtension = FilenameUtils.getExtension(mf.getFilename());
-      newFilename = createDestinationForFilename(Globals.settings.getMovieSettings().getMovieRenamerFilename(), movie) + "-trailer." + fileExtension;
+      newFilename = createDestinationForFilename(MovieModuleManager.MOVIE_SETTINGS.getMovieRenamerFilename(), movie) + "-trailer." + fileExtension;
       MediaFile newMF = new MediaFile(mf);
       if (renameFiles) { // renamer template was not empty
         File newFile = new File(newPathname, newFilename);
@@ -618,7 +636,7 @@ public class MovieRenamer {
     movie.saveToDb();
 
     // rewrite NFO if it's a MP NFO and there was a change with poster/fanart
-    if (Globals.settings.getMovieSettings().getMovieConnector() == MovieConnectors.MP && (posterRenamed || fanartRenamed)) {
+    if (MovieModuleManager.MOVIE_SETTINGS.getMovieConnector() == MovieConnectors.MP && (posterRenamed || fanartRenamed)) {
       movie.writeNFO();
     }
 
@@ -650,7 +668,7 @@ public class MovieRenamer {
     }
 
     // clean all non tmm nfos
-    if (Globals.settings.getMovieSettings().isMovieRenamerNfoCleanup()) {
+    if (MovieModuleManager.MOVIE_SETTINGS.isMovieRenamerNfoCleanup()) {
       File[] content = new File(movie.getPath()).listFiles();
       for (File file : content) {
         if (file.isFile() && file.getName().toLowerCase().endsWith(".nfo")) {
@@ -785,7 +803,7 @@ public class MovieRenamer {
     // replace token Movie set title - sorted ($M)
     if (newDestination.contains("$M")) {
       if (movie.getMovieSet() != null
-          && (movie.getMovieSet().getMovies().size() > 1 || Globals.settings.getMovieSettings().isMovieRenamerCreateMoviesetForSingleMovie())) {
+          && (movie.getMovieSet().getMovies().size() > 1 || MovieModuleManager.MOVIE_SETTINGS.isMovieRenamerCreateMoviesetForSingleMovie())) {
         newDestination = replaceToken(newDestination, "$M", movie.getMovieSet().getTitleSortable());
       }
       else {
@@ -796,7 +814,7 @@ public class MovieRenamer {
     // replace token Movie set title ($N)
     if (newDestination.contains("$N")) {
       if (movie.getMovieSet() != null
-          && (movie.getMovieSet().getMovies().size() > 1 || Globals.settings.getMovieSettings().isMovieRenamerCreateMoviesetForSingleMovie())) {
+          && (movie.getMovieSet().getMovies().size() > 1 || MovieModuleManager.MOVIE_SETTINGS.isMovieRenamerCreateMoviesetForSingleMovie())) {
         newDestination = replaceToken(newDestination, "$N", movie.getMovieSet().getTitle());
       }
       else {
@@ -831,6 +849,11 @@ public class MovieRenamer {
         newDestination = replaceToken(newDestination, "$R", mf.getVideoResolution());
       }
 
+      // replace token 3D format ($3)
+      if (newDestination.contains("$3")) {
+        newDestination = replaceToken(newDestination, "$3", mf.getVideo3DFormat());
+      }
+
       // replace token audio codec + channels ($A)
       if (newDestination.contains("$A")) {
         newDestination = replaceToken(newDestination, "$A", mf.getAudioCodec() + (mf.getAudioCodec().isEmpty() ? "" : "-") + mf.getAudioChannels());
@@ -849,16 +872,21 @@ public class MovieRenamer {
     else {
       // no mediafiles; remove at least token (if available)
       newDestination = newDestination.replace("$R", "");
+      newDestination = newDestination.replace("$3", "");
       newDestination = newDestination.replace("$A", "");
       newDestination = newDestination.replace("$V", "");
       newDestination = newDestination.replace("$F", "");
     }
 
     // replace token media source (BluRay|DVD|TV|...) ($S)
-    // if (newDestination.contains("$S")) {
-    // newDestination = newDestination.replaceAll("\\$S",
-    // movie.getMediaSource());
-    // }
+    if (newDestination.contains("$S")) {
+      if (movie.getMediaSource() != MovieMediaSource.UNKNOWN) {
+        newDestination = newDestination.replaceAll("\\$S", movie.getMediaSource().toString());
+      }
+      else {
+        newDestination = newDestination.replaceAll("\\$S", "");
+      }
+    }
 
     // replace empty brackets
     newDestination = newDestination.replaceAll("\\(\\)", "");
@@ -886,8 +914,8 @@ public class MovieRenamer {
     newDestination = newDestination.replaceAll(" +", " ").trim();
 
     // replace spaces with underscores if needed
-    if (Globals.settings.getMovieSettings().isMovieRenamerSpaceSubstitution()) {
-      String replacement = Globals.settings.getMovieSettings().getMovieRenamerSpaceReplacement();
+    if (MovieModuleManager.MOVIE_SETTINGS.isMovieRenamerSpaceSubstitution()) {
+      String replacement = MovieModuleManager.MOVIE_SETTINGS.getMovieRenamerSpaceReplacement();
       newDestination = newDestination.replace(" ", replacement);
 
       // also replace now multiple replacements with one to avoid strange looking results;
@@ -897,7 +925,7 @@ public class MovieRenamer {
     }
 
     // ASCII replacement
-    if (Globals.settings.getMovieSettings().isAsciiReplacement()) {
+    if (MovieModuleManager.MOVIE_SETTINGS.isAsciiReplacement()) {
       newDestination = StrgUtils.convertToAscii(newDestination, false);
     }
 
@@ -909,9 +937,20 @@ public class MovieRenamer {
     if (StringUtils.isNotBlank(replacement)) {
       // replace illegal characters
       // http://msdn.microsoft.com/en-us/library/windows/desktop/aa365247%28v=vs.85%29.aspx
-      replacingCleaned = replacement.replaceAll("([\"\\:<>|/?*])", "");
+      replacingCleaned = replaceInvalidCharacters(replacement);
     }
     return destination.replace(token, replacingCleaned);
+  }
+
+  /**
+   * replaces all invalid/illegal characters for filenames with ""
+   * 
+   * @param source
+   *          string to clean
+   * @return cleaned string
+   */
+  public static String replaceInvalidCharacters(String source) {
+    return source.replaceAll("([\"\\:<>|/?*])", "");
   }
 
   /**

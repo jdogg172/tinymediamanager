@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,13 +27,15 @@ import org.apache.commons.lang3.SystemUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
-import org.tinymediamanager.core.MediaFile;
-import org.tinymediamanager.core.MediaFileSubtitle;
 import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
 import org.tinymediamanager.core.Utils;
+import org.tinymediamanager.core.entities.MediaFile;
+import org.tinymediamanager.core.entities.MediaFileSubtitle;
+import org.tinymediamanager.core.tvshow.entities.TvShow;
+import org.tinymediamanager.core.tvshow.entities.TvShowEpisode;
 import org.tinymediamanager.scraper.util.StrgUtils;
 
 /**
@@ -63,7 +65,13 @@ public class TvShowRenamer {
    * @return the cleaned string
    */
   private static String cleanForFilename(String name) {
-    return name.replaceAll("([\"\\:<>|/?*])", "");
+    String cleanedName = name.replaceAll("([\"\\:<>|/?*])", "").replaceAll(" +", " ").trim();
+
+    if (Globals.settings.getTvShowSettings().isRenamerSpaceSubstitution()) {
+      cleanedName = cleanedName.replaceAll(" ", Globals.settings.getTvShowSettings().getRenamerSpaceReplacement());
+    }
+
+    return cleanedName;
   }
 
   /**
@@ -310,7 +318,7 @@ public class TvShowRenamer {
    *          the tvShow
    * @param mf
    *          the MF for multiepisode
-   * @return
+   * @return the file name for the media file
    */
   public static String generateFilename(TvShow tvShow, MediaFile mf) {
     return generateName(tvShow, mf, true);
@@ -324,7 +332,7 @@ public class TvShowRenamer {
    *          the tvShow
    * @param mf
    *          the MF for multiepisode
-   * @return
+   * @return the file name for media file
    */
   public static String generateFolderename(TvShow tvShow, MediaFile mf) {
     return generateName(tvShow, mf, false);
@@ -458,7 +466,8 @@ public class TvShowRenamer {
 
     seasonDir = seasonDir.replace("$1", String.valueOf(episode.getSeason()));
     seasonDir = seasonDir.replace("$2", lz(episode.getSeason()));
-    if (seasonDir.isEmpty()) {
+    // only allow empty season dir if the season is in the filename
+    if (seasonDir.isEmpty() && !Globals.settings.getTvShowSettings().getRenamerAddSeason()) {
       seasonDir = "Season " + String.valueOf(episode.getSeason());
     }
     return seasonDir;

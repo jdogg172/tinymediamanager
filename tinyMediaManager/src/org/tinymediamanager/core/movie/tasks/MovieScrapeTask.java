@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,23 +15,29 @@
  */
 package org.tinymediamanager.core.movie.tasks;
 
+import java.awt.GraphicsEnvironment;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.ResourceBundle;
+
+import javax.swing.SwingUtilities;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tinymediamanager.Globals;
-import org.tinymediamanager.TmmThreadPool;
-import org.tinymediamanager.core.MediaFile;
 import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
-import org.tinymediamanager.core.movie.Movie;
+import org.tinymediamanager.core.entities.MediaFile;
 import org.tinymediamanager.core.movie.MovieList;
+import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.core.movie.MovieScraperMetadataConfig;
 import org.tinymediamanager.core.movie.MovieSearchAndScrapeOptions;
+import org.tinymediamanager.core.movie.entities.Movie;
+import org.tinymediamanager.core.threading.TmmTask;
+import org.tinymediamanager.core.threading.TmmTaskManager;
+import org.tinymediamanager.core.threading.TmmThreadPool;
 import org.tinymediamanager.scraper.IMediaArtworkProvider;
 import org.tinymediamanager.scraper.IMediaMetadataProvider;
 import org.tinymediamanager.scraper.IMediaTrailerProvider;
@@ -42,6 +48,9 @@ import org.tinymediamanager.scraper.MediaScrapeOptions;
 import org.tinymediamanager.scraper.MediaSearchResult;
 import org.tinymediamanager.scraper.MediaTrailer;
 import org.tinymediamanager.scraper.MediaType;
+import org.tinymediamanager.scraper.trakttv.SyncTraktTvTask;
+import org.tinymediamanager.ui.UTF8Control;
+import org.tinymediamanager.ui.movies.dialogs.MovieChooserDialog;
 
 /**
  * The Class MovieScrapeTask.
@@ -49,86 +58,79 @@ import org.tinymediamanager.scraper.MediaType;
  * @author Manuel Laggner
  */
 public class MovieScrapeTask extends TmmThreadPool {
-
   private final static Logger         LOGGER = LoggerFactory.getLogger(MovieScrapeTask.class);
+  private static final ResourceBundle BUNDLE = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
 
   private List<Movie>                 moviesToScrape;
   private boolean                     doSearch;
   private MovieSearchAndScrapeOptions options;
+  private List<Movie>                 smartScrapeList;
 
-  /**
-   * Instantiates a new movie scrape task.
-   * 
-   * @param moviesToScrape
-   *          the movies to scrape
-   * @param doSearch
-   *          the do search
-   * @param options
-   *          the options
-   */
   public MovieScrapeTask(List<Movie> moviesToScrape, boolean doSearch, MovieSearchAndScrapeOptions options) {
+    super(BUNDLE.getString("movie.scraping"));
     this.moviesToScrape = moviesToScrape;
     this.doSearch = doSearch;
     this.options = options;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.swing.SwingWorker#doInBackground()
-   */
   @Override
-  protected Void doInBackground() throws Exception {
+  protected void doInBackground() {
     initThreadPool(3, "scrape");
-    startProgressBar("scraping movies", 0);
+    start();
+
+    smartScrapeList = new ArrayList<Movie>(0);
 
     for (int i = 0; i < moviesToScrape.size(); i++) {
       Movie movie = moviesToScrape.get(i);
       submitTask(new Worker(movie));
     }
     waitForCompletionOrCancel();
-    if (cancel) {
-      cancel(false);// swing cancel
+
+    // initiate smart scrape
+    if (!smartScrapeList.isEmpty() && !GraphicsEnvironment.isHeadless()) {
+      try {
+        SwingUtilities.invokeAndWait(new Runnable() {
+          @Override
+          public void run() {
+            for (Movie movie : smartScrapeList) {
+              MovieChooserDialog dialogMovieChooser = new MovieChooserDialog(movie, smartScrapeList.size() > 1 ? true : false);
+              if (!dialogMovieChooser.showDialog()) {
+                break;
+              }
+            }
+          }
+        });
+      }
+      catch (Exception e) {
+        LOGGER.error("SmartScrape crashed " + e.getMessage());
+      }
     }
+
+    if (MovieModuleManager.MOVIE_SETTINGS.getSyncTrakt()) {
+      TmmTask task = new SyncTraktTvTask(moviesToScrape, null);
+      TmmTaskManager.getInstance().addUnnamedTask(task);
+    }
+
     LOGGER.info("Done scraping movies)");
-
-    return null;
-  }
-
-  /**
-   * Cancel.
-   */
-  public void cancel() {
-    cancel = true;
-    // cancel(false);
-    // moviesToScrape.clear();
   }
 
   @Override
-  public void done() {
-    stopProgressBar();
+  public void callback(Object obj) {
+    // do not publish task description here, because with different workers the text is never right
+    publishState(progressDone);
   }
 
-  /**
-   * The Class Worker.
-   */
+  /****************************************************************************************
+   * Helper classes
+   ****************************************************************************************/
   private class Worker implements Runnable {
-
     private MovieList movieList;
     private Movie     movie;
 
-    /**
-     * Instantiates a new worker.
-     */
     public Worker(Movie movie) {
       this.movie = movie;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.lang.Runnable#run()
-     */
     @Override
     public void run() {
       try {
@@ -142,35 +144,13 @@ public class MovieScrapeTask extends TmmThreadPool {
         // search movie
         MediaSearchResult result1 = null;
         if (doSearch) {
-          List<MediaSearchResult> results = movieList.searchMovie(movie.getTitle(), movie, mediaMetadataProvider);
-          if (results != null && !results.isEmpty()) {
-            result1 = results.get(0);
-            // check if there is an other result with 100% score
-            if (results.size() > 1) {
-              MediaSearchResult result2 = results.get(1);
-              // if both results have 100% score - do not take any result
-              if (result1.getScore() == 1 && result2.getScore() == 1) {
-                LOGGER.info("two 100% results, can't decide whitch to take - ignore result");
-                MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, movie, "movie.scrape.toosimilar"));
-                return;
-              }
+          result1 = searchForMovie(mediaMetadataProvider);
+          if (result1 == null) {
+            // append this search request to the UI with search & scrape dialog
+            synchronized (smartScrapeList) {
+              smartScrapeList.add(movie);
+              return;
             }
-
-            // if there is only one result - we assume it is THE right movie
-            // else: get treshold from settings (default 0.75) - to minimize false positives
-            if (results.size() > 1) {
-              final double scraperTreshold = Globals.settings.getMovieSettings().getScraperThreshold();
-              LOGGER.info("using treshold from settings of {}", scraperTreshold);
-              if (result1.getScore() < scraperTreshold) {
-                LOGGER.info("score is lower than " + scraperTreshold + " (" + result1.getScore() + ") - ignore result");
-                MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, movie, "movie.scrape.toolowscore"));
-                return;
-              }
-            }
-          }
-          else {
-            LOGGER.info("no result found for " + movie.getTitle());
-            MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, movie, "movie.scrape.nomatchfound"));
           }
         }
 
@@ -179,12 +159,12 @@ public class MovieScrapeTask extends TmmThreadPool {
           try {
             MediaScrapeOptions options = new MediaScrapeOptions();
             options.setResult(result1);
-            options.setLanguage(Globals.settings.getMovieSettings().getScraperLanguage());
-            options.setCountry(Globals.settings.getMovieSettings().getCertificationCountry());
+            options.setLanguage(MovieModuleManager.MOVIE_SETTINGS.getScraperLanguage());
+            options.setCountry(MovieModuleManager.MOVIE_SETTINGS.getCertificationCountry());
+            options.setScrapeImdbForeignLanguage(MovieModuleManager.MOVIE_SETTINGS.isImdbScrapeForeignLanguage());
             options.setScrapeCollectionInfo(scraperMetadataConfig.isCollection());
 
-            // we didn't do a search - pass imdbid and tmdbid from movie
-            // object
+            // we didn't do a search - pass imdbid and tmdbid from movie object
             if (!doSearch) {
               for (Entry<String, Object> entry : movie.getIds().entrySet()) {
                 options.setId(entry.getKey(), entry.getValue().toString());
@@ -227,19 +207,43 @@ public class MovieScrapeTask extends TmmThreadPool {
       }
     }
 
-    /**
-     * Gets the artwork.
-     * 
-     * @param movie
-     *          the movie
-     * @param metadata
-     *          the metadata
-     * @param artworkProviders
-     *          the artwork providers
-     * @return the artwork
-     */
-    public List<MediaArtwork> getArtwork(Movie movie, MediaMetadata metadata, List<IMediaArtworkProvider> artworkProviders) {
-      List<MediaArtwork> artwork = null;
+    private MediaSearchResult searchForMovie(IMediaMetadataProvider mediaMetadataProvider) {
+      List<MediaSearchResult> results = movieList.searchMovie(movie.getTitle(), movie, mediaMetadataProvider);
+      MediaSearchResult result = null;
+
+      if (results != null && !results.isEmpty()) {
+        result = results.get(0);
+        // check if there is an other result with 100% score
+        if (results.size() > 1) {
+          MediaSearchResult result2 = results.get(1);
+          // if both results have 100% score - do not take any result
+          if (result.getScore() == 1 && result2.getScore() == 1) {
+            LOGGER.info("two 100% results, can't decide whitch to take - ignore result");
+            MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, movie, "movie.scrape.toosimilar"));
+            return null;
+          }
+        }
+
+        // get threshold from settings (default 0.75) - to minimize false positives
+        final double scraperTreshold = MovieModuleManager.MOVIE_SETTINGS.getScraperThreshold();
+        LOGGER.info("using treshold from settings of {}", scraperTreshold);
+        if (result.getScore() < scraperTreshold) {
+          LOGGER.info("score is lower than " + scraperTreshold + " (" + result.getScore() + ") - ignore result");
+          MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, movie, "movie.scrape.toolowscore", new String[] { String.format("%.2f",
+              scraperTreshold) }));
+          return null;
+        }
+      }
+      else {
+        LOGGER.info("no result found for " + movie.getTitle());
+        MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, movie, "movie.scrape.nomatchfound"));
+      }
+
+      return result;
+    }
+
+    private List<MediaArtwork> getArtwork(Movie movie, MediaMetadata metadata, List<IMediaArtworkProvider> artworkProviders) {
+      List<MediaArtwork> artwork = new ArrayList<MediaArtwork>();
 
       MediaScrapeOptions options = new MediaScrapeOptions();
       options.setType(MediaType.MOVIE);
@@ -247,44 +251,24 @@ public class MovieScrapeTask extends TmmThreadPool {
       options.setMetadata(metadata);
       options.setImdbId(movie.getImdbId());
       options.setTmdbId(movie.getTmdbId());
-      options.setLanguage(Globals.settings.getMovieSettings().getScraperLanguage());
-      options.setCountry(Globals.settings.getMovieSettings().getCertificationCountry());
+      options.setLanguage(MovieModuleManager.MOVIE_SETTINGS.getScraperLanguage());
+      options.setCountry(MovieModuleManager.MOVIE_SETTINGS.getCertificationCountry());
+      options.setScrapeImdbForeignLanguage(MovieModuleManager.MOVIE_SETTINGS.isImdbScrapeForeignLanguage());
 
       // scrape providers till one artwork has been found
       for (IMediaArtworkProvider artworkProvider : artworkProviders) {
         try {
-          artwork = artworkProvider.getArtwork(options);
+          artwork.addAll(artworkProvider.getArtwork(options));
         }
         catch (Exception e) {
           LOGGER.error("getArtwork", e);
           MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, movie, "message.scrape.movieartworkfailed"));
-          artwork = new ArrayList<MediaArtwork>();
         }
-        // check if at least one artwork has been found
-        if (artwork.size() > 0) {
-          break;
-        }
-      }
-
-      // initialize if null
-      if (artwork == null) {
-        artwork = new ArrayList<MediaArtwork>();
       }
 
       return artwork;
     }
 
-    /**
-     * Gets the trailers.
-     * 
-     * @param movie
-     *          the movie
-     * @param metadata
-     *          the metadata
-     * @param trailerProviders
-     *          the trailer providers
-     * @return the trailers
-     */
     private List<MediaTrailer> getTrailers(Movie movie, MediaMetadata metadata, List<IMediaTrailerProvider> trailerProviders) {
       List<MediaTrailer> trailers = new ArrayList<MediaTrailer>();
 
@@ -304,8 +288,9 @@ public class MovieScrapeTask extends TmmThreadPool {
       options.setMetadata(metadata);
       options.setImdbId(movie.getImdbId());
       options.setTmdbId(movie.getTmdbId());
-      options.setLanguage(Globals.settings.getMovieSettings().getScraperLanguage());
-      options.setCountry(Globals.settings.getMovieSettings().getCertificationCountry());
+      options.setLanguage(MovieModuleManager.MOVIE_SETTINGS.getScraperLanguage());
+      options.setCountry(MovieModuleManager.MOVIE_SETTINGS.getCertificationCountry());
+      options.setScrapeImdbForeignLanguage(MovieModuleManager.MOVIE_SETTINGS.isImdbScrapeForeignLanguage());
 
       // scrape trailers
       for (IMediaTrailerProvider trailerProvider : trailerProviders) {
@@ -321,10 +306,5 @@ public class MovieScrapeTask extends TmmThreadPool {
 
       return trailers;
     }
-  }
-
-  @Override
-  public void callback(Object obj) {
-    startProgressBar((String) obj, getTaskcount(), getTaskdone());
   }
 }

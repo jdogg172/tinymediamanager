@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,10 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -41,6 +44,7 @@ import javax.xml.bind.UnmarshalException;
 import javax.xml.bind.Unmarshaller;
 import javax.xml.bind.annotation.XmlAnyElement;
 import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.XmlElementWrapper;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlSeeAlso;
 import javax.xml.bind.annotation.XmlType;
@@ -51,20 +55,21 @@ import org.apache.commons.lang3.SystemUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
-import org.tinymediamanager.core.MediaFile;
-import org.tinymediamanager.core.MediaFileAudioStream;
 import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
-import org.tinymediamanager.core.movie.Movie;
-import org.tinymediamanager.core.movie.MovieActor;
+import org.tinymediamanager.core.entities.MediaFile;
+import org.tinymediamanager.core.entities.MediaFileAudioStream;
 import org.tinymediamanager.core.movie.MovieList;
+import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.core.movie.MovieNfoNaming;
-import org.tinymediamanager.core.movie.MovieProducer;
-import org.tinymediamanager.core.movie.MovieSet;
 import org.tinymediamanager.core.movie.connector.MovieToXbmcNfoConnector.Actor;
 import org.tinymediamanager.core.movie.connector.MovieToXbmcNfoConnector.Producer;
+import org.tinymediamanager.core.movie.entities.Movie;
+import org.tinymediamanager.core.movie.entities.MovieActor;
+import org.tinymediamanager.core.movie.entities.MovieProducer;
+import org.tinymediamanager.core.movie.entities.MovieSet;
 import org.tinymediamanager.scraper.Certification;
 import org.tinymediamanager.scraper.CountryCode;
 import org.tinymediamanager.scraper.MediaGenres;
@@ -78,9 +83,9 @@ import org.tinymediamanager.scraper.MediaTrailer;
 @XmlRootElement(name = "movie")
 @XmlSeeAlso({ Actor.class, Producer.class })
 @XmlType(propOrder = { "title", "originaltitle", "set", "sorttitle", "rating", "epbookmark", "year", "top250", "votes", "outline", "plot", "tagline",
-    "runtime", "thumb", "fanart", "mpaa", "certifications", "id", "tmdbId", "trailer", "country", "premiered", "status", "code", "aired", "fileinfo",
-    "watched", "playcount", "genres", "studio", "credits", "director", "tags", "actors", "producers", "resume", "lastplayed", "dateadded",
-    "keywords", "poster", "url", "languages" })
+    "runtime", "thumb", "fanart", "mpaa", "certifications", "id", "ids", "tmdbId", "trailer", "country", "premiered", "status", "code", "aired",
+    "fileinfo", "watched", "playcount", "genres", "studio", "credits", "director", "tags", "actors", "producers", "resume", "lastplayed",
+    "dateadded", "keywords", "poster", "url", "languages", "unsupportedElements" })
 public class MovieToXbmcNfoConnector {
   private static final Logger LOGGER         = LoggerFactory.getLogger(MovieToXbmcNfoConnector.class);
   private static JAXBContext  context        = initContext();
@@ -114,6 +119,9 @@ public class MovieToXbmcNfoConnector {
 
   @XmlElement
   private String              id             = "";
+
+  @XmlElementWrapper(name = "ids")
+  private Map<String, Object> ids;
 
   @XmlElement
   private String              studio         = "";
@@ -181,6 +189,9 @@ public class MovieToXbmcNfoConnector {
   @XmlElement
   private String              languages;
 
+  @XmlAnyElement(lax = true)
+  private List<Object>        unsupportedElements;
+
   /** not supported tags, but used to retrain in NFO. */
   @XmlElement
   private String              epbookmark;
@@ -236,6 +247,8 @@ public class MovieToXbmcNfoConnector {
     director = new ArrayList<String>();
     credits = new ArrayList<String>();
     producers = new ArrayList();
+    ids = new HashMap<String, Object>();
+    unsupportedElements = new ArrayList<Object>();
   }
 
   /**
@@ -251,6 +264,7 @@ public class MovieToXbmcNfoConnector {
     }
 
     MovieToXbmcNfoConnector xbmc = null;
+    List<Object> unsupportedTags = new ArrayList<Object>();
 
     // load existing NFO if possible
     for (MediaFile mf : movie.getMediaFiles(MediaFileType.NFO)) {
@@ -271,6 +285,14 @@ public class MovieToXbmcNfoConnector {
     // create new
     if (xbmc == null) {
       xbmc = new MovieToXbmcNfoConnector();
+    }
+    else {
+      // store all unsupported tags
+      for (Object obj : xbmc.actors) { // ugly hack for invalid xml structure
+        if (!(obj instanceof Producer) && !(obj instanceof Actor)) {
+          unsupportedTags.add(obj);
+        }
+      }
     }
 
     // set data
@@ -311,6 +333,8 @@ public class MovieToXbmcNfoConnector {
     xbmc.id = movie.getImdbId();
     xbmc.tmdbId = movie.getTmdbId();
 
+    xbmc.ids.putAll(movie.getIds());
+
     // only write first studio
     if (StringUtils.isNotEmpty(movie.getProductionCompany())) {
       String[] studio = movie.getProductionCompany().split(", ");
@@ -329,7 +353,7 @@ public class MovieToXbmcNfoConnector {
 
     // certifications
     if (movie.getCertification() != null) {
-      if (Globals.settings.getMovieSettings().getCertificationCountry() == CountryCode.US) {
+      if (MovieModuleManager.MOVIE_SETTINGS.getCertificationCountry() == CountryCode.US) {
         // if we have US verts, write correct "Rated XX" String
         xbmc.mpaa = Certification.getMPAAString(movie.getCertification());
       }
@@ -378,6 +402,7 @@ public class MovieToXbmcNfoConnector {
       xbmc.genres.add(genre.toString());
     }
 
+    xbmc.trailer = "";
     for (MediaTrailer trailer : new ArrayList<MediaTrailer>(movie.getTrailers())) {
       if (trailer.getInNfo() && !trailer.getUrl().startsWith("file")) {
         // parse internet trailer url for nfo (do not add local one)
@@ -432,6 +457,9 @@ public class MovieToXbmcNfoConnector {
       // }
     }
 
+    // add all unsupported tags again
+    xbmc.unsupportedElements.addAll(unsupportedTags);
+
     // and marshall it
     String nfoFilename = "";
     List<MediaFile> newNfos = new ArrayList<MediaFile>(1);
@@ -442,7 +470,7 @@ public class MovieToXbmcNfoConnector {
       nfonames.add(MovieNfoNaming.FILENAME_NFO);
     }
     else {
-      nfonames = Globals.settings.getMovieSettings().getMovieNfoFilenames();
+      nfonames = MovieModuleManager.MOVIE_SETTINGS.getMovieNfoFilenames();
     }
     for (MovieNfoNaming name : nfonames) {
       try {
@@ -545,8 +573,21 @@ public class MovieToXbmcNfoConnector {
         }
       }
 
-      movie.setImdbId(xbmc.id);
-      movie.setTmdbId(xbmc.tmdbId);
+      for (Entry<String, Object> entry : xbmc.ids.entrySet()) {
+        try {
+          movie.setId(entry.getKey(), entry.getValue());
+        }
+        catch (Exception e) {
+          LOGGER.warn("could not set ID: " + entry.getKey() + " ; " + entry.getValue());
+        }
+      }
+
+      if (StringUtils.isBlank(movie.getImdbId())) {
+        movie.setImdbId(xbmc.id);
+      }
+      if (movie.getTmdbId() == 0) {
+        movie.setTmdbId(xbmc.tmdbId);
+      }
 
       // convert director to internal format
       String director = "";
@@ -577,6 +618,9 @@ public class MovieToXbmcNfoConnector {
         movie.setCertification(Certification.parseCertificationStringForMovieSetupCountry(xbmc.mpaa));
       }
       movie.setWatched(xbmc.watched);
+      if (xbmc.playcount > 0) {
+        movie.setWatched(true);
+      }
       movie.setSpokenLanguages(xbmc.languages);
 
       // movieset

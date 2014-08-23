@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,29 +17,32 @@ package org.tinymediamanager.core.tvshow.tasks;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ResourceBundle;
 import java.util.concurrent.Callable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tinymediamanager.TmmThreadPool;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
-import org.tinymediamanager.core.tvshow.TvShow;
-import org.tinymediamanager.core.tvshow.TvShowEpisode;
+import org.tinymediamanager.core.threading.TmmThreadPool;
 import org.tinymediamanager.core.tvshow.TvShowRenamer;
+import org.tinymediamanager.core.tvshow.entities.TvShow;
+import org.tinymediamanager.core.tvshow.entities.TvShowEpisode;
+import org.tinymediamanager.ui.UTF8Control;
 
 /**
- * The Class MovieRenameTask.
+ * The class MovieRenameTask. rename all chosen movies
  * 
  * @author Manuel Laggner
  */
 public class TvShowRenameTask extends TmmThreadPool {
-  private final static Logger LOGGER           = LoggerFactory.getLogger(TvShowRenameTask.class);
+  private final static Logger         LOGGER           = LoggerFactory.getLogger(TvShowRenameTask.class);
+  private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
 
-  private List<TvShow>        tvShowsToRename  = new ArrayList<TvShow>();
-  private List<TvShowEpisode> episodesToRename = new ArrayList<TvShowEpisode>();
-  private boolean             renameRoot       = true;
+  private List<TvShow>                tvShowsToRename  = new ArrayList<TvShow>();
+  private List<TvShowEpisode>         episodesToRename = new ArrayList<TvShowEpisode>();
+  private boolean                     renameRoot       = true;
 
   /**
    * Instantiates a new tv show rename task.
@@ -48,23 +51,27 @@ public class TvShowRenameTask extends TmmThreadPool {
    *          the tvshows to rename
    */
   public TvShowRenameTask(List<TvShow> tvShowsToRename, List<TvShowEpisode> episodesToRename, boolean renameRootFolder) {
-    this.tvShowsToRename.addAll(tvShowsToRename);
-    this.episodesToRename.addAll(episodesToRename);
+    super(BUNDLE.getString("tvshow.rename"));
+    if (tvShowsToRename != null) {
+      this.tvShowsToRename.addAll(tvShowsToRename);
+    }
+    if (episodesToRename != null) {
+      this.episodesToRename.addAll(episodesToRename);
+    }
     this.renameRoot = renameRootFolder;
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.swing.SwingWorker#doInBackground()
-   */
   @Override
-  protected Void doInBackground() throws Exception {
+  protected void doInBackground() {
     try {
+      start();
       initThreadPool(1, "rename");
-      startProgressBar("renaming TV shows...");
+
       // rename complete tv shows
       for (int i = 0; i < tvShowsToRename.size(); i++) {
+        if (cancel) {
+          break;
+        }
         TvShow show = tvShowsToRename.get(i);
         for (TvShowEpisode episode : new ArrayList<TvShowEpisode>(show.getEpisodes())) {
           submitTask(new RenameEpisodeTask(episode));
@@ -72,18 +79,34 @@ public class TvShowRenameTask extends TmmThreadPool {
       }
       // rename single episodes
       for (int i = 0; i < episodesToRename.size(); i++) {
+        if (cancel) {
+          break;
+        }
         TvShowEpisode episode = episodesToRename.get(i);
         submitTask(new RenameEpisodeTask(episode));
       }
 
       waitForCompletionOrCancel();
       if (cancel) {
-        cancel(false);// swing cancel
+        return;
       }
 
       // rename TvShowRoot and update all MFs in DB to new path
       if (renameRoot) {
+        for (int i = 0; i < episodesToRename.size(); i++) {
+          if (cancel) {
+            break;
+          }
+          // fill TvShowsToRename if we just rename an episodes list
+          TvShow show = episodesToRename.get(i).getTvShow();
+          if (!tvShowsToRename.contains(show)) {
+            tvShowsToRename.add(show);
+          }
+        }
         for (int i = 0; i < tvShowsToRename.size(); i++) {
+          if (cancel) {
+            break;
+          }
           TvShowRenamer.renameTvShowRoot(tvShowsToRename.get(i)); // rename root and update ShowMFs
         }
       }
@@ -94,7 +117,7 @@ public class TvShowRenameTask extends TmmThreadPool {
       LOGGER.error("Thread crashed", e);
       MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, "Settings.renamer", "message.renamer.threadcrashed"));
     }
-    return null;
+    return;
   }
 
   /**
@@ -115,29 +138,8 @@ public class TvShowRenameTask extends TmmThreadPool {
     }
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.swing.SwingWorker#done()
-   */
-  @Override
-  public void done() {
-    stopProgressBar();
-  }
-
-  /*
-   * (non-Javadoc)
-   * 
-   * @see org.tinymediamanager.ui.TmmSwingWorker#cancel()
-   */
-  @Override
-  public void cancel() {
-    cancel = true;
-    // cancel(false);
-  }
-
   @Override
   public void callback(Object obj) {
-    startProgressBar((String) obj, getTaskcount(), getTaskdone());
+    publishState((String) obj, progressDone);
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ import java.util.HashMap;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
-import org.tinymediamanager.core.movie.Movie;
-import org.tinymediamanager.core.movie.MovieActor;
+import org.tinymediamanager.core.movie.entities.Movie;
+import org.tinymediamanager.core.movie.entities.MovieActor;
 import org.tinymediamanager.scraper.MediaGenres;
 
 /**
@@ -152,7 +152,7 @@ public class MovieMatcher {
     // check against video format
     if (searchOptions.containsKey(SearchOptions.VIDEO_FORMAT)) {
       String videoFormat = (String) searchOptions.get(SearchOptions.VIDEO_FORMAT);
-      if (videoFormat == movie.getMediaInfoVideoFormat()) {
+      if (videoFormat.equals(movie.getMediaInfoVideoFormat())) {
         return true;
       }
     }

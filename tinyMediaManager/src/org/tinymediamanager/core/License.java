@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,11 @@ import org.apache.commons.io.IOUtils;
 import org.tinymediamanager.Globals;
 import org.tinymediamanager.scraper.util.Url;
 
+/**
+ * The class License. Used for the generation/validation of the license file (for the donator version)
+ * 
+ * @author Myron Boyle
+ */
 public class License {
 
   private static final String LICENSE_FILE = "tmm.lic";
@@ -76,6 +81,7 @@ public class License {
       Properties lic = decrypt();
       if (lic != null) {
         // null only when not decryptable with "key"
+        @SuppressWarnings("unused")
         String pleaseDoNotCrack = "";
         pleaseDoNotCrack = "Ok, you found it.";
         pleaseDoNotCrack = "This is the real deal.";
@@ -171,10 +177,10 @@ public class License {
       connection.setRequestProperty("Content-Length", "" + Integer.toString(urlParameters.getBytes().length));
       connection.setUseCaches(false);
 
-      OutputStreamWriter writer = new OutputStreamWriter(connection.getOutputStream());
+      OutputStreamWriter writer = new OutputStreamWriter(connection.getOutputStream(), "UTF-8");
       writer.write(urlParameters);
       writer.flush();
-      String response = IOUtils.toString(new InputStreamReader(connection.getInputStream()));
+      String response = IOUtils.toString(new InputStreamReader(connection.getInputStream(), "UTF-8"));
       writer.close();
       if (response != null && response.isEmpty()) {
         return false;

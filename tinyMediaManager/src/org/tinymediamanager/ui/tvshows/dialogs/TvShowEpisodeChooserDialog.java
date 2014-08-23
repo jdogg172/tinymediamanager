@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import java.util.Map.Entry;
 import java.util.ResourceBundle;
 
 import javax.swing.JButton;
-import javax.swing.JDialog;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
@@ -41,13 +40,14 @@ import org.jdesktop.observablecollections.ObservableCollections;
 import org.jdesktop.swingbinding.JTableBinding;
 import org.jdesktop.swingbinding.SwingBindings;
 import org.tinymediamanager.Globals;
-import org.tinymediamanager.core.tvshow.TvShowEpisode;
+import org.tinymediamanager.core.tvshow.entities.TvShowEpisode;
 import org.tinymediamanager.scraper.ITvShowMetadataProvider;
 import org.tinymediamanager.scraper.MediaEpisode;
 import org.tinymediamanager.scraper.MediaScrapeOptions;
 import org.tinymediamanager.ui.EqualsLayout;
-import org.tinymediamanager.ui.TmmWindowSaver;
+import org.tinymediamanager.ui.IconManager;
 import org.tinymediamanager.ui.UTF8Control;
+import org.tinymediamanager.ui.dialogs.TmmDialog;
 import org.tinymediamanager.ui.tvshows.TvShowEpisodeChooserModel;
 
 import com.jgoodies.forms.factories.FormFactory;
@@ -60,7 +60,7 @@ import com.jgoodies.forms.layout.RowSpec;
  * 
  * @author Manuel Laggner
  */
-public class TvShowEpisodeChooserDialog extends JDialog implements ActionListener {
+public class TvShowEpisodeChooserDialog extends TmmDialog implements ActionListener {
   private static final long               serialVersionUID = 3317576458848699068L;
   private static final ResourceBundle     BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control());                         //$NON-NLS-1$
 
@@ -72,12 +72,8 @@ public class TvShowEpisodeChooserDialog extends JDialog implements ActionListene
   private JTextArea                       taPlot;
 
   public TvShowEpisodeChooserDialog(TvShowEpisode ep, ITvShowMetadataProvider mp) {
-    setName("episodeChooser");
+    super(BUNDLE.getString("tvshowepisode.choose"), "episodeChooser"); //$NON-NLS-1$
     setBounds(5, 5, 600, 400);
-    TmmWindowSaver.loadSettings(this);
-    setModal(true);
-    setIconImage(Globals.logo);
-    setTitle(BUNDLE.getString("tvshowepisode.choose")); //$NON-NLS-1$
 
     this.episode = ep;
     this.metadataProvider = mp;
@@ -85,28 +81,6 @@ public class TvShowEpisodeChooserDialog extends JDialog implements ActionListene
 
     getContentPane().setLayout(new BorderLayout(0, 0));
     {
-      JPanel bottomPanel = new JPanel();
-      getContentPane().add(bottomPanel, BorderLayout.SOUTH);
-
-      bottomPanel.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.LABEL_COMPONENT_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
-          FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), FormFactory.DEFAULT_COLSPEC, }, new RowSpec[] {
-          FormFactory.LINE_GAP_ROWSPEC, RowSpec.decode("25px"), }));
-
-      JPanel buttonPane = new JPanel();
-      bottomPanel.add(buttonPane, "5, 2, fill, fill");
-      EqualsLayout layout = new EqualsLayout(5);
-      layout.setMinWidth(100);
-      buttonPane.setLayout(layout);
-      JButton okButton = new JButton(BUNDLE.getString("Button.ok")); //$NON-NLS-1$
-      okButton.setToolTipText(BUNDLE.getString("tvshow.change"));
-      buttonPane.add(okButton);
-      okButton.setActionCommand("OK");
-      okButton.addActionListener(this);
-
-      JButton cancelButton = new JButton(BUNDLE.getString("Button.cancel")); //$NON-NLS-1$
-      cancelButton.setToolTipText(BUNDLE.getString("edit.discard"));
-      buttonPane.add(cancelButton);
-      cancelButton.setActionCommand("Cancel");
 
       JSplitPane splitPane = new JSplitPane();
       getContentPane().add(splitPane, BorderLayout.CENTER);
@@ -126,8 +100,33 @@ public class TvShowEpisodeChooserDialog extends JDialog implements ActionListene
       taPlot.setWrapStyleWord(true);
       taPlot.setLineWrap(true);
       scrollPane_1.setViewportView(taPlot);
-      cancelButton.addActionListener(this);
+
     }
+    JPanel bottomPanel = new JPanel();
+    getContentPane().add(bottomPanel, BorderLayout.SOUTH);
+
+    bottomPanel.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.LABEL_COMPONENT_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
+        FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), FormFactory.DEFAULT_COLSPEC, FormFactory.RELATED_GAP_COLSPEC, },
+        new RowSpec[] { FormFactory.LINE_GAP_ROWSPEC, RowSpec.decode("25px"), FormFactory.RELATED_GAP_ROWSPEC, }));
+
+    JPanel buttonPane = new JPanel();
+    bottomPanel.add(buttonPane, "5, 2, fill, fill");
+    EqualsLayout layout = new EqualsLayout(5);
+    layout.setMinWidth(100);
+    buttonPane.setLayout(layout);
+    JButton okButton = new JButton(BUNDLE.getString("Button.ok")); //$NON-NLS-1$
+    okButton.setToolTipText(BUNDLE.getString("tvshow.change"));
+    okButton.setIcon(IconManager.APPLY);
+    buttonPane.add(okButton);
+    okButton.setActionCommand("OK");
+    okButton.addActionListener(this);
+
+    JButton cancelButton = new JButton(BUNDLE.getString("Button.cancel")); //$NON-NLS-1$
+    cancelButton.setToolTipText(BUNDLE.getString("edit.discard"));
+    cancelButton.setIcon(IconManager.CANCEL);
+    buttonPane.add(cancelButton);
+    cancelButton.setActionCommand("Cancel");
+    cancelButton.addActionListener(this);
 
     initDataBindings();
 
@@ -153,14 +152,12 @@ public class TvShowEpisodeChooserDialog extends JDialog implements ActionListene
         metadata = episode.getMediaEpisode();
       }
 
-      this.setVisible(false);
-      dispose();
+      setVisible(false);
     }
 
     // cancel
     if ("Cancel".equals(e.getActionCommand())) {
-      this.setVisible(false);
-      dispose();
+      setVisible(false);
     }
   }
 
@@ -172,8 +169,8 @@ public class TvShowEpisodeChooserDialog extends JDialog implements ActionListene
     @Override
     public Void doInBackground() {
       MediaScrapeOptions options = new MediaScrapeOptions();
-      options.setLanguage(Globals.settings.getMovieSettings().getScraperLanguage());
-      options.setCountry(Globals.settings.getMovieSettings().getCertificationCountry());
+      options.setLanguage(Globals.settings.getTvShowSettings().getScraperLanguage());
+      options.setCountry(Globals.settings.getTvShowSettings().getCertificationCountry());
       for (Entry<String, Object> entry : episode.getTvShow().getIds().entrySet()) {
         options.setId(entry.getKey(), entry.getValue().toString());
       }

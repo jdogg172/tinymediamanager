@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,23 +19,27 @@ import java.awt.BorderLayout;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.Properties;
 import java.util.ResourceBundle;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
-import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.border.EmptyBorder;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tinymediamanager.Globals;
 import org.tinymediamanager.ReleaseInfo;
+import org.tinymediamanager.core.License;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
+import org.tinymediamanager.ui.IconManager;
+import org.tinymediamanager.ui.TmmFontHelper;
 import org.tinymediamanager.ui.TmmUIHelper;
 import org.tinymediamanager.ui.UTF8Control;
 import org.tinymediamanager.ui.components.LinkLabel;
@@ -50,7 +54,7 @@ import com.jgoodies.forms.layout.RowSpec;
  * 
  * @author Manuel Laggner
  */
-public class AboutDialog extends JDialog {
+public class AboutDialog extends TmmDialog {
   private static final long           serialVersionUID = 2298570526828925319L;
   private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
   private static final Logger         LOGGER           = LoggerFactory.getLogger(AboutDialog.class);
@@ -58,19 +62,14 @@ public class AboutDialog extends JDialog {
   private final JPanel                contentPanel     = new JPanel();
   private final Action                action           = new SwingAction();
 
-  /**
-   * Create the dialog.
-   */
   public AboutDialog() {
-    setTitle(BUNDLE.getString("tmm.about")); //$NON-NLS-1$
-    setName("aboutDialog");
+    super(BUNDLE.getString("tmm.about"), "aboutDialog"); //$NON-NLS-1$
     setResizable(false);
-    setModal(true);
-    setBounds(100, 100, 643, 431);
+    setBounds(100, 100, 544, 408);
     getContentPane().setLayout(new BorderLayout());
     contentPanel.setBorder(new EmptyBorder(5, 5, 5, 5));
     getContentPane().add(contentPanel, BorderLayout.CENTER);
-    contentPanel.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("center:89px"),
+    contentPanel.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
         FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC, FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"),
         FormFactory.RELATED_GAP_COLSPEC, }, new RowSpec[] { FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
         FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC, FormFactory.RELATED_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
@@ -87,12 +86,21 @@ public class AboutDialog extends JDialog {
     }
     {
       JLabel lblTinymediamanager = new JLabel("tinyMediaManager"); //$NON-NLS-1$
-      lblTinymediamanager.setFont(lblTinymediamanager.getFont().deriveFont(Font.BOLD).deriveFont(18f));
+      TmmFontHelper.changeFont(lblTinymediamanager, 1.5, Font.BOLD);
       contentPanel.add(lblTinymediamanager, "4, 2, 3, 1, center, default");
     }
     {
-      JLabel lblByManuel = new JLabel("\u00A9 2012 - 2013 by Manuel Laggner"); //$NON-NLS-1$
+      JLabel lblByManuel = new JLabel("\u00A9 2012 - 2014 by Manuel Laggner"); //$NON-NLS-1$
       contentPanel.add(lblByManuel, "4, 4, 3, 1, center, default");
+    }
+    {
+      if (Globals.isDonator()) {
+        Properties p = License.decrypt();
+        // p.list(System.out);
+        JLabel lblRegged = new JLabel(BUNDLE.getString("tmm.registeredto") + " " + p.getProperty("user") + " (" + p.getProperty("email") + ")"); //$NON-NLS-1$
+        TmmFontHelper.changeFont(lblRegged, 1.166, Font.BOLD);
+        contentPanel.add(lblRegged, "4, 6, 3, 1, center, default");
+      }
     }
     {
       JLabel lblVersion = new JLabel(BUNDLE.getString("tmm.version") + ": " + ReleaseInfo.getRealVersion()); //$NON-NLS-1$ 
@@ -147,7 +155,7 @@ public class AboutDialog extends JDialog {
       contentPanel.add(lblXzener, "6, 24");
     }
     {
-      JLabel lblXzener = new JLabel("                              zagoslav, piodio, roliverosc, Peppe_sr, roandr");
+      JLabel lblXzener = new JLabel("                              zagoslav, piodio, roliverosc, Peppe_sr, roandr, sxczmnb");
       contentPanel.add(lblXzener, "6, 26");
     }
     {
@@ -175,28 +183,16 @@ public class AboutDialog extends JDialog {
     pack();
   }
 
-  /**
-   * The Class SwingAction.
-   * 
-   * @author Manuel Laggner
-   */
   private class SwingAction extends AbstractAction {
+    private static final long serialVersionUID = 4652946848116365706L;
 
-    /** The Constant serialVersionUID. */
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * Instantiates a new swing action.
-     */
     public SwingAction() {
       putValue(NAME, BUNDLE.getString("Button.ok")); //$NON-NLS-1$
+      putValue(SMALL_ICON, IconManager.APPLY);
+      putValue(LARGE_ICON_KEY, IconManager.APPLY);
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-     */
+    @Override
     public void actionPerformed(ActionEvent e) {
       setVisible(false);
     }

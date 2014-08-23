@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,13 +46,13 @@ import org.apache.commons.lang3.SystemUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
-import org.tinymediamanager.core.MediaFile;
 import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
-import org.tinymediamanager.core.tvshow.TvShowActor;
-import org.tinymediamanager.core.tvshow.TvShowEpisode;
+import org.tinymediamanager.core.entities.MediaFile;
+import org.tinymediamanager.core.tvshow.entities.TvShowActor;
+import org.tinymediamanager.core.tvshow.entities.TvShowEpisode;
 
 /**
  * The Class tvShowEpisodeEpisodeToXbmcNfoConnector.
@@ -61,7 +61,7 @@ import org.tinymediamanager.core.tvshow.TvShowEpisode;
  */
 @XmlRootElement(name = "episodedetails")
 @XmlType(propOrder = { "title", "showtitle", "rating", "votes", "season", "episode", "uniqueid", "plot", "thumb", "mpaa", "tags", "playcount",
-    "lastplayed", "watched", "credits", "director", "aired", "premiered", "studio", "actors" })
+    "lastplayed", "watched", "credits", "director", "aired", "premiered", "studio", "actors", "unsupportedElements" })
 public class TvShowEpisodeToXbmcNfoConnector {
   private static final Logger LOGGER    = LoggerFactory.getLogger(TvShowEpisodeToXbmcNfoConnector.class);
   private static JAXBContext  context   = initContext();
@@ -96,6 +96,9 @@ public class TvShowEpisodeToXbmcNfoConnector {
   @XmlElement(name = "tag")
   private List<String>        tags;
 
+  @XmlAnyElement(lax = true)
+  private List<Object>        unsupportedElements;
+
   /** not supported tags, but used to retrain in NFO. */
   @XmlElement
   String                      thumb;
@@ -121,6 +124,7 @@ public class TvShowEpisodeToXbmcNfoConnector {
     director = new ArrayList<String>();
     credits = new ArrayList<String>();
     tags = new ArrayList<String>();
+    unsupportedElements = new ArrayList<Object>();
   }
 
   /**
@@ -155,6 +159,7 @@ public class TvShowEpisodeToXbmcNfoConnector {
     StringBuilder outputXml = new StringBuilder();
     for (int i = 0; i < tvShowEpisodes.size(); i++) {
       episode = tvShowEpisodes.get(i);
+      List<Object> unsupportedTags = new ArrayList<Object>();
 
       // look in all parsed NFOs for this episode
       TvShowEpisodeToXbmcNfoConnector xbmc = null;
@@ -169,6 +174,14 @@ public class TvShowEpisodeToXbmcNfoConnector {
         // create a new connector
         xbmc = new TvShowEpisodeToXbmcNfoConnector();
       }
+      else {
+        // store all unsupported tags
+        for (Object obj : xbmc.actors) { // ugly hack for invalid xml structure
+          if (!(obj instanceof Actor)) {
+            unsupportedTags.add(obj);
+          }
+        }
+      }
 
       xbmc.setTitle(episode.getTitle());
       xbmc.setShowtitle(episode.getTvShow().getTitle());
@@ -179,8 +192,8 @@ public class TvShowEpisodeToXbmcNfoConnector {
       xbmc.setAired(episode.getFirstAiredFormatted());
       xbmc.setPremiered(episode.getFirstAiredFormatted());
       xbmc.setStudio(episode.getTvShow().getStudio());
-      if (episode.getId("tvdb") != null) {
-        xbmc.setUniqueid(episode.getId("tvdb").toString());
+      if (episode.getTvdbId() != null) {
+        xbmc.setUniqueid(episode.getTvdbId().toString());
       }
       xbmc.setMpaa(episode.getTvShow().getCertification().getName());
       xbmc.watched = episode.isWatched();
@@ -189,15 +202,15 @@ public class TvShowEpisodeToXbmcNfoConnector {
       }
 
       xbmc.actors.clear();
-      // actors for tv show episode (guests?)
+      // actors for tv show episode (guests and show sctors)
       for (TvShowActor actor : episode.getActors()) {
         xbmc.addActor(actor.getName(), actor.getCharacter(), actor.getThumb());
       }
 
-      // actors for tv show
-      for (TvShowActor actor : episode.getTvShow().getActors()) {
-        xbmc.addActor(actor.getName(), actor.getCharacter(), actor.getThumb());
-      }
+      // // actors for tv show
+      // for (TvShowActor actor : episode.getTvShow().getActors()) {
+      // xbmc.addActor(actor.getName(), actor.getCharacter(), actor.getThumb());
+      // }
 
       // support of frodo director tags
       xbmc.director.clear();
@@ -221,6 +234,9 @@ public class TvShowEpisodeToXbmcNfoConnector {
       for (String tag : episode.getTags()) {
         xbmc.tags.add(tag);
       }
+
+      // add all unsupported tags again
+      xbmc.unsupportedElements.addAll(unsupportedTags);
 
       // and marshall it
       try {

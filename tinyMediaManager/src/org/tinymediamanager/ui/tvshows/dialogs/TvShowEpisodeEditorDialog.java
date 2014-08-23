@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,11 +33,9 @@ import java.util.Map.Entry;
 import java.util.ResourceBundle;
 
 import javax.swing.AbstractAction;
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
-import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
@@ -61,11 +59,11 @@ import org.jdesktop.swingbinding.SwingBindings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
-import org.tinymediamanager.core.MediaFile;
-import org.tinymediamanager.core.tvshow.TvShowActor;
-import org.tinymediamanager.core.tvshow.TvShowEpisode;
+import org.tinymediamanager.core.entities.MediaFile;
 import org.tinymediamanager.core.tvshow.TvShowList;
 import org.tinymediamanager.core.tvshow.TvShowScrapers;
+import org.tinymediamanager.core.tvshow.entities.TvShowActor;
+import org.tinymediamanager.core.tvshow.entities.TvShowEpisode;
 import org.tinymediamanager.scraper.ITvShowMetadataProvider;
 import org.tinymediamanager.scraper.MediaArtwork;
 import org.tinymediamanager.scraper.MediaArtwork.MediaArtworkType;
@@ -74,12 +72,12 @@ import org.tinymediamanager.scraper.MediaMetadata;
 import org.tinymediamanager.scraper.MediaScrapeOptions;
 import org.tinymediamanager.scraper.MediaType;
 import org.tinymediamanager.ui.EqualsLayout;
-import org.tinymediamanager.ui.MainWindow;
+import org.tinymediamanager.ui.IconManager;
 import org.tinymediamanager.ui.TmmUIHelper;
-import org.tinymediamanager.ui.TmmWindowSaver;
 import org.tinymediamanager.ui.UTF8Control;
 import org.tinymediamanager.ui.components.AutocompleteComboBox;
 import org.tinymediamanager.ui.components.ImageLabel;
+import org.tinymediamanager.ui.dialogs.TmmDialog;
 
 import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
@@ -91,7 +89,7 @@ import com.jgoodies.forms.layout.RowSpec;
  * 
  * @author Manuel Laggner
  */
-public class TvShowEpisodeEditorDialog extends JDialog implements ActionListener {
+public class TvShowEpisodeEditorDialog extends TmmDialog implements ActionListener {
 
   private static final long                                     serialVersionUID = 7702248909791283043L;
   private static final ResourceBundle                           BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control());           //$NON-NLS-1$
@@ -132,12 +130,8 @@ public class TvShowEpisodeEditorDialog extends JDialog implements ActionListener
    *          the in queue
    */
   public TvShowEpisodeEditorDialog(TvShowEpisode episode, boolean inQueue) {
-    setTitle(BUNDLE.getString("tvshowepisode.scrape")); //$NON-NLS-1$
-    setName("tvShowEpisodeScraper");
-    TmmWindowSaver.loadSettings(this);
+    super(BUNDLE.getString("tvshowepisode.scrape"), "tvShowEpisodeScraper"); //$NON-NLS-1$
     setBounds(5, 5, 964, 632);
-    setIconImage(Globals.logo);
-    setModal(true);
 
     this.episodeToEdit = episode;
     getContentPane().setLayout(new BorderLayout());
@@ -266,25 +260,27 @@ public class TvShowEpisodeEditorDialog extends JDialog implements ActionListener
       scrollPaneTags.setViewportView(listTags);
 
       JButton btnAddActor = new JButton("");
-      btnAddActor.setIcon(new ImageIcon(TvShowEpisodeEditorDialog.class.getResource("/org/tinymediamanager/ui/images/Add.png")));
       btnAddActor.setMargin(new Insets(2, 2, 2, 2));
+      btnAddActor.setAction(new AddActorAction());
+      btnAddActor.setIcon(IconManager.LIST_ADD);
       contentPanel.add(btnAddActor, "2, 20, right, top");
 
       JButton btnAddTag = new JButton("");
       btnAddTag.setMargin(new Insets(2, 2, 2, 2));
       btnAddTag.setAction(new AddTagAction());
-      btnAddTag.setIcon(new ImageIcon(TvShowEditorDialog.class.getResource("/org/tinymediamanager/ui/images/Add.png")));
+      btnAddTag.setIcon(IconManager.LIST_ADD);
       contentPanel.add(btnAddTag, "10, 20, right, top");
 
       JButton btnRemoveActor = new JButton("");
-      btnRemoveActor.setIcon(new ImageIcon(TvShowEpisodeEditorDialog.class.getResource("/org/tinymediamanager/ui/images/Remove.png")));
       btnRemoveActor.setMargin(new Insets(2, 2, 2, 2));
+      btnRemoveActor.setAction(new RemoveActorAction());
+      btnRemoveActor.setIcon(IconManager.LIST_REMOVE);
       contentPanel.add(btnRemoveActor, "2, 22, right, top");
 
       JButton btnRemoveTag = new JButton("");
       btnRemoveTag.setMargin(new Insets(2, 2, 2, 2));
       btnRemoveTag.setAction(new RemoveTagAction());
-      btnRemoveTag.setIcon(new ImageIcon(TvShowEditorDialog.class.getResource("/org/tinymediamanager/ui/images/Remove.png")));
+      btnRemoveTag.setIcon(IconManager.LIST_REMOVE);
       contentPanel.add(btnRemoveTag, "10, 22, right, top");
 
       cbTags = new AutocompleteComboBox(tvShowList.getTagsInEpisodes().toArray());
@@ -298,7 +294,8 @@ public class TvShowEpisodeEditorDialog extends JDialog implements ActionListener
 
       bottomPanel.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.LABEL_COMPONENT_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
           FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC, FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"),
-          FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC, }, new RowSpec[] { FormFactory.LINE_GAP_ROWSPEC, RowSpec.decode("25px"), }));
+          FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC, FormFactory.RELATED_GAP_COLSPEC, }, new RowSpec[] {
+          FormFactory.LINE_GAP_ROWSPEC, RowSpec.decode("25px"), FormFactory.RELATED_GAP_ROWSPEC, }));
 
       JComboBox cbScraper = new JComboBox(TvShowScrapers.values());
       cbScraper.setSelectedItem(Globals.settings.getTvShowSettings().getTvShowScraper());
@@ -318,6 +315,7 @@ public class TvShowEpisodeEditorDialog extends JDialog implements ActionListener
       btnSearch.setMaximumSize(new Dimension(0, 0));
       btnSearch.setActionCommand("Search");
       btnSearch.addActionListener(this);
+      btnSearch.setIcon(IconManager.SEARCH);
       bottomPanel.add(btnSearch, "6, 2, left, default");
       {
         JPanel buttonPane = new JPanel();
@@ -327,12 +325,14 @@ public class TvShowEpisodeEditorDialog extends JDialog implements ActionListener
         buttonPane.setLayout(layout);
         JButton okButton = new JButton(BUNDLE.getString("Button.ok")); //$NON-NLS-1$
         okButton.setToolTipText(BUNDLE.getString("tvshow.change"));
+        okButton.setIcon(IconManager.APPLY);
         buttonPane.add(okButton);
         okButton.setActionCommand("OK");
         okButton.addActionListener(this);
 
         JButton cancelButton = new JButton(BUNDLE.getString("Button.cancel")); //$NON-NLS-1$
         cancelButton.setToolTipText(BUNDLE.getString("edit.discard"));
+        cancelButton.setIcon(IconManager.CANCEL);
         buttonPane.add(cancelButton);
         cancelButton.setActionCommand("Cancel");
         cancelButton.addActionListener(this);
@@ -340,6 +340,7 @@ public class TvShowEpisodeEditorDialog extends JDialog implements ActionListener
         if (inQueue) {
           JButton abortButton = new JButton(BUNDLE.getString("Button.abortqueue")); //$NON-NLS-1$
           abortButton.setToolTipText(BUNDLE.getString("tvshow.edit.abortqueue.desc")); //$NON-NLS-1$
+          abortButton.setIcon(IconManager.PROCESS_STOP);
           buttonPane.add(abortButton);
           abortButton.setActionCommand("Abort");
           abortButton.addActionListener(this);
@@ -377,7 +378,7 @@ public class TvShowEpisodeEditorDialog extends JDialog implements ActionListener
       tfDirector.setText(episodeToEdit.getDirector());
       tfWriter.setText(episodeToEdit.getWriter());
 
-      for (TvShowActor origCast : episodeToEdit.getActors()) {
+      for (TvShowActor origCast : episodeToEdit.getGuests()) {
         TvShowActor actor = new TvShowActor();
         actor.setName(origCast.getName());
         actor.setCharacter(origCast.getCharacter());
@@ -402,7 +403,6 @@ public class TvShowEpisodeEditorDialog extends JDialog implements ActionListener
    * @return true, if successful
    */
   public boolean showDialog() {
-    setLocationRelativeTo(MainWindow.getActiveInstance());
     setVisible(true);
     return continueQueue;
   }
@@ -445,21 +445,18 @@ public class TvShowEpisodeEditorDialog extends JDialog implements ActionListener
       episodeToEdit.writeNFO();
       episodeToEdit.saveToDb();
 
-      this.setVisible(false);
-      dispose();
+      setVisible(false);
     }
 
     // cancel
     if ("Cancel".equals(e.getActionCommand())) {
-      this.setVisible(false);
-      dispose();
+      setVisible(false);
     }
 
     // Abort queue
     if ("Abort".equals(e.getActionCommand())) {
       continueQueue = false;
-      this.setVisible(false);
-      dispose();
+      setVisible(false);
     }
 
     // scrape
@@ -489,11 +486,6 @@ public class TvShowEpisodeEditorDialog extends JDialog implements ActionListener
     }
   }
 
-  /**
-   * The Class ScrapeTask.
-   * 
-   * @author Manuel Laggner
-   */
   private class ScrapeTask extends SwingWorker<Void, Void> {
     ITvShowMetadataProvider mp;
 
@@ -504,15 +496,15 @@ public class TvShowEpisodeEditorDialog extends JDialog implements ActionListener
     @Override
     protected Void doInBackground() throws Exception {
       MediaScrapeOptions options = new MediaScrapeOptions();
-      options.setLanguage(Globals.settings.getMovieSettings().getScraperLanguage());
-      options.setCountry(Globals.settings.getMovieSettings().getCertificationCountry());
+      options.setLanguage(Globals.settings.getTvShowSettings().getScraperLanguage());
+      options.setCountry(Globals.settings.getTvShowSettings().getCertificationCountry());
       for (Entry<String, Object> entry : episodeToEdit.getTvShow().getIds().entrySet()) {
         options.setId(entry.getKey(), entry.getValue().toString());
       }
 
       options.setType(MediaType.TV_EPISODE);
-      options.setId("seasonNr", spSeason.getValue().toString());
-      options.setId("episodeNr", spEpisode.getValue().toString());
+      options.setId(MediaMetadata.SEASON_NR, spSeason.getValue().toString());
+      options.setId(MediaMetadata.EPISODE_NR, spEpisode.getValue().toString());
 
       try {
         MediaMetadata metadata = mp.getEpisodeMetadata(options);
@@ -564,6 +556,11 @@ public class TvShowEpisodeEditorDialog extends JDialog implements ActionListener
     jListBinding.unbind();
   }
 
+  @Override
+  public void pack() {
+    // do not let it pack - it looks weird
+  }
+
   private class AddTagAction extends AbstractAction {
     private static final long serialVersionUID = 5968029647764173330L;
 
@@ -602,6 +599,37 @@ public class TvShowEpisodeEditorDialog extends JDialog implements ActionListener
     public void actionPerformed(ActionEvent e) {
       String tag = (String) listTags.getSelectedValue();
       tags.remove(tag);
+    }
+  }
+
+  private class AddActorAction extends AbstractAction {
+    private static final long serialVersionUID = -5879601617842300526L;
+
+    public AddActorAction() {
+      putValue(SHORT_DESCRIPTION, BUNDLE.getString("cast.actor.add")); //$NON-NLS-1$
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      TvShowActor actor = new TvShowActor(BUNDLE.getString("cast.actor.unknown"), BUNDLE.getString("cast.role.unknown")); //$NON-NLS-1$
+      cast.add(0, actor);
+    }
+  }
+
+  private class RemoveActorAction extends AbstractAction {
+    private static final long serialVersionUID = 6970920169867315771L;
+
+    public RemoveActorAction() {
+      putValue(SHORT_DESCRIPTION, BUNDLE.getString("cast.actor.remove")); //$NON-NLS-1$
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+      int row = tableGuests.getSelectedRow();
+      if (row > -1) {
+        row = tableGuests.convertRowIndexToModel(row);
+        cast.remove(row);
+      }
     }
   }
 }

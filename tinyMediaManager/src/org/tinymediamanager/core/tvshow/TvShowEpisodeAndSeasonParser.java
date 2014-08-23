@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,30 +67,6 @@ public class TvShowEpisodeAndSeasonParser {
                                                         Pattern.CASE_INSENSITIVE);
 
   /**
-   * The Class EpisodeMatchingResult.
-   * 
-   * @author Manuel Laggner
-   */
-  public static class EpisodeMatchingResult {
-
-    public int           season              = -1;
-    public List<Integer> episodes            = new ArrayList<Integer>();
-    public String        name                = "";
-    public Date          date                = null;
-    public boolean       stackingMarkerFound = false;
-
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.lang.Object#toString()
-     */
-    @Override
-    public String toString() {
-      return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
-    }
-  }
-
-  /**
    * Detect episode from filename.
    * 
    * @param file
@@ -156,7 +132,7 @@ public class TvShowEpisodeAndSeasonParser {
     }
 
     // FIXME: pattern quite fine, but second find should start AFTER complete first match, not inbetween
-    Pattern regex = Pattern.compile("(?i)[epx_-]+(\\d{2})"); // episode fixed to 2 chars
+    Pattern regex = Pattern.compile("(?i)[epx_-]+(\\d{1,2})"); // episode fixed to 1-2 chars
     Matcher m = regex.matcher(filename);
     while (m.find()) {
       int ep = 0;
@@ -174,7 +150,7 @@ public class TvShowEpisodeAndSeasonParser {
 
     if (result.episodes.isEmpty()) {
       // alternative episode style; didn't get it working in above regex
-      regex = Pattern.compile("(?i)episode[\\. _-]*(\\d{2})"); // episode fixed to 2 chars
+      regex = Pattern.compile("(?i)episode[\\. _-]*(\\d{1,2})"); // episode fixed to 1-2 chars
       m = regex.matcher(filename);
       while (m.find()) {
         int ep = 0;
@@ -260,9 +236,9 @@ public class TvShowEpisodeAndSeasonParser {
       }
     }
 
-    // parse XYY
+    // parse XYY or XX_YY (but no \w at end, so must have a delimiter!)
     if (result.episodes.isEmpty() || result.season == -1) {
-      regex = Pattern.compile("[^\\d](\\d)+[x_-]?(\\d{2})[^\\d]");
+      regex = Pattern.compile("[^\\d](\\d)+[x_-]?(\\d{2})[^a-zA-Z\\d]");
       m = regex.matcher(filename);
       if (m.find()) {
         int ep = -1;
@@ -366,6 +342,8 @@ public class TvShowEpisodeAndSeasonParser {
     resultFromParser = parse(stringToParse, pattern7);
     result = combineResults(result, resultFromParser);
 
+    // clean the name
+    result.name = result.name.replaceAll("^[ .\\-_]+", "").trim();
     return result;
   }
 
@@ -539,5 +517,22 @@ public class TvShowEpisodeAndSeasonParser {
     // decode the last character, which is always added
     result += decodeSingleRoman(uRoman.charAt(uRoman.length() - 1));
     return result;
+  }
+
+  /******************************************************************************************
+   * helper classes
+   ******************************************************************************************/
+  public static class EpisodeMatchingResult {
+
+    public int           season              = -1;
+    public List<Integer> episodes            = new ArrayList<Integer>();
+    public String        name                = "";
+    public Date          date                = null;
+    public boolean       stackingMarkerFound = false;
+
+    @Override
+    public String toString() {
+      return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
+    }
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,6 @@ import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
-import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -59,6 +58,8 @@ import org.imgscalr.Scalr;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
+import org.tinymediamanager.core.ImageCache;
+import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.scraper.IMediaArtworkProvider;
 import org.tinymediamanager.scraper.MediaArtwork;
 import org.tinymediamanager.scraper.MediaArtwork.ImageSizeAndUrl;
@@ -67,8 +68,9 @@ import org.tinymediamanager.scraper.MediaScrapeOptions;
 import org.tinymediamanager.scraper.MediaType;
 import org.tinymediamanager.scraper.util.Url;
 import org.tinymediamanager.ui.EqualsLayout;
+import org.tinymediamanager.ui.IconManager;
+import org.tinymediamanager.ui.TmmFontHelper;
 import org.tinymediamanager.ui.TmmUIHelper;
-import org.tinymediamanager.ui.TmmWindowSaver;
 import org.tinymediamanager.ui.ToggleButtonUI;
 import org.tinymediamanager.ui.UTF8Control;
 import org.tinymediamanager.ui.WrapLayout;
@@ -80,17 +82,17 @@ import com.jgoodies.forms.layout.FormLayout;
 import com.jgoodies.forms.layout.RowSpec;
 
 /**
- * The Class ImageChooser.
+ * The Class ImageChooser. Let the user choose the right image for the media entity
  * 
  * @author Manuel Laggner
  */
-public class ImageChooserDialog extends JDialog {
+public class ImageChooserDialog extends TmmDialog {
   private static final long           serialVersionUID = 8193355920006275933L;
   private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
   private static final Logger         LOGGER           = LoggerFactory.getLogger(ImageChooserDialog.class);
 
   public enum ImageType {
-    POSTER, FANART, BANNER, SEASON;
+    POSTER, FANART, BANNER, SEASON, LOGO, CLEARART, DISC, THUMB;
   }
 
   private DownloadTask                task;
@@ -109,8 +111,8 @@ public class ImageChooserDialog extends JDialog {
   private ButtonGroup                 buttonGroup     = new ButtonGroup();
   private List<JToggleButton>         buttons         = new ArrayList<JToggleButton>();
 
-  private final Action                actionOK        = new SwingAction();
-  private final Action                actionCancel    = new SwingAction_1();
+  private final Action                actionOK        = new OkAction();
+  private final Action                actionCancel    = new CancelAction();
   private final ToggleButtonUI        toggleButtonUI  = new ToggleButtonUI();
   private final Action                actionLocalFile = new LocalFileChooseAction();
 
@@ -132,8 +134,7 @@ public class ImageChooserDialog extends JDialog {
    */
   public ImageChooserDialog(final HashMap<String, Object> ids, ImageType type, List<IMediaArtworkProvider> artworkProviders, ImageLabel imageLabel,
       List<String> extraThumbs, List<String> extraFanarts, MediaType mediaType) {
-    setModal(true);
-    setIconImage(Globals.logo);
+    super("", "imageChooser");
     this.imageLabel = imageLabel;
     this.type = type;
     this.mediaType = mediaType;
@@ -157,11 +158,25 @@ public class ImageChooserDialog extends JDialog {
       case SEASON:
         setTitle(BUNDLE.getString("image.choose.season")); //$NON-NLS-1$
         break;
+
+      case CLEARART:
+        setTitle(BUNDLE.getString("image.choose.clearart")); //$NON-NLS-1$
+        break;
+
+      case DISC:
+        setTitle(BUNDLE.getString("image.choose.disc")); //$NON-NLS-1$
+        break;
+
+      case LOGO:
+        setTitle(BUNDLE.getString("image.choose.logo")); //$NON-NLS-1$
+        break;
+
+      case THUMB:
+        setTitle(BUNDLE.getString("image.choose.thumb")); //$NON-NLS-1$
+        break;
     }
 
-    setName("imageChooser");
     setBounds(5, 5, 1000, 590);
-    TmmWindowSaver.loadSettings(this);
 
     getContentPane().setLayout(new BorderLayout());
     getContentPane().add(contentPanel, BorderLayout.CENTER);
@@ -184,19 +199,19 @@ public class ImageChooserDialog extends JDialog {
       bottomPane.setLayout(new FormLayout(new ColumnSpec[] { FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
           FormFactory.RELATED_GAP_COLSPEC, ColumnSpec.decode("default:grow"), FormFactory.RELATED_GAP_COLSPEC, FormFactory.DEFAULT_COLSPEC,
           FormFactory.RELATED_GAP_COLSPEC, }, new RowSpec[] { FormFactory.NARROW_LINE_GAP_ROWSPEC, FormFactory.DEFAULT_ROWSPEC,
-          FormFactory.NARROW_LINE_GAP_ROWSPEC, RowSpec.decode("23px:grow"), }));
+          FormFactory.NARROW_LINE_GAP_ROWSPEC, RowSpec.decode("23px:grow"), FormFactory.RELATED_GAP_ROWSPEC, }));
       {
         if (type == ImageType.FANART && extraFanarts != null && extraThumbs != null) {
           JPanel panelExtraButtons = new JPanel();
           bottomPane.add(panelExtraButtons, "2, 2, fill, bottom");
           panelExtraButtons.setLayout(new FlowLayout(FlowLayout.LEFT, 2, 0));
           {
-            if (mediaType == MediaType.MOVIE && Globals.settings.getMovieSettings().isImageExtraThumbs()) {
+            if (mediaType == MediaType.MOVIE && MovieModuleManager.MOVIE_SETTINGS.isImageExtraThumbs()) {
               JLabel labelThumbs = new JLabel("Extrathumbs:");
               panelExtraButtons.add(labelThumbs);
               JButton btnMarkExtrathumbs = new JButton("");
               btnMarkExtrathumbs.setMargin(new Insets(0, 0, 0, 0));
-              btnMarkExtrathumbs.setIcon(new ImageIcon(ImageChooserDialog.class.getResource("/org/tinymediamanager/ui/images/checkall.png")));
+              btnMarkExtrathumbs.setIcon(IconManager.CHECK_ALL);
               btnMarkExtrathumbs.setToolTipText(BUNDLE.getString("image.extrathumbs.markall")); //$NON-NLS-1$
               btnMarkExtrathumbs.addActionListener(new ActionListener() {
                 @Override
@@ -212,7 +227,7 @@ public class ImageChooserDialog extends JDialog {
               panelExtraButtons.add(btnMarkExtrathumbs);
               JButton btnUnMarkExtrathumbs = new JButton("");
               btnUnMarkExtrathumbs.setMargin(new Insets(0, 0, 0, 0));
-              btnUnMarkExtrathumbs.setIcon(new ImageIcon(ImageChooserDialog.class.getResource("/org/tinymediamanager/ui/images/uncheckall.png")));
+              btnUnMarkExtrathumbs.setIcon(IconManager.UNCHECK_ALL);
               btnUnMarkExtrathumbs.setToolTipText(BUNDLE.getString("image.extrathumbs.unmarkall")); //$NON-NLS-1$
               btnUnMarkExtrathumbs.addActionListener(new ActionListener() {
                 @Override
@@ -227,18 +242,18 @@ public class ImageChooserDialog extends JDialog {
               });
               panelExtraButtons.add(btnUnMarkExtrathumbs);
             }
-            if (mediaType == MediaType.MOVIE && Globals.settings.getMovieSettings().isImageExtraThumbs()
-                && Globals.settings.getMovieSettings().isImageExtraFanart()) {
+            if (mediaType == MediaType.MOVIE && MovieModuleManager.MOVIE_SETTINGS.isImageExtraThumbs()
+                && MovieModuleManager.MOVIE_SETTINGS.isImageExtraFanart()) {
               JSeparator separator = new JSeparator(SwingConstants.VERTICAL);
               separator.setPreferredSize(new Dimension(2, 16));
               panelExtraButtons.add(separator);
             }
-            if (mediaType == MediaType.MOVIE && Globals.settings.getMovieSettings().isImageExtraFanart()) {
+            if (mediaType == MediaType.MOVIE && MovieModuleManager.MOVIE_SETTINGS.isImageExtraFanart()) {
               JLabel labelFanart = new JLabel("Extrafanart:");
               panelExtraButtons.add(labelFanart);
               JButton btnMarkExtrafanart = new JButton("");
               btnMarkExtrafanart.setMargin(new Insets(0, 0, 0, 0));
-              btnMarkExtrafanart.setIcon(new ImageIcon(ImageChooserDialog.class.getResource("/org/tinymediamanager/ui/images/checkall.png")));
+              btnMarkExtrafanart.setIcon(IconManager.CHECK_ALL);
               btnMarkExtrafanart.setToolTipText(BUNDLE.getString("image.extrafanart.markall")); //$NON-NLS-1$
               btnMarkExtrafanart.addActionListener(new ActionListener() {
                 @Override
@@ -254,7 +269,7 @@ public class ImageChooserDialog extends JDialog {
               panelExtraButtons.add(btnMarkExtrafanart);
               JButton btnUnMarkExtrafanart = new JButton("");
               btnUnMarkExtrafanart.setMargin(new Insets(0, 0, 0, 0));
-              btnUnMarkExtrafanart.setIcon(new ImageIcon(ImageChooserDialog.class.getResource("/org/tinymediamanager/ui/images/uncheckall.png")));
+              btnUnMarkExtrafanart.setIcon(IconManager.UNCHECK_ALL);
               btnUnMarkExtrafanart.setToolTipText(BUNDLE.getString("image.extrafanart.unmarkall")); //$NON-NLS-1$
               btnUnMarkExtrafanart.addActionListener(new ActionListener() {
                 @Override
@@ -308,29 +323,161 @@ public class ImageChooserDialog extends JDialog {
     task.execute();
   }
 
-  /**
-   * The Class SwingAction.
-   * 
-   * @author Manuel Laggner
-   */
-  private class SwingAction extends AbstractAction {
+  private void startProgressBar(String description) {
+    lblProgressAction.setText(description);
+    progressBar.setVisible(true);
+    progressBar.setIndeterminate(true);
+  }
 
-    /** The Constant serialVersionUID. */
-    private static final long serialVersionUID = 1L;
+  private void stopProgressBar() {
+    lblProgressAction.setText("");
+    progressBar.setVisible(false);
+    progressBar.setIndeterminate(false);
+  }
 
-    /**
-     * Instantiates a new swing action.
-     */
-    public SwingAction() {
-      putValue(NAME, BUNDLE.getString("Button.ok")); //$NON-NLS-1$
-      putValue(SHORT_DESCRIPTION, BUNDLE.getString("image.seteselected")); //$NON-NLS-1$
+  @SuppressWarnings({ "unchecked", "rawtypes" })
+  private void addImage(BufferedImage originalImage, final MediaArtwork artwork) {
+    Point size = null;
+
+    GridBagLayout gbl = new GridBagLayout();
+
+    switch (type) {
+      case FANART:
+      case CLEARART:
+      case THUMB:
+      case DISC:
+        gbl.columnWidths = new int[] { 130 };
+        gbl.rowHeights = new int[] { 180 };
+        size = ImageCache.calculateSize(300, 150, originalImage.getWidth(), originalImage.getHeight(), true);
+        break;
+
+      case BANNER:
+      case LOGO:
+        gbl.columnWidths = new int[] { 130 };
+        gbl.rowHeights = new int[] { 120 };
+        size = ImageCache.calculateSize(300, 100, originalImage.getWidth(), originalImage.getHeight(), true);
+        break;
+
+      case POSTER:
+      default:
+        gbl.columnWidths = new int[] { 180 };
+        gbl.rowHeights = new int[] { 270 };
+        size = ImageCache.calculateSize(150, 250, originalImage.getWidth(), originalImage.getHeight(), true);
+        break;
+
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-     */
+    gbl.columnWeights = new double[] { Double.MIN_VALUE };
+    gbl.rowWeights = new double[] { Double.MIN_VALUE };
+    JPanel imagePanel = new JPanel();
+    imagePanel.setLayout(gbl);
+
+    GridBagConstraints gbc = new GridBagConstraints();
+    gbc.fill = GridBagConstraints.BOTH;
+    gbc.gridx = 0;
+    gbc.gridy = 0;
+    gbc.gridwidth = 3;
+    gbc.insets = new Insets(5, 5, 5, 5);
+
+    JToggleButton button = new JToggleButton();
+    button.setBackground(Color.white);
+    button.setUI(toggleButtonUI);
+    button.setMargin(new Insets(10, 10, 10, 10));
+    ImageIcon imageIcon = new ImageIcon(Scalr.resize(originalImage, Scalr.Method.BALANCED, Scalr.Mode.AUTOMATIC, size.x, size.y, Scalr.OP_ANTIALIAS));
+    button.setIcon(imageIcon);
+    button.putClientProperty("MediaArtwork", artwork);
+
+    buttonGroup.add(button);
+    buttons.add(button);
+    imagePanel.add(button, gbc);
+
+    gbc = new GridBagConstraints();
+    gbc.gridx = 0;
+    gbc.gridy = 1;
+    gbc.anchor = GridBagConstraints.LAST_LINE_START;
+    gbc.insets = new Insets(0, 5, 0, 0);
+
+    JComboBox cb = null;
+    if (artwork.getImageSizes().size() > 0) {
+      cb = new JComboBox(artwork.getImageSizes().toArray());
+    }
+    else {
+      cb = new JComboBox(new String[] { originalImage.getWidth() + "x" + originalImage.getHeight() });
+    }
+    button.putClientProperty("MediaArtworkSize", cb);
+    imagePanel.add(cb, gbc);
+
+    // should we provide an option for extrathumbs
+    if (mediaType == MediaType.MOVIE && type == ImageType.FANART && MovieModuleManager.MOVIE_SETTINGS.isImageExtraThumbs()) {
+      gbc = new GridBagConstraints();
+      gbc.gridx = 1;
+      gbc.gridy = 1;
+      gbc.anchor = GridBagConstraints.LINE_END;
+      JLabel label = new JLabel("Extrathumb");
+      imagePanel.add(label, gbc);
+
+      gbc = new GridBagConstraints();
+      gbc.gridx = 2;
+      gbc.gridy = 1;
+      gbc.anchor = GridBagConstraints.LINE_END;
+      JCheckBox chkbx = new JCheckBox();
+      button.putClientProperty("MediaArtworkExtrathumb", chkbx);
+      imagePanel.add(chkbx, gbc);
+    }
+
+    // should we provide an option for extrafanart
+    if (mediaType == MediaType.MOVIE && type == ImageType.FANART && MovieModuleManager.MOVIE_SETTINGS.isImageExtraFanart()) {
+      gbc = new GridBagConstraints();
+      gbc.gridx = 1;
+      gbc.gridy = MovieModuleManager.MOVIE_SETTINGS.isImageExtraThumbs() ? 2 : 1;
+      gbc.anchor = GridBagConstraints.LINE_END;
+      JLabel label = new JLabel("Extrafanart");
+      imagePanel.add(label, gbc);
+
+      gbc = new GridBagConstraints();
+      gbc.gridx = 2;
+      gbc.gridy = MovieModuleManager.MOVIE_SETTINGS.isImageExtraThumbs() ? 2 : 1;
+      gbc.anchor = GridBagConstraints.LINE_END;
+      JCheckBox chkbx = new JCheckBox();
+      button.putClientProperty("MediaArtworkExtrafanart", chkbx);
+      imagePanel.add(chkbx, gbc);
+    }
+
+    /* show image button */
+    gbc.gridx = 0;
+    gbc.gridy++;
+    gbc.anchor = GridBagConstraints.LAST_LINE_START;
+    gbc.gridwidth = 3;
+    gbc.insets = new Insets(0, 0, 0, 0);
+    JButton btnShowImage = new JButton("<html><font color=\"#0000CF\"><u>" + BUNDLE.getString("image.showoriginal") + "</u></font></html>");
+    btnShowImage.setBorderPainted(false);
+    btnShowImage.setFocusPainted(false);
+    btnShowImage.setContentAreaFilled(false);
+    btnShowImage.addActionListener(new ActionListener() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        ImagePreviewDialog dialog = new ImagePreviewDialog(artwork.getDefaultUrl());
+        dialog.setVisible(true);
+      }
+    });
+    imagePanel.add(btnShowImage, gbc);
+
+    panelImages.add(imagePanel);
+    panelImages.validate();
+    panelImages.getParent().validate();
+  }
+
+  private class OkAction extends AbstractAction {
+    private static final long serialVersionUID = -1255049344169945137L;
+
+    public OkAction() {
+      putValue(NAME, BUNDLE.getString("Button.ok")); //$NON-NLS-1$
+      putValue(SHORT_DESCRIPTION, BUNDLE.getString("image.seteselected")); //$NON-NLS-1$
+      putValue(SMALL_ICON, IconManager.APPLY);
+      putValue(LARGE_ICON_KEY, IconManager.APPLY);
+    }
+
+    @Override
     public void actionPerformed(ActionEvent e) {
       MediaArtwork artwork = null;
       ImageSizeAndUrl resolution = null;
@@ -344,6 +491,7 @@ public class ImageChooserDialog extends JDialog {
             clientProperty = button.getClientProperty("MediaArtworkSize");
             // try to get the size
             if (clientProperty instanceof JComboBox) {
+              @SuppressWarnings("rawtypes")
               JComboBox cb = (JComboBox) clientProperty;
               if (cb.getSelectedItem() instanceof ImageSizeAndUrl) {
                 resolution = (ImageSizeAndUrl) cb.getSelectedItem();
@@ -370,18 +518,17 @@ public class ImageChooserDialog extends JDialog {
       }
 
       // extrathumbs
-      if (mediaType == MediaType.MOVIE && type == ImageType.FANART && extraThumbs != null && Globals.settings.getMovieSettings().isImageExtraThumbs()) {
+      if (mediaType == MediaType.MOVIE && type == ImageType.FANART && extraThumbs != null && MovieModuleManager.MOVIE_SETTINGS.isImageExtraThumbs()) {
         processExtraThumbs();
       }
 
       // extrafanart
-      if (mediaType == MediaType.MOVIE && type == ImageType.FANART && extraThumbs != null && Globals.settings.getMovieSettings().isImageExtraFanart()) {
+      if (mediaType == MediaType.MOVIE && type == ImageType.FANART && extraThumbs != null && MovieModuleManager.MOVIE_SETTINGS.isImageExtraFanart()) {
         processExtraFanart();
       }
 
       task.cancel(true);
       setVisible(false);
-      dispose();
     }
 
     /**
@@ -396,6 +543,7 @@ public class ImageChooserDialog extends JDialog {
           JCheckBox chkbx = (JCheckBox) button.getClientProperty("MediaArtworkExtrathumb");
           if (chkbx.isSelected()) {
             MediaArtwork artwork = (MediaArtwork) button.getClientProperty("MediaArtwork");
+            @SuppressWarnings("rawtypes")
             JComboBox cb = (JComboBox) button.getClientProperty("MediaArtworkSize");
             ImageSizeAndUrl size = (ImageSizeAndUrl) cb.getSelectedItem();
             if (size != null) {
@@ -421,6 +569,7 @@ public class ImageChooserDialog extends JDialog {
           JCheckBox chkbx = (JCheckBox) button.getClientProperty("MediaArtworkExtrafanart");
           if (chkbx.isSelected()) {
             MediaArtwork artwork = (MediaArtwork) button.getClientProperty("MediaArtwork");
+            @SuppressWarnings("rawtypes")
             JComboBox cb = (JComboBox) button.getClientProperty("MediaArtworkSize");
             ImageSizeAndUrl size = (ImageSizeAndUrl) cb.getSelectedItem();
             if (size != null) {
@@ -435,205 +584,33 @@ public class ImageChooserDialog extends JDialog {
     }
   }
 
-  /**
-   * Start progress bar.
-   * 
-   * @param description
-   *          the description
-   */
-  private void startProgressBar(String description) {
-    lblProgressAction.setText(description);
-    progressBar.setVisible(true);
-    progressBar.setIndeterminate(true);
-  }
+  private class CancelAction extends AbstractAction {
+    private static final long serialVersionUID = 403327079655572423L;
 
-  /**
-   * Stop progress bar.
-   */
-  private void stopProgressBar() {
-    lblProgressAction.setText("");
-    progressBar.setVisible(false);
-    progressBar.setIndeterminate(false);
-  }
-
-  /**
-   * Adds the image.
-   * 
-   * @param originalImage
-   *          the original image
-   * @param artwork
-   *          the tmdb artwork
-   */
-  private void addImage(BufferedImage originalImage, MediaArtwork artwork) {
-    // int imageType = originalImage.getType() == 0 ? BufferedImage.TYPE_INT_ARGB : originalImage.getType();
-    Point size = null;
-
-    GridBagLayout gbl = new GridBagLayout();
-
-    switch (type) {
-      case FANART:
-        gbl.columnWidths = new int[] { 130 };
-        gbl.rowHeights = new int[] { 180 };
-        size = ImageLabel.calculateSize(300, 150, originalImage.getWidth(), originalImage.getHeight(), true);
-        break;
-
-      case BANNER:
-        gbl.columnWidths = new int[] { 130 };
-        gbl.rowHeights = new int[] { 120 };
-        size = ImageLabel.calculateSize(300, 100, originalImage.getWidth(), originalImage.getHeight(), true);
-        break;
-
-      case POSTER:
-      default:
-        gbl.columnWidths = new int[] { 180 };
-        gbl.rowHeights = new int[] { 270 };
-        size = ImageLabel.calculateSize(150, 250, originalImage.getWidth(), originalImage.getHeight(), true);
-        break;
-
-    }
-
-    gbl.columnWeights = new double[] { Double.MIN_VALUE };
-    gbl.rowWeights = new double[] { Double.MIN_VALUE };
-    JPanel imagePanel = new JPanel();
-    imagePanel.setLayout(gbl);
-
-    GridBagConstraints gbc = new GridBagConstraints();
-    gbc.fill = GridBagConstraints.BOTH;
-    gbc.gridx = 0;
-    gbc.gridy = 0;
-    gbc.gridwidth = 3;
-    gbc.insets = new Insets(5, 5, 5, 5);
-
-    JToggleButton button = new JToggleButton();
-    button.setBackground(Color.white);
-    button.setUI(toggleButtonUI);
-    button.setMargin(new Insets(10, 10, 10, 10));
-    // ImageIcon imageIcon = new ImageIcon(Scaling.scale(originalImage, size.x, size.y));
-    ImageIcon imageIcon = new ImageIcon(Scalr.resize(originalImage, Scalr.Method.BALANCED, Scalr.Mode.AUTOMATIC, size.x, size.y, Scalr.OP_ANTIALIAS));
-    button.setIcon(imageIcon);
-    button.putClientProperty("MediaArtwork", artwork);
-
-    buttonGroup.add(button);
-    buttons.add(button);
-    imagePanel.add(button, gbc);
-
-    gbc = new GridBagConstraints();
-    gbc.gridx = 0;
-    gbc.gridy = 1;
-    gbc.anchor = GridBagConstraints.LAST_LINE_START;
-    gbc.insets = new Insets(0, 5, 0, 0);
-    JComboBox cb = null;
-    if (artwork.getImageSizes().size() > 0) {
-      cb = new JComboBox(artwork.getImageSizes().toArray());
-    }
-    else {
-      cb = new JComboBox(new String[] { originalImage.getWidth() + "x" + originalImage.getHeight() });
-    }
-    button.putClientProperty("MediaArtworkSize", cb);
-    imagePanel.add(cb, gbc);
-
-    // should we provide an option for extrathumbs
-    if (mediaType == MediaType.MOVIE && type == ImageType.FANART && Globals.settings.getMovieSettings().isImageExtraThumbs()) {
-      gbc = new GridBagConstraints();
-      gbc.gridx = 1;
-      gbc.gridy = 1;
-      gbc.anchor = GridBagConstraints.LINE_END;
-      JLabel label = new JLabel("Extrathumb");
-      imagePanel.add(label, gbc);
-
-      gbc = new GridBagConstraints();
-      gbc.gridx = 2;
-      gbc.gridy = 1;
-      gbc.anchor = GridBagConstraints.LINE_END;
-      JCheckBox chkbx = new JCheckBox();
-      button.putClientProperty("MediaArtworkExtrathumb", chkbx);
-      imagePanel.add(chkbx, gbc);
-    }
-
-    // should we provide an option for extrafanart
-    if (mediaType == MediaType.MOVIE && type == ImageType.FANART && Globals.settings.getMovieSettings().isImageExtraFanart()) {
-      gbc = new GridBagConstraints();
-      gbc.gridx = 1;
-      gbc.gridy = Globals.settings.getMovieSettings().isImageExtraThumbs() ? 2 : 1;
-      gbc.anchor = GridBagConstraints.LINE_END;
-      JLabel label = new JLabel("Extrafanart");
-      imagePanel.add(label, gbc);
-
-      gbc = new GridBagConstraints();
-      gbc.gridx = 2;
-      gbc.gridy = Globals.settings.getMovieSettings().isImageExtraThumbs() ? 2 : 1;
-      gbc.anchor = GridBagConstraints.LINE_END;
-      JCheckBox chkbx = new JCheckBox();
-      button.putClientProperty("MediaArtworkExtrafanart", chkbx);
-      imagePanel.add(chkbx, gbc);
-    }
-
-    panelImages.add(imagePanel);
-    panelImages.validate();
-    panelImages.getParent().validate();
-  }
-
-  /**
-   * The Class SwingAction_1.
-   * 
-   * @author Manuel Laggner
-   */
-  private class SwingAction_1 extends AbstractAction {
-
-    /** The Constant serialVersionUID. */
-    private static final long serialVersionUID = 1L;
-
-    /**
-     * Instantiates a new swing action_1.
-     */
-    public SwingAction_1() {
+    public CancelAction() {
       putValue(NAME, BUNDLE.getString("Button.cancel")); //$NON-NLS-1$
       putValue(SHORT_DESCRIPTION, BUNDLE.getString("Button.cancel")); //$NON-NLS-1$
+      putValue(SMALL_ICON, IconManager.CANCEL);
+      putValue(LARGE_ICON_KEY, IconManager.CANCEL);
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
-     */
+    @Override
     public void actionPerformed(ActionEvent e) {
       task.cancel(true);
       setVisible(false);
-      dispose();
     }
   }
 
-  /**
-   * The Class DownloadTask.
-   * 
-   * @author Manuel Laggner
-   */
-  private class DownloadTask extends SwingWorker<Void, Void> {
-
-    /** The ids. */
+  private class DownloadTask extends SwingWorker<Void, DownloadChunk> {
     private HashMap<String, Object>     ids;
-
-    /** The artwork providers. */
     private List<IMediaArtworkProvider> artworkProviders;
+    private boolean                     imagesFound = false;
 
-    /**
-     * Instantiates a new download task.
-     * 
-     * @param ids
-     *          the ids
-     * @param artworkProviders
-     *          the artwork providers
-     */
     public DownloadTask(HashMap<String, Object> ids, List<IMediaArtworkProvider> artworkProviders) {
       this.ids = ids;
       this.artworkProviders = artworkProviders;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.SwingWorker#doInBackground()
-     */
     @Override
     public Void doInBackground() {
       if (ids.isEmpty()) {
@@ -657,8 +634,9 @@ public class ImageChooserDialog extends JDialog {
         for (IMediaArtworkProvider artworkProvider : artworkProviders) {
           MediaScrapeOptions options = new MediaScrapeOptions();
           if (mediaType == MediaType.MOVIE) {
-            options.setLanguage(Globals.settings.getMovieSettings().getScraperLanguage());
-            options.setCountry(Globals.settings.getMovieSettings().getCertificationCountry());
+            options.setLanguage(MovieModuleManager.MOVIE_SETTINGS.getScraperLanguage());
+            options.setCountry(MovieModuleManager.MOVIE_SETTINGS.getCertificationCountry());
+            options.setScrapeImdbForeignLanguage(MovieModuleManager.MOVIE_SETTINGS.isImdbScrapeForeignLanguage());
           }
           else if (mediaType == MediaType.TV_SHOW) {
             options.setLanguage(Globals.settings.getTvShowSettings().getScraperLanguage());
@@ -685,6 +663,21 @@ public class ImageChooserDialog extends JDialog {
               options.setArtworkType(MediaArtworkType.SEASON);
               break;
 
+            case CLEARART:
+              options.setArtworkType(MediaArtworkType.CLEARART);
+              break;
+
+            case DISC:
+              options.setArtworkType(MediaArtworkType.DISC);
+              break;
+
+            case LOGO:
+              options.setArtworkType(MediaArtworkType.LOGO);
+              break;
+
+            case THUMB:
+              options.setArtworkType(MediaArtworkType.THUMB);
+              break;
           }
 
           // populate ids
@@ -712,7 +705,13 @@ public class ImageChooserDialog extends JDialog {
               url = new Url(art.getPreviewUrl());
               Image image = Toolkit.getDefaultToolkit().createImage(url.getBytes());
               BufferedImage bufferedImage = com.bric.image.ImageLoader.createImage(image);
-              addImage(bufferedImage, art);
+
+              DownloadChunk chunk = new DownloadChunk();
+              chunk.artwork = art;
+              chunk.image = bufferedImage;
+              publish(chunk);
+              imagesFound = true;
+              // addImage(bufferedImage, art);
             }
             catch (Exception e) {
               LOGGER.error("DownloadTask", e);
@@ -728,16 +727,22 @@ public class ImageChooserDialog extends JDialog {
       return null;
     }
 
-    /*
-     * Executed in event dispatching thread
-     */
-    /*
-     * (non-Javadoc)
-     * 
-     * @see javax.swing.SwingWorker#done()
-     */
+    @Override
+    protected void process(List<DownloadChunk> chunks) {
+      for (DownloadChunk chunk : chunks) {
+        addImage(chunk.image, chunk.artwork);
+      }
+    };
+
     @Override
     public void done() {
+      if (!imagesFound) {
+        JLabel lblNothingFound = new JLabel(BUNDLE.getString("image.download.nothingfound"));//$NON-NLS-1$
+        TmmFontHelper.changeFont(lblNothingFound, 1.33);
+        panelImages.add(lblNothingFound);
+        panelImages.validate();
+        panelImages.getParent().validate();
+      }
       SwingUtilities.invokeLater(new Runnable() {
         @Override
         public void run() {
@@ -747,14 +752,27 @@ public class ImageChooserDialog extends JDialog {
     }
   }
 
+  @Override
+  public void pack() {
+    // do not pack - it would look weird
+  }
+
+  private class DownloadChunk {
+    private BufferedImage image;
+    private MediaArtwork  artwork;
+  }
+
   private class LocalFileChooseAction extends AbstractAction {
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = -1178325861474276709L;
 
     public LocalFileChooseAction() {
       putValue(NAME, BUNDLE.getString("image.choose.file")); //$NON-NLS-1$
       putValue(SHORT_DESCRIPTION, BUNDLE.getString("image.choose.file")); //$NON-NLS-1$
+      putValue(SMALL_ICON, IconManager.FILE_OPEN);
+      putValue(LARGE_ICON_KEY, IconManager.FILE_OPEN);
     }
 
+    @Override
     public void actionPerformed(ActionEvent e) {
       File file = TmmUIHelper.selectFile(BUNDLE.getString("image.choose")); //$NON-NLS-1$
       if (file != null && file.exists() && file.isFile()) {
@@ -762,7 +780,6 @@ public class ImageChooserDialog extends JDialog {
         imageLabel.setImageUrl("file:/" + fileName);
         task.cancel(true);
         setVisible(false);
-        dispose();
       }
     }
   }

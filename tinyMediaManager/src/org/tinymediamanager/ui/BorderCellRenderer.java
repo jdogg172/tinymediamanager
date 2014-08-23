@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ package org.tinymediamanager.ui;
 
 import java.awt.Color;
 import java.awt.Component;
-import java.awt.Font;
 
 import javax.swing.BorderFactory;
 import javax.swing.JComponent;
@@ -25,7 +24,7 @@ import javax.swing.JTable;
 import javax.swing.border.Border;
 import javax.swing.table.DefaultTableCellRenderer;
 
-import org.tinymediamanager.core.movie.Movie;
+import org.tinymediamanager.core.movie.entities.Movie;
 
 /**
  * The Class BorderCellRenderer.
@@ -65,7 +64,7 @@ public class BorderCellRenderer extends DefaultTableCellRenderer {
       setValue(movie.getTitleSortable());
       if (movie.isNewlyAdded()) {
         setForeground(new Color(76, 143, 72));
-        setFont(new Font("Dialog", Font.BOLD, 11));
+        // TmmFontHelper.changeFont(this, 0.916);
       }
     }
     else if (value != null) {

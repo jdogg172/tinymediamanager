@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,12 @@
  */
 package org.tinymediamanager.ui.components;
 
+import java.awt.Cursor;
+import java.awt.Point;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
+import java.io.File;
 import java.util.Comparator;
 import java.util.ResourceBundle;
 
@@ -27,11 +31,13 @@ import javax.swing.JTable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tinymediamanager.core.MediaFile;
 import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
+import org.tinymediamanager.core.entities.MediaFile;
+import org.tinymediamanager.ui.IconManager;
+import org.tinymediamanager.ui.MainWindow;
 import org.tinymediamanager.ui.TableColumnResizer;
 import org.tinymediamanager.ui.TmmUIHelper;
 import org.tinymediamanager.ui.UTF8Control;
@@ -53,10 +59,7 @@ import com.jgoodies.forms.layout.RowSpec;
 public class MediaFilesPanel extends JPanel {
   private static final long                 serialVersionUID    = -4929581173434859034L;
   private static final Logger               LOGGER              = LoggerFactory.getLogger(MediaFilesPanel.class);
-  private static final ResourceBundle       BUNDLE              = ResourceBundle.getBundle("messages", new UTF8Control());              //$NON-NLS-1$
-  private static final ImageIcon            PLAY_ICON           = new ImageIcon(
-                                                                    MediaFilesPanel.class
-                                                                        .getResource("/org/tinymediamanager/ui/images/Play_small.png"));
+  private static final ResourceBundle       BUNDLE              = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
 
   private JScrollPane                       scrollPaneFiles;
   private JTable                            tableFiles;
@@ -72,80 +75,26 @@ public class MediaFilesPanel extends JPanel {
     tableFiles = new ZebraJTable(mediaFileTableModel);
     tableFiles.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 
-    tableFiles.addMouseListener(new MouseListener() {
-      @Override
-      public void mouseReleased(MouseEvent arg0) {
-      }
-
-      @Override
-      public void mousePressed(MouseEvent arg0) {
-      }
-
-      @Override
-      public void mouseExited(MouseEvent arg0) {
-      }
-
-      @Override
-      public void mouseEntered(MouseEvent arg0) {
-      }
-
-      @Override
-      public void mouseClicked(MouseEvent arg0) {
-        int col = tableFiles.columnAtPoint(arg0.getPoint());
-        if (col == 0) {
-          int row = tableFiles.rowAtPoint(arg0.getPoint());
-          row = tableFiles.convertRowIndexToModel(row);
-          MediaFile mf = mediaFileEventList.get(row);
-          if (mf.isVideo()) {
-            try {
-              TmmUIHelper.openFile(mf.getFile());
-            }
-            catch (Exception e) {
-              LOGGER.error("open file", e);
-              MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, mf, "message.erroropenfile", new String[] { ":",
-                  e.getLocalizedMessage() }));
-            }
-          }
-        }
-      }
-    });
+    LinkListener linkListener = new LinkListener();
+    tableFiles.addMouseListener(linkListener);
+    tableFiles.addMouseMotionListener(linkListener);
 
     scrollPaneFiles = ZebraJTable.createStripedJScrollPane(tableFiles);
     add(scrollPaneFiles, "1, 1, fill, fill");
 
     scrollPaneFiles.setViewportView(tableFiles);
-
   }
 
-  /**
-   * Adjust columns.
-   */
   public void adjustColumns() {
     TableColumnResizer.adjustColumnPreferredWidths(tableFiles, 6);
   }
 
-  /**
-   * The Class MediaTableFormat.
-   * 
-   * @author Manuel Laggner
-   */
   private static class MediaTableFormat implements AdvancedTableFormat<MediaFile> {
-
-    /*
-     * (non-Javadoc)
-     * 
-     * @see ca.odell.glazedlists.gui.TableFormat#getColumnCount()
-     */
     @Override
     public int getColumnCount() {
       return 8;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see ca.odell.glazedlists.gui.TableFormat#getColumnName(int)
-     */
     @Override
     public String getColumnName(int column) {
       switch (column) {
@@ -177,17 +126,15 @@ public class MediaFilesPanel extends JPanel {
       throw new IllegalStateException();
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see ca.odell.glazedlists.gui.TableFormat#getColumnValue(java.lang.Object, int)
-     */
     @Override
     public Object getColumnValue(MediaFile mediaFile, int column) {
       switch (column) {
         case 0:
           if (mediaFile.isVideo()) {
-            return MediaFilesPanel.PLAY_ICON;
+            return IconManager.PLAY_SMALL;
+          }
+          if (mediaFile.isGraphic()) {
+            return IconManager.SEARCH;
           }
           return null;
 
@@ -216,11 +163,6 @@ public class MediaFilesPanel extends JPanel {
       throw new IllegalStateException();
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see ca.odell.glazedlists.gui.AdvancedTableFormat#getColumnClass(int)
-     */
     @SuppressWarnings("rawtypes")
     @Override
     public Class getColumnClass(int column) {
@@ -241,11 +183,6 @@ public class MediaFilesPanel extends JPanel {
       throw new IllegalStateException();
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see ca.odell.glazedlists.gui.AdvancedTableFormat#getColumnComparator(int)
-     */
     @SuppressWarnings("rawtypes")
     @Override
     public Comparator getColumnComparator(int arg0) {
@@ -255,6 +192,75 @@ public class MediaFilesPanel extends JPanel {
     private String getMediaFileTypeLocalized(MediaFileType type) {
       String prop = "mediafiletype." + type.name().toLowerCase();
       return BUNDLE.getString(prop);
+    }
+  }
+
+  private class LinkListener implements MouseListener, MouseMotionListener {
+    @Override
+    public void mouseClicked(MouseEvent arg0) {
+      int col = tableFiles.columnAtPoint(arg0.getPoint());
+      if (col == 0) {
+        int row = tableFiles.rowAtPoint(arg0.getPoint());
+        row = tableFiles.convertRowIndexToModel(row);
+        MediaFile mf = mediaFileEventList.get(row);
+        // open the video file in the desired player
+        if (mf.isVideo()) {
+          try {
+            TmmUIHelper.openFile(mf.getFile());
+          }
+          catch (Exception e) {
+            LOGGER.error("open file", e);
+            MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, mf, "message.erroropenfile", new String[] { ":",
+                e.getLocalizedMessage() }));
+          }
+        }
+        // open the graphic in the lightbox
+        if (mf.isGraphic()) {
+          MainWindow.getActiveInstance().createLightbox(mf.getPath() + File.separator + mf.getFilename(), "");
+        }
+      }
+    }
+
+    @Override
+    public void mouseEntered(MouseEvent e) {
+      JTable table = (JTable) e.getSource();
+      int col = table.columnAtPoint(new Point(e.getX(), e.getY()));
+      if (col == 0) {
+        table.setCursor(new Cursor(Cursor.HAND_CURSOR));
+      }
+    }
+
+    @Override
+    public void mouseExited(MouseEvent e) {
+      JTable table = (JTable) e.getSource();
+      int col = table.columnAtPoint(new Point(e.getX(), e.getY()));
+      if (col != 0) {
+        table.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+      }
+    }
+
+    @Override
+    public void mouseMoved(MouseEvent e) {
+      JTable table = (JTable) e.getSource();
+      int col = table.columnAtPoint(new Point(e.getX(), e.getY()));
+      if (col != 0 && table.getCursor().getType() == Cursor.HAND_CURSOR) {
+        table.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+      }
+      if (col == 0 && table.getCursor().getType() == Cursor.DEFAULT_CURSOR) {
+        table.setCursor(new Cursor(Cursor.HAND_CURSOR));
+      }
+    }
+
+    @Override
+    public void mousePressed(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseReleased(MouseEvent e) {
+    }
+
+    @Override
+    public void mouseDragged(MouseEvent arg0) {
     }
   }
 }

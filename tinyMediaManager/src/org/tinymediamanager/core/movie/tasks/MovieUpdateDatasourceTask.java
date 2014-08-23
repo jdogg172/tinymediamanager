@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.ResourceBundle;
 import java.util.concurrent.Callable;
 
 import org.apache.commons.io.FileUtils;
@@ -32,22 +33,28 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
-import org.tinymediamanager.TmmThreadPool;
 import org.tinymediamanager.core.ImageCacheTask;
-import org.tinymediamanager.core.MediaFile;
 import org.tinymediamanager.core.MediaFileInformationFetcherTask;
 import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
 import org.tinymediamanager.core.Utils;
-import org.tinymediamanager.core.movie.Movie;
+import org.tinymediamanager.core.entities.MediaFile;
 import org.tinymediamanager.core.movie.MovieList;
+import org.tinymediamanager.core.movie.MovieMediaSource;
+import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.core.movie.connector.MovieToMpNfoConnector;
 import org.tinymediamanager.core.movie.connector.MovieToXbmcNfoConnector;
+import org.tinymediamanager.core.movie.entities.Movie;
+import org.tinymediamanager.core.threading.TmmTask;
+import org.tinymediamanager.core.threading.TmmTaskManager;
+import org.tinymediamanager.core.threading.TmmThreadPool;
 import org.tinymediamanager.scraper.MediaTrailer;
+import org.tinymediamanager.scraper.trakttv.SyncTraktTvTask;
 import org.tinymediamanager.scraper.util.ParserUtils;
 import org.tinymediamanager.scraper.util.StrgUtils;
+import org.tinymediamanager.ui.UTF8Control;
 
 /**
  * The Class UpdateDataSourcesTask.
@@ -56,37 +63,35 @@ import org.tinymediamanager.scraper.util.StrgUtils;
  */
 
 public class MovieUpdateDatasourceTask extends TmmThreadPool {
-  private static final Logger       LOGGER           = LoggerFactory.getLogger(MovieUpdateDatasourceTask.class);
+  private static final Logger         LOGGER           = LoggerFactory.getLogger(MovieUpdateDatasourceTask.class);
+  private static final ResourceBundle BUNDLE           = ResourceBundle.getBundle("messages", new UTF8Control());                         //$NON-NLS-1$
 
   // skip well-known, but unneeded folders (UPPERCASE)
-  private static final List<String> skipFolders      = Arrays.asList(".", "..", "CERTIFICATE", "BACKUP", "PLAYLIST", "CLPINF", "SSIF", "AUXDATA",
-                                                         "AUDIO_TS", "$RECYCLE.BIN", "RECYCLER", "SYSTEM VOLUME INFORMATION", "@EADIR");
+  private static final List<String>   skipFolders      = Arrays.asList(".", "..", "CERTIFICATE", "BACKUP", "PLAYLIST", "CLPINF", "SSIF", "AUXDATA",
+                                                           "AUDIO_TS", "$RECYCLE.BIN", "RECYCLER", "SYSTEM VOLUME INFORMATION", "@EADIR");
 
   // skip folders starting with a SINGLE "." or "._"
-  private static final String       skipFoldersRegex = "^[.][\\w]+.*";
+  private static final String         skipFoldersRegex = "^[.][\\w]+.*";
 
-  private List<String>              dataSources;
-  private MovieList                 movieList;
-  private HashSet<File>             filesFound       = new HashSet<File>();
+  private List<String>                dataSources;
+  private MovieList                   movieList;
+  private HashSet<File>               filesFound       = new HashSet<File>();
 
   public MovieUpdateDatasourceTask() {
+    super(BUNDLE.getString("update.datasource"));
     movieList = MovieList.getInstance();
-    dataSources = new ArrayList<String>(Globals.settings.getMovieSettings().getMovieDataSource());
+    dataSources = new ArrayList<String>(MovieModuleManager.MOVIE_SETTINGS.getMovieDataSource());
   }
 
   public MovieUpdateDatasourceTask(String datasource) {
+    super(BUNDLE.getString("update.datasource") + " (" + datasource + ")");
     movieList = MovieList.getInstance();
     dataSources = new ArrayList<String>(1);
     dataSources.add(datasource);
   }
 
-  /*
-   * (non-Javadoc)
-   * 
-   * @see javax.swing.SwingWorker#doInBackground()
-   */
   @Override
-  public Void doInBackground() {
+  public void doInBackground() {
     try {
       long start = System.currentTimeMillis();
       List<File> imageFiles = new ArrayList<File>();
@@ -97,8 +102,10 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
       }
 
       for (String ds : dataSources) {
-        startProgressBar("prepare scan '" + ds + "'");
-        if (Globals.settings.getMovieSettings().isDetectMovieMultiDir()) {
+        setTaskName(BUNDLE.getString("update.datasource") + " '" + ds + "'");
+        publishState();
+
+        if (MovieModuleManager.MOVIE_SETTINGS.isDetectMovieMultiDir()) {
           initThreadPool(1, "update"); // use only one, since the multiDir detection relies on accurate values...
         }
         else {
@@ -128,7 +135,7 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
             }
             else {
               if (Globals.settings.getVideoFileType().contains("." + FilenameUtils.getExtension(file.getName()))) {
-                if (Globals.settings.getMovieSettings().isDetectMovieMultiDir()) {
+                if (MovieModuleManager.MOVIE_SETTINGS.isDetectMovieMultiDir()) {
                   parseDsRoot = true; // at least on movie found in DS root
                 }
                 else {
@@ -164,7 +171,7 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
         }
 
         // build image cache on import
-        if (Globals.settings.getMovieSettings().isBuildImageCacheOnImport()) {
+        if (MovieModuleManager.MOVIE_SETTINGS.isBuildImageCacheOnImport()) {
           for (Movie movie : movieList.getMovies()) {
             if (!new File(ds).equals(new File(movie.getDataSource()))) {
               // check only movies matching datasource
@@ -178,21 +185,21 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
 
       if (imageFiles.size() > 0) {
         ImageCacheTask task = new ImageCacheTask(imageFiles);
-        Globals.executor.execute(task);
+        TmmTaskManager.getInstance().addUnnamedTask(task);
+      }
+
+      if (MovieModuleManager.MOVIE_SETTINGS.getSyncTrakt()) {
+        TmmTask task = new SyncTraktTvTask(true, true, false, false);
+        TmmTaskManager.getInstance().addUnnamedTask(task);
       }
 
       long end = System.currentTimeMillis();
       LOGGER.info("Done updating datasource :) - took " + Utils.MSECtoHHMMSS(end - start));
-
-      if (cancel) {
-        cancel(false);// swing cancel
-      }
     }
     catch (Exception e) {
       LOGGER.error("Thread crashed", e);
       MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, "update.datasource", "message.update.threadcrashed"));
     }
-    return null;
   }
 
   /**
@@ -226,8 +233,9 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
         }
         for (MediaFile mfile : m.getMediaFiles(MediaFileType.VIDEO)) {
           // try to match like if we would create a new movie
-          if (ParserUtils.detectCleanMoviename(Utils.cleanStackingMarkers(mfile.getBasename())).equals(
-              ParserUtils.detectCleanMoviename(Utils.cleanStackingMarkers(mf.getBasename())))) {
+          String[] mfileTY = ParserUtils.detectCleanMovienameAndYear(Utils.cleanStackingMarkers(mfile.getBasename()));
+          String[] mfTY = ParserUtils.detectCleanMovienameAndYear(Utils.cleanStackingMarkers(mf.getBasename()));
+          if (mfileTY[0].equals(mfTY[0]) && mfileTY[1].equals(mfTY[1])) { // title AND year (even empty) match
             LOGGER.debug("found possible movie '" + m.getTitle() + "' from filename " + file);
             movie = m;
             break;
@@ -243,7 +251,7 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
           MediaFile nfo = new MediaFile(nfoFile, MediaFileType.NFO);
           // from NFO?
           LOGGER.debug("found NFO '" + nfo.getFile() + "' - try to parse");
-          switch (Globals.settings.getMovieSettings().getMovieConnector()) {
+          switch (MovieModuleManager.MOVIE_SETTINGS.getMovieConnector()) {
             case XBMC:
               movie = MovieToXbmcNfoConnector.getData(nfo.getFile());
               break;
@@ -271,22 +279,30 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
         }
         movie.setDataSource(datasource);
         movie.setNewlyAdded(true);
+        movie.justAdded = true;
         movie.setPath(mf.getPath());
+
+        movieList.addMovie(movie);
       }
 
       if (!Utils.isValidImdbId(movie.getImdbId())) {
         movie.setImdbId(ParserUtils.detectImdbId(mf.getFile().getAbsolutePath()));
       }
+      if (movie.getMediaSource() == MovieMediaSource.UNKNOWN) {
+        movie.setMediaSource(MovieMediaSource.parseMediaSource(mf.getFile().getAbsolutePath()));
+      }
+      LOGGER.debug("parsing video file " + mf.getFilename());
       movie.addToMediaFiles(mf);
       movie.setMultiMovieDir(true);
 
       // 3) find additional files, which start with videoFileName
+      List<MediaFile> existingMediaFiles = new ArrayList<MediaFile>(movie.getMediaFiles());
       List<MediaFile> foundMediaFiles = new ArrayList<MediaFile>();
       for (int i = completeDirContents.size() - 1; i >= 0; i--) {
         File fileInDir = completeDirContents.get(i);
         if (fileInDir.getName().startsWith(basename)) {
           MediaFile mediaFile = new MediaFile(fileInDir);
-          if (!movie.getMediaFiles().contains(mediaFile)) {
+          if (!existingMediaFiles.contains(mediaFile)) {
             // store file for faster cleanup
             synchronized (filesFound) {
               filesFound.add(fileInDir);
@@ -308,8 +324,6 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
         movie.getMovieSet().saveToDb();
         movie.saveToDb();
       }
-      movie.justAdded = true;
-      movieList.addMovie(movie);
     } // end for every file
   }
 
@@ -339,16 +353,17 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
       LOGGER.debug("Checking for multi-movie dir; parsing all video files in " + movieDir);
       for (File file : files) {
         MediaFile mf = new MediaFile(file);
-        if (mf.isDiscFile()) {
+        if (mf.isDiscFile()) { // MacOS ignore
           // ignore disc files when trying to detect multi movie dir!
           continue;
         }
-        h.add(ParserUtils.detectCleanMoviename(Utils.cleanStackingMarkers(FilenameUtils.getBaseName(file.getName()))));
+        String[] ty = ParserUtils.detectCleanMovienameAndYear(Utils.cleanStackingMarkers(FilenameUtils.getBaseName(file.getName())));
+        h.add(ty[0] + ty[1]); // title+year, just temp
       }
       // more than 1, or if DS=dir then assume a multi dir (only second level is a normal movie dir)
       if (h.size() > 1 || movieDir.equals(new File(dataSource))) {
         LOGGER.debug("WOOT - we have a multi movie directory: " + movieDir);
-        if (Globals.settings.getMovieSettings().isDetectMovieMultiDir()) {
+        if (MovieModuleManager.MOVIE_SETTINGS.isDetectMovieMultiDir()) {
           parseMultiMovieDir(files, movieDir, dataSource);
         }
         else {
@@ -371,7 +386,7 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
             if (mf.getType().equals(MediaFileType.NFO)) {
               LOGGER.debug("parsing NFO " + mf.getFilename());
               Movie nfo = null;
-              switch (Globals.settings.getMovieSettings().getMovieConnector()) {
+              switch (MovieModuleManager.MOVIE_SETTINGS.getMovieConnector()) {
                 case XBMC:
                   nfo = MovieToXbmcNfoConnector.getData(mf.getFile());
                   break;
@@ -413,9 +428,13 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
           movie.setDateAdded(new Date());
           movie.setNewlyAdded(true);
 
+          movie.justAdded = true;
+
           movie.findActorImages(); // TODO: find as MediaFIles
           LOGGER.debug("store movie into DB " + movieDir.getName());
           movie.saveToDb(); // savepoint
+
+          movieList.addMovie(movie);
 
           if (movie.getMovieSet() != null) {
             LOGGER.debug("movie is part of a movieset");
@@ -451,8 +470,6 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
         }
 
         movie.saveToDb();
-        movie.justAdded = true;
-        movieList.addMovie(movie);
       }
     }
     catch (NullPointerException e) {
@@ -569,12 +586,15 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
   }
 
   private void addMediafilesToMovie(Movie movie, List<MediaFile> mediaFiles) {
-    List<MediaFile> current = movie.getMediaFiles();
+    List<MediaFile> current = new ArrayList<MediaFile>(movie.getMediaFiles());
 
     for (MediaFile mf : mediaFiles) {
       if (!current.contains(mf)) { // a new mediafile was found!
         if (mf.getPath().toUpperCase().contains("BDMV") || mf.getPath().toUpperCase().contains("VIDEO_TS") || mf.isDiscFile()) {
           movie.setDisc(true);
+          if (movie.getMediaSource() == MovieMediaSource.UNKNOWN) {
+            movie.setMediaSource(MovieMediaSource.parseMediaSource(mf.getPath()));
+          }
         }
 
         if (!Utils.isValidImdbId(movie.getImdbId())) {
@@ -585,6 +605,9 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
           case VIDEO:
             LOGGER.debug("parsing video file " + mf.getFilename());
             movie.addToMediaFiles(mf);
+            if (movie.getMediaSource() == MovieMediaSource.UNKNOWN) {
+              movie.setMediaSource(MovieMediaSource.parseMediaSource(mf.getFile().getAbsolutePath()));
+            }
             break;
 
           case VIDEO_EXTRA:
@@ -648,6 +671,14 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
             movie.addToMediaFiles(mf);
             break;
 
+          case DISCART:
+          case BANNER:
+          case CLEARART:
+          case LOGO:
+            LOGGER.debug("parsing " + mf.getType().name().toLowerCase() + " " + mf.getFilename());
+            movie.addToMediaFiles(mf);
+            break;
+
           case GRAPHIC:
           case UNKNOWN:
           default:
@@ -655,6 +686,13 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
             // movie.addToMediaFiles(mf); // DO NOT ADD UNKNOWN
             break;
         } // end switch type
+
+        // debug
+        if (mf.getType() != MediaFileType.GRAPHIC && mf.getType() != MediaFileType.UNKNOWN && mf.getType() != MediaFileType.NFO
+            && !movie.getMediaFiles().contains(mf)) {
+          LOGGER.error("Movie not added mf: " + mf.getFile().getPath());
+        }
+
       } // end new MF found
     } // end MF loop
   }
@@ -663,7 +701,12 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
    * cleanup database - remove orphaned movies/files
    */
   private void cleanup(String datasource) {
-    startProgressBar("database cleanup...");
+    setTaskName(BUNDLE.getString("update.cleanup"));
+    setTaskDescription(null);
+    setProgressDone(0);
+    setWorkUnits(0);
+    publishState();
+
     LOGGER.info("removing orphaned movies/files...");
     List<Movie> moviesToRemove = new ArrayList<Movie>();
     for (int i = movieList.getMovies().size() - 1; i >= 0; i--) {
@@ -697,6 +740,7 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
           for (MediaFile mf : mediaFiles) {
             if (!filesFound.contains(mf.getFile())) {
               if (!mf.exists()) {
+                LOGGER.debug("removing orphaned file: " + mf.getPath() + File.separator + mf.getFilename());
                 movie.removeFromMediaFiles(mf);
                 dirty = true;
               }
@@ -719,8 +763,11 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
    */
   private void gatherMediainfo(String datasource) {
     // start MI
+    setTaskName(BUNDLE.getString("update.mediainfo"));
+    publishState();
+
     initThreadPool(1, "mediainfo");
-    startProgressBar("getting Mediainfo");
+
     LOGGER.info("getting Mediainfo...");
     for (int i = movieList.getMovies().size() - 1; i >= 0; i--) {
       if (cancel) {
@@ -734,7 +781,7 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
       }
 
       ArrayList<MediaFile> ungatheredMediaFiles = new ArrayList<MediaFile>();
-      for (MediaFile mf : movie.getMediaFiles()) {
+      for (MediaFile mf : new ArrayList<MediaFile>(movie.getMediaFiles())) {
         if (StringUtils.isBlank(mf.getContainerFormat())) {
           ungatheredMediaFiles.add(mf);
         }
@@ -746,22 +793,10 @@ public class MovieUpdateDatasourceTask extends TmmThreadPool {
     }
   }
 
-  /*
-   * Executed in event dispatching thread
-   */
-  @Override
-  public void done() {
-    stopProgressBar();
-  }
-
-  @Override
-  public void cancel() {
-    cancel = true;
-  }
-
   @Override
   public void callback(Object obj) {
-    startProgressBar((String) obj, getTaskcount(), getTaskdone());
+    // do not publish task description here, because with different workers the text is never right
+    publishState(progressDone);
   }
 
   /**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2013 Manuel Laggner
+ * Copyright 2012 - 2014 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,8 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.ResourceBundle;
 
 import javax.swing.Box;
@@ -38,13 +40,16 @@ import org.jdesktop.beansbinding.AutoBinding;
 import org.jdesktop.beansbinding.AutoBinding.UpdateStrategy;
 import org.jdesktop.beansbinding.BeanProperty;
 import org.jdesktop.beansbinding.Bindings;
-import org.tinymediamanager.core.tvshow.TvShow;
+import org.tinymediamanager.core.entities.MediaFile;
+import org.tinymediamanager.core.tvshow.entities.TvShow;
 import org.tinymediamanager.scraper.Certification;
-import org.tinymediamanager.ui.CertificationImageConverter;
 import org.tinymediamanager.ui.ColumnLayout;
+import org.tinymediamanager.ui.TmmFontHelper;
 import org.tinymediamanager.ui.UTF8Control;
 import org.tinymediamanager.ui.components.ImageLabel;
+import org.tinymediamanager.ui.components.ImagePanel;
 import org.tinymediamanager.ui.components.StarRater;
+import org.tinymediamanager.ui.converter.CertificationImageConverter;
 
 import com.jgoodies.forms.factories.FormFactory;
 import com.jgoodies.forms.layout.ColumnSpec;
@@ -192,7 +197,7 @@ public class TvShowInformationPanel extends JPanel {
     panelTvShowTitle.setLayout(new BorderLayout(0, 0));
     lblTvShowName = new JLabel("");
     panelTvShowTitle.add(lblTvShowName);
-    lblTvShowName.setFont(new Font("Dialog", Font.BOLD, 16));
+    TmmFontHelper.changeFont(lblTvShowName, 1.33, Font.BOLD);
 
     JPanel panelRatingTagline = new JPanel();
     panelTvShowHeader.add(panelRatingTagline, "1, 2, fill, top");
@@ -205,7 +210,7 @@ public class TvShowInformationPanel extends JPanel {
     lblVoteCount = new JLabel("");
     panelRatingTagline.add(lblVoteCount, "3, 2, left, center");
 
-    panelRatingStars = new StarRater(5, 2);
+    panelRatingStars = new StarRater(10, 1);
     panelRatingTagline.add(panelRatingStars, "1, 2, left, top");
     panelRatingStars.setEnabled(false);
 
@@ -256,6 +261,10 @@ public class TvShowInformationPanel extends JPanel {
     panelMediaInformation = new TvShowMediaInformationPanel(tvShowSelectionModel);
     tabbedPaneTvShowDetails.addTab(BUNDLE.getString("metatag.mediafiles"), null, panelMediaInformation, null); //$NON-NLS-1$
 
+    final List<MediaFile> mediaFiles = new ArrayList<MediaFile>();
+    final ImagePanel panelArtwork = new ImagePanel(mediaFiles);
+    tabbedPaneTvShowDetails.addTab(BUNDLE.getString("metatag.artwork"), null, panelArtwork, null); //$NON-NLS-1$
+
     // beansbinding init
     initDataBindings();
 
@@ -270,6 +279,27 @@ public class TvShowInformationPanel extends JPanel {
           setFanart(model.getSelectedTvShow());
           setPoster(model.getSelectedTvShow());
           setBanner(model.getSelectedTvShow());
+          synchronized (mediaFiles) {
+            mediaFiles.clear();
+            for (MediaFile mediafile : new ArrayList<MediaFile>(model.getSelectedTvShow().getMediaFiles())) {
+              if (mediafile.isGraphic()) {
+                mediaFiles.add(mediafile);
+              }
+            }
+            panelArtwork.rebuildPanel();
+          }
+        }
+        if (source instanceof TvShow && MEDIA_FILES.equals(property)) {
+          TvShow show = (TvShow) source;
+          synchronized (mediaFiles) {
+            mediaFiles.clear();
+            for (MediaFile mediafile : new ArrayList<MediaFile>(show.getMediaFiles())) {
+              if (mediafile.isGraphic()) {
+                mediaFiles.add(mediafile);
+              }
+            }
+            panelArtwork.rebuildPanel();
+          }
         }
         if ((source.getClass() == TvShow.class && FANART.equals(property))) {
           TvShow tvShow = (TvShow) source;
