@@ -481,6 +481,13 @@ public abstract class MediaEntity extends AbstractModelObject {
     firePropertyChange(key, null, value);
   }
 
+  public void removeId(String key) {
+    Object obj = ids.remove(key);
+    if (obj != null) {
+      firePropertyChange(key, obj, null);
+    }
+  }
+
   public Object getId(String key) {
     return ids.get(key);
   }
@@ -580,7 +587,11 @@ public abstract class MediaEntity extends AbstractModelObject {
   }
 
   public List<MediaFile> getMediaFiles() {
-    return mediaFiles;
+    List<MediaFile> mf = new ArrayList<MediaFile>();
+    readWriteLock.readLock().lock();
+    mf.addAll(mediaFiles);
+    readWriteLock.readLock().unlock();
+    return mf;
   }
 
   public List<MediaFile> getMediaFiles(MediaFileType type) {
