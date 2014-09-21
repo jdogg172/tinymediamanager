@@ -1,6 +1,8 @@
 Version 2.6.2
 =======================
 + added column for watched state to the movie table
++ added action to scrape episode metadata without thumbs
++ added quick creation of movie sets to the movie bulk editor
 x greatly improved our episode detection engine
 x performance improvements with loading and update datasources
 x fixed season poster detection
