@@ -1,3 +1,11 @@
+Version 2.6.3
+=======================
+x updated Trakt.tv libs
+x fix release build version info
+x fix some nullpointers
+x added more transifex languages
+x and some more minor internal things... 
+
 Version 2.6.2
 =======================
 + added column for watched state to the movie table
