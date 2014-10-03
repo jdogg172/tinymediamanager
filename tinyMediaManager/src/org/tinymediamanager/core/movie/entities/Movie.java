@@ -1346,23 +1346,6 @@ public class Movie extends MediaEntity {
    * @return the nfo filename
    */
   public String getNfoFilename(MovieNfoNaming nfo, String newMovieFilename) {
-    if (isDisc) {
-      // detect if this directory is a DVD or BR directory
-      File dir = new File(path, "VIDEO_TS");
-      if (dir.exists()) {
-        // we need to pass the subdir in this case
-        // info for that file naming: http://wiki.xbmc.org/index.php?title=NFO_files/movies
-        return "VIDEO_TS" + File.separator + "VIDEO_TS.nfo";
-      }
-
-      dir = new File(path, "BDMV");
-      if (dir.exists()) {
-        // we need to pass the subdir in this case
-        // info for that file naming: http://forum.xbmc.org/showthread.php?tid=155523
-        return "BDMV" + File.separator + "index.nfo";
-      }
-    }
-
     String filename = "";
     switch (nfo) {
       case FILENAME_NFO:
@@ -1371,6 +1354,22 @@ public class Movie extends MediaEntity {
         break;
       case MOVIE_NFO:
         filename += "movie.nfo";
+        break;
+      case DISC_NFO:
+        // detect if this directory is a DVD or BR directory
+        // info for that file naming: http://wiki.xbmc.org/index.php?title=NFO_files/movies
+        File dir = new File(path, "VIDEO_TS.ifo");
+        if (dir.exists()) {
+          return "VIDEO_TS.nfo";// DVD w/o video_ts folder
+        }
+        dir = new File(path, "VIDEO_TS");
+        if (dir.exists() && dir.isDirectory()) {
+          return "VIDEO_TS" + File.separator + "VIDEO_TS.nfo";
+        }
+        dir = new File(path, "BDMV");
+        if (dir.exists() && dir.isDirectory()) {
+          return "BDMV" + File.separator + "index.nfo";
+        }
         break;
       default:
         filename = "";
@@ -2004,39 +2003,6 @@ public class Movie extends MediaEntity {
   }
 
   /**
-   * <b>PHYSICALLY</b> Deletes a file by moving it to datasource backup folder<br>
-   * DS\.backup\&lt;moviename&gt;\mediafile.ext
-   * 
-   * @param mf
-   *          the mediafile to delete
-   */
-  public void deleteSafely(MediaFile mf) {
-    String fn = mf.getFile().getAbsolutePath();
-    // inject backup path
-    fn = fn.replace(getDataSource(), getDataSource() + File.separator + Constants.BACKUP_FOLDER);
-
-    // create path
-    File backup = new File(fn);
-    if (!backup.getParentFile().exists()) {
-      backup.getParentFile().mkdirs();
-    }
-
-    // backup
-    try {
-      // overwrite backup file by deletion prior
-      FileUtils.deleteQuietly(backup);
-      boolean ok = Utils.moveFileSafe(mf.getFile(), backup);
-      if (ok) {
-        removeFromMediaFiles(mf);
-        saveToDb();
-      }
-    }
-    catch (IOException e) {
-      LOGGER.warn("could not delete media file: " + e.getMessage());
-    }
-  }
-
-  /**
    * <b>PHYSICALLY</b> deletes a complete Movie by moving it to datasource backup folder<br>
    * DS\.backup\&lt;moviename&gt;
    */
@@ -2045,17 +2011,34 @@ public class Movie extends MediaEntity {
     // inject backup path
     fn = fn.replace(getDataSource(), getDataSource() + File.separator + Constants.BACKUP_FOLDER);
 
-    // create path
-    File backup = new File(fn);
-    if (!backup.getParentFile().exists()) {
-      backup.getParentFile().mkdirs();
-    }
-
     // backup
     try {
-      // overwrite backup file by deletion prior
-      FileUtils.deleteQuietly(backup);
-      return Utils.moveDirectorySafe(new File(getPath()), backup);
+      if (isMultiMovieDir()) {
+        // create deletedBy folder
+        File backup = new File(fn);
+        if (!backup.exists()) {
+          backup.mkdirs();
+        }
+        boolean ok = true;
+        for (MediaFile mf : getMediaFiles()) {
+          // overwrite backup file by deletion prior
+          FileUtils.deleteQuietly(new File(backup, mf.getFilename()));
+          if (!Utils.moveFileSafe(mf.getFile(), new File(backup, mf.getFilename()))) {
+            ok = false;
+          }
+        }
+        return ok;
+      }
+      else {
+        // create path
+        File backup = new File(fn);
+        if (!backup.getParentFile().exists()) {
+          backup.getParentFile().mkdirs();
+        }
+        // overwrite backup file by deletion prior
+        FileUtils.deleteQuietly(backup);
+        return Utils.moveDirectorySafe(new File(getPath()), backup);
+      }
     }
     catch (IOException e) {
       LOGGER.warn("could not delete movie files: " + e.getMessage());
