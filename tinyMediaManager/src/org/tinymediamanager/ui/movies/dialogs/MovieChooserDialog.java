@@ -422,6 +422,61 @@ public class MovieChooserDialog extends TmmDialog implements ActionListener {
                   movieToScrape.downloadArtwork(MediaFileType.EXTRATHUMB);
                 }
               }
+
+              // banner
+              if (MovieModuleManager.MOVIE_SETTINGS.isImageBanner()) {
+                ImageLabel lblImage = new ImageLabel();
+                ImageChooserDialog dialog = new ImageChooserDialog(movieToScrape.getIds(), ImageType.BANNER, artworkProviders, lblImage, null, null,
+                    MediaType.MOVIE);
+                dialog.setLocationRelativeTo(MainWindow.getActiveInstance());
+                dialog.setVisible(true);
+                movieToScrape.setArtworkUrl(lblImage.getImageUrl(), MediaFileType.BANNER);
+                movieToScrape.downloadArtwork(MediaFileType.BANNER);
+              }
+
+              // logo
+              if (MovieModuleManager.MOVIE_SETTINGS.isImageLogo()) {
+                ImageLabel lblImage = new ImageLabel();
+                ImageChooserDialog dialog = new ImageChooserDialog(movieToScrape.getIds(), ImageType.LOGO, artworkProviders, lblImage, null, null,
+                    MediaType.MOVIE);
+                dialog.setLocationRelativeTo(MainWindow.getActiveInstance());
+                dialog.setVisible(true);
+                movieToScrape.setArtworkUrl(lblImage.getImageUrl(), MediaFileType.LOGO);
+                movieToScrape.downloadArtwork(MediaFileType.LOGO);
+              }
+
+              // clearart
+              if (MovieModuleManager.MOVIE_SETTINGS.isImageClearart()) {
+                ImageLabel lblImage = new ImageLabel();
+                ImageChooserDialog dialog = new ImageChooserDialog(movieToScrape.getIds(), ImageType.CLEARART, artworkProviders, lblImage, null,
+                    null, MediaType.MOVIE);
+                dialog.setLocationRelativeTo(MainWindow.getActiveInstance());
+                dialog.setVisible(true);
+                movieToScrape.setArtworkUrl(lblImage.getImageUrl(), MediaFileType.CLEARART);
+                movieToScrape.downloadArtwork(MediaFileType.CLEARART);
+              }
+
+              // discart
+              if (MovieModuleManager.MOVIE_SETTINGS.isImageDiscart()) {
+                ImageLabel lblImage = new ImageLabel();
+                ImageChooserDialog dialog = new ImageChooserDialog(movieToScrape.getIds(), ImageType.DISC, artworkProviders, lblImage, null, null,
+                    MediaType.MOVIE);
+                dialog.setLocationRelativeTo(MainWindow.getActiveInstance());
+                dialog.setVisible(true);
+                movieToScrape.setArtworkUrl(lblImage.getImageUrl(), MediaFileType.DISCART);
+                movieToScrape.downloadArtwork(MediaFileType.DISCART);
+              }
+
+              // thumb
+              if (MovieModuleManager.MOVIE_SETTINGS.isImageThumb()) {
+                ImageLabel lblImage = new ImageLabel();
+                ImageChooserDialog dialog = new ImageChooserDialog(movieToScrape.getIds(), ImageType.THUMB, artworkProviders, lblImage, null, null,
+                    MediaType.MOVIE);
+                dialog.setLocationRelativeTo(MainWindow.getActiveInstance());
+                dialog.setVisible(true);
+                movieToScrape.setArtworkUrl(lblImage.getImageUrl(), MediaFileType.THUMB);
+                movieToScrape.downloadArtwork(MediaFileType.THUMB);
+              }
             }
             else {
               // get artwork directly from provider
