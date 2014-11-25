@@ -8,14 +8,11 @@ Version 2.6.4
 + certification bulk edit
 + add season to image chooser title
 + remember last opened directory in the directory/file chooser
-x fixed BD NFO
-x fixed Excel export template
 x fixed/improved some tooltips
 x improved artwork sorting, better language detection
 x fixed MacOS startup; Java detection, executable, ...
 x fixed SSxEE TvShow parser
 x fixed movie exporter filename generation
-x ingore folders/files starting with .@
 x many code cleanups 
 
 Version 2.6.3
