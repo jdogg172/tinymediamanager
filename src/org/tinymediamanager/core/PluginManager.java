@@ -6,7 +6,9 @@ import java.util.List;
 
 import net.xeoh.plugins.base.Plugin;
 import net.xeoh.plugins.base.impl.PluginManagerFactory;
+import net.xeoh.plugins.base.options.GetPluginOption;
 import net.xeoh.plugins.base.options.addpluginsfrom.OptionReportAfter;
+import net.xeoh.plugins.base.options.getplugin.OptionCapabilities;
 import net.xeoh.plugins.base.util.PluginManagerUtil;
 import net.xeoh.plugins.base.util.uri.ClassURI;
 
@@ -18,6 +20,7 @@ import org.tinymediamanager.scraper.IMediaProvider;
 import org.tinymediamanager.scraper.IMediaSubtitleProvider;
 import org.tinymediamanager.scraper.IMediaTrailerProvider;
 import org.tinymediamanager.scraper.ITvShowMetadataProvider;
+import org.tinymediamanager.scraper.MediaScraper;
 
 public class PluginManager {
   private final static Logger                              LOGGER = LoggerFactory.getLogger(PluginManager.class);
@@ -30,6 +33,11 @@ public class PluginManager {
 
   public synchronized static PluginManager getInstance() {
     if (instance == null) {
+      // JSPFProperties props = new JSPFProperties();
+      // props.setProperty(PluginManager.class, "cache.enabled", "true");
+      // props.setProperty(PluginManager.class, "cache.mode", "weak"); // optional
+      // props.setProperty(PluginManager.class, "cache.file", "jspf.cache");
+
       instance = new PluginManager();
 
       long start = System.currentTimeMillis();
@@ -61,6 +69,55 @@ public class PluginManager {
       }
     }
     return instance;
+  }
+
+  private Class ScraperToImplClass(MediaScraper scraper) {
+    Class c = IMediaProvider.class;
+    switch (scraper.getType()) {
+      case MOVIE:
+        c = IMediaMetadataProvider.class;
+      case TV_SHOW:
+        c = ITvShowMetadataProvider.class;
+      case ARTWORK:
+        c = IMediaArtworkProvider.class;
+      case TRAILER:
+        c = IMediaTrailerProvider.class;
+      case SUBTITLE:
+        c = IMediaSubtitleProvider.class;
+      case ALBUM:
+      case ARTIST:
+      case LIBRARY:
+      case MUSICVIDEO:
+      default:
+        LOGGER.warn("No implementing interface for scraper: " + scraper);
+        break;
+    }
+    return c;
+  }
+
+  /**
+   * Gets the plugin from a MediaScraper
+   * 
+   * @param scraper
+   *          the TMM scraper
+   * @return Plugin
+   */
+  public Plugin getPlugin(MediaScraper scraper) {
+    Class paramClass = ScraperToImplClass(scraper);
+    return pm.getPlugin(paramClass, new OptionCapabilities("id:" + scraper.getId()));
+  }
+
+  /**
+   * Gets the plugin implementing a desired interface and capabilities
+   * 
+   * @param paramClass
+   *          plugin implementing the TMM interface IMedia...
+   * @param paramVarArgs
+   *          String to fetch desired capabilities like "id:tmdb.org"
+   * @return Plugin
+   */
+  public Plugin getPlugin(Class paramClass, GetPluginOption... paramVarArgs) {
+    return pm.getPlugin(paramClass, paramVarArgs);
   }
 
   /**

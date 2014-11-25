@@ -100,6 +100,15 @@ public class MediaScraper {
       case TV_SHOW:
         plugins.addAll(PluginManager.getInstance().getTvShowPlugins());
         break;
+      case ARTWORK:
+        plugins.addAll(PluginManager.getInstance().getArtworkPlugins());
+        break;
+      case TRAILER:
+        plugins.addAll(PluginManager.getInstance().getTrailerPlugins());
+        break;
+      case SUBTITLE:
+        plugins.addAll(PluginManager.getInstance().getSubtitlePlugins());
+        break;
       default:
         break;
     }

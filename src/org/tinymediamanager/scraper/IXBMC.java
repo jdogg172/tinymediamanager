@@ -16,7 +16,7 @@
 package org.tinymediamanager.scraper;
 
 /**
- * just a dedicated interface, for JSPF to find
+ * just a dedicated interface, for JSPF to find all "special" XBMC impls.<br>
  * 
  * @author Myron Boyle
  *
