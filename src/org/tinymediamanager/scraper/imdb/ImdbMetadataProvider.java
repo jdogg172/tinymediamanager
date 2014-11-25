@@ -31,6 +31,8 @@ import java.util.concurrent.Future;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import net.xeoh.plugins.base.annotations.PluginImplementation;
+
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -65,6 +67,7 @@ import org.tinymediamanager.scraper.util.CachedUrl;
  * @author Manuel Laggner
  */
 @SuppressWarnings("PMD")
+@PluginImplementation
 public class ImdbMetadataProvider implements IMediaMetadataProvider {
 
   private static MediaProviderInfo     providerInfo  = new MediaProviderInfo(Constants.IMDBID, "imdb.com",

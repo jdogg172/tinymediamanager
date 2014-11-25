@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import net.xeoh.plugins.base.annotations.PluginImplementation;
+
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +64,7 @@ import com.omertron.thetvdbapi.model.Series;
  * 
  * @author Manuel Laggner
  */
+@PluginImplementation
 public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaArtworkProvider {
   private static final Logger      LOGGER       = LoggerFactory.getLogger(TheTvDbMetadataProvider.class);
   private static TheTVDBApi        tvdb;

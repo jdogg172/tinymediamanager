@@ -70,9 +70,11 @@ import org.tinymediamanager.scraper.IMediaMetadataProvider;
 import org.tinymediamanager.scraper.IMediaTrailerProvider;
 import org.tinymediamanager.scraper.MediaArtwork;
 import org.tinymediamanager.scraper.MediaMetadata;
+import org.tinymediamanager.scraper.MediaScraper;
 import org.tinymediamanager.scraper.MediaSearchResult;
 import org.tinymediamanager.scraper.MediaTrailer;
 import org.tinymediamanager.scraper.MediaType;
+import org.tinymediamanager.scraper.ScraperType;
 import org.tinymediamanager.scraper.trakttv.SyncTraktTvTask;
 import org.tinymediamanager.ui.EqualsLayout;
 import org.tinymediamanager.ui.IconManager;
@@ -191,7 +193,8 @@ public class MovieChooserDialog extends TmmDialog implements ActionListener {
         panelSearchField.add(lblScraper, "2, 1, right, default");
       }
       {
-        cbScraper = new JComboBox(MovieScrapers.values());
+        // cbScraper = new JComboBox(MovieScrapers.values());
+        cbScraper = new JComboBox(MediaScraper.getMediaScraper(ScraperType.MOVIE).toArray());
         MovieScrapers defaultScraper = MovieModuleManager.MOVIE_SETTINGS.getMovieScraper();
         cbScraper.setSelectedItem(defaultScraper);
         cbScraper.setAction(new ChangeScraperAction());

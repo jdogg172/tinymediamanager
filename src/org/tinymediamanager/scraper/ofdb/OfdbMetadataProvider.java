@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import net.xeoh.plugins.base.annotations.PluginImplementation;
+
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
@@ -58,6 +60,7 @@ import org.tinymediamanager.scraper.util.Url;
  * 
  * @author Myron Boyle (myron0815@gmx.net)
  */
+@PluginImplementation
 public class OfdbMetadataProvider implements IMediaMetadataProvider, IMediaTrailerProvider {
   private static final Logger         LOGGER       = LoggerFactory.getLogger(OfdbMetadataProvider.class);
   private static final String         BASE_URL     = "http://www.ofdb.de";

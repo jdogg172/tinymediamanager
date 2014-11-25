@@ -20,6 +20,8 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import net.xeoh.plugins.base.annotations.PluginImplementation;
+
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -31,6 +33,8 @@ import org.tinymediamanager.core.movie.entities.Movie;
 import org.tinymediamanager.core.tvshow.TvShowList;
 import org.tinymediamanager.core.tvshow.entities.TvShow;
 import org.tinymediamanager.core.tvshow.entities.TvShowEpisode;
+import org.tinymediamanager.scraper.IMediaProvider;
+import org.tinymediamanager.scraper.MediaProviderInfo;
 import org.tinymediamanager.scraper.util.Pair;
 
 import retrofit.RetrofitError;
@@ -54,14 +58,17 @@ import com.jakewharton.trakt.services.ShowService.Show;
  * @author Myron Boyle
  * 
  */
-public class TraktTv {
+@PluginImplementation
+public class TraktTv implements IMediaProvider {
 
-  private static final Logger LOGGER   = LoggerFactory.getLogger(TraktTv.class);
-  private static final Trakt  TRAKT    = new Trakt();
-  private String              userName = "";
-  private String              password = "";
-  private String              apiKey   = "";
-  private ActionResponse      response;
+  private static final Logger      LOGGER       = LoggerFactory.getLogger(TraktTv.class);
+  private static final Trakt       TRAKT        = new Trakt();
+  private String                   userName     = "";
+  private String                   password     = "";
+  private String                   apiKey       = "";
+  private ActionResponse           response;
+  private static MediaProviderInfo providerInfo = new MediaProviderInfo(Constants.TRAKTTV, "Trakt.tv",
+                                                    "Scraper for Trakt.tv; yes, we can scraper here too :)");
 
   /**
    * gets a new Trakt object with settings values (user / pass / apikey)
@@ -80,6 +87,11 @@ public class TraktTv {
 
     TRAKT.setApiKey(userApiKey);
     TRAKT.setAuthentication(username, passwordSha1);
+  }
+
+  @Override
+  public MediaProviderInfo getProviderInfo() {
+    return providerInfo;
   }
 
   /**

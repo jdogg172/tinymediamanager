@@ -6,9 +6,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
-import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -41,7 +38,7 @@ public class XbmcScraper extends MediaScraper {
 
       this.setFolder(scraperFolder);
       this.setId(addon.attr("id"));
-      this.setName(addon.attr("name"));
+      this.setName("XBMC: " + addon.attr("name"));
       this.setVersion(addon.attr("version"));
       this.provider = addon.attr("provider-name");
 
@@ -165,18 +162,5 @@ public class XbmcScraper extends MediaScraper {
 
   public void setLanguage(String language) {
     this.language = language;
-  }
-
-  /**
-   * <p>
-   * Uses <code>ReflectionToStringBuilder</code> to generate a <code>toString</code> for the specified object.
-   * </p>
-   * 
-   * @return the String result
-   * @see ReflectionToStringBuilder#toString(Object)
-   */
-  @Override
-  public String toString() {
-    return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
   }
 }

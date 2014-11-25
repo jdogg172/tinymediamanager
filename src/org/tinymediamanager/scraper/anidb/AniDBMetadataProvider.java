@@ -27,6 +27,8 @@ import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import net.xeoh.plugins.base.annotations.PluginImplementation;
+
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -58,6 +60,7 @@ import org.tinymediamanager.thirdparty.RingBuffer;
  * 
  * @author Manuel Laggner
  */
+@PluginImplementation
 public class AniDBMetadataProvider implements ITvShowMetadataProvider, IMediaArtworkProvider {
   private static final Logger              LOGGER            = LoggerFactory.getLogger(AniDBMetadataProvider.class);
   private static final String              IMAGE_SERVER      = "http://img7.anidb.net/pics/anime/";

@@ -20,9 +20,12 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import net.xeoh.plugins.base.annotations.PluginImplementation;
+
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tinymediamanager.Globals;
 import org.tinymediamanager.core.Constants;
 import org.tinymediamanager.core.Utils;
 import org.tinymediamanager.core.movie.MovieModuleManager;
@@ -71,6 +74,7 @@ import com.omertron.themoviedbapi.model.Trailer;
  * 
  * @author Manuel Laggner
  */
+@PluginImplementation
 public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtworkProvider, IMediaTrailerProvider {
   private static final Logger           LOGGER            = LoggerFactory.getLogger(TmdbMetadataProvider.class);
   private static final RingBuffer<Long> connectionCounter = new RingBuffer<Long>(30);
@@ -92,6 +96,16 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
         tmdb = new TheMovieDbApi(apiKey);
         if (tmdb.getConfiguration() == null) {
           throw new Exception("Invalid TMDB API key");
+        }
+        // set our proxy
+        if (StringUtils.isNotEmpty(Globals.settings.getProxyPort()) && StringUtils.isNotEmpty(Globals.settings.getProxyHost())) {
+          try {
+            tmdb.setProxy(Globals.settings.getProxyHost(), Integer.valueOf(Globals.settings.getProxyPort()), Globals.settings.getProxyUsername(),
+                Globals.settings.getProxyPassword());
+          }
+          catch (Exception e) {
+            LOGGER.error("Failed to set proxy for FanartTvMetadataProvider - using NONE", e);
+          }
         }
       }
       catch (Exception e) {

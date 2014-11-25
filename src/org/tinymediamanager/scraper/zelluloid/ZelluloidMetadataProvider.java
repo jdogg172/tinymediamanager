@@ -25,6 +25,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import net.xeoh.plugins.base.annotations.PluginImplementation;
+
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -56,6 +58,7 @@ import org.tinymediamanager.scraper.util.Url;
  * 
  * @author Myron Boyle (myron0815@gmx.net)
  */
+@PluginImplementation
 public class ZelluloidMetadataProvider implements IMediaMetadataProvider, IMediaTrailerProvider {
   private static final Logger              LOGGER        = LoggerFactory.getLogger(ZelluloidMetadataProvider.class);
   private static final String              BASE_URL      = "http://www.zelluloid.de";

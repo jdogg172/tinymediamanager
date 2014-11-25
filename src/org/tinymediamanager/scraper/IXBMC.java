@@ -15,14 +15,11 @@
  */
 package org.tinymediamanager.scraper;
 
-import net.xeoh.plugins.base.Plugin;
-
-public interface IMediaProvider extends Plugin {
-  /**
-   * Gets a general information about this metadata provider
-   * 
-   * @return the provider info containing metadata of the provider
-   */
-  public MediaProviderInfo getProviderInfo();
-
+/**
+ * just a dedicated interface, for JSPF to find
+ * 
+ * @author Myron Boyle
+ *
+ */
+public interface IXBMC extends IMediaProvider {
 }

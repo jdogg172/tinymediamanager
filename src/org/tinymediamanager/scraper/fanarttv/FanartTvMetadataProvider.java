@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import net.xeoh.plugins.base.annotations.PluginImplementation;
+
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +47,7 @@ import com.omertron.fanarttvapi.model.FTSeries;
  * 
  * @author Myron Boyle, Manuel Laggner
  */
+@PluginImplementation
 public class FanartTvMetadataProvider implements IMediaArtworkProvider {
   private static final Logger      LOGGER       = LoggerFactory.getLogger(FanartTvMetadataProvider.class);
   private static MediaProviderInfo providerInfo = new MediaProviderInfo(Constants.FANARTTVID, "fanart.tv", "Scraper for fanarts");

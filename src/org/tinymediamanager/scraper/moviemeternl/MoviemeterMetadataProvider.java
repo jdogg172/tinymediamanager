@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import net.xeoh.plugins.base.annotations.PluginImplementation;
+
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +48,7 @@ import org.tinymediamanager.scraper.moviemeternl.model.FilmDetail.Genre;
  * 
  * @author Myron Boyle (myron0815@gmx.net)
  */
+@PluginImplementation
 public class MoviemeterMetadataProvider implements IMediaMetadataProvider {
   private static final Logger      LOGGER       = LoggerFactory.getLogger(MoviemeterMetadataProvider.class);
 

@@ -17,9 +17,9 @@ httpclient-4.3.2.jar
 httpcore-4.3.1.jar
 httpmime-4.3.2.jar
 imgscalr-lib-4.2.jar
-jackson-annotations-2.1.2.jar
-jackson-core-2.1.2.jar
-jackson-databind-2.1.2.jar
+jackson-annotations-2.4.3.jar
+jackson-core-2.4.3.jar
+jackson-databind-2.4.3.jar
 jcl-over-slf4j-1.7.5.jar
 jdom.jar
 jgoodies-common-1.8.0.jar

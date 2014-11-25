@@ -19,6 +19,8 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import net.xeoh.plugins.base.annotations.PluginImplementation;
+
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -40,6 +42,7 @@ import org.tinymediamanager.scraper.util.Url;
  * 
  * @author Myron Boyle
  */
+@PluginImplementation
 public class HDTrailersNet implements IMediaTrailerProvider {
   private static final Logger      LOGGER       = LoggerFactory.getLogger(HDTrailersNet.class);
   private static MediaProviderInfo providerInfo = new MediaProviderInfo(Constants.HDTRAILERSID, "hd-trailers.net",

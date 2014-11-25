@@ -3,6 +3,10 @@ package org.tinymediamanager.scraper;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.tinymediamanager.core.PluginManager;
+import org.tinymediamanager.scraper.xbmc.XbmcScraper;
+import org.tinymediamanager.scraper.xbmc.XbmcUtil;
+
 /**
  * Class representing a MediaScraper; (type, info, description...)<br>
  * replacement of MovieScrapers /TvShowScrapers ENUM
@@ -88,25 +92,32 @@ public class MediaScraper {
   public static List<MediaScraper> getMediaScraper(ScraperType type) {
     ArrayList<MediaScraper> scraper = new ArrayList<MediaScraper>();
 
-    // ArrayList<IMediaProvider> plugins = new ArrayList<IMediaProvider>();
-    // switch (type) {
-    // case MOVIE:
-    // plugins.addAll(PluginManager.getInstance().getMetadataPlugins());
-    // break;
-    // case TV_SHOW:
-    // plugins.addAll(PluginManager.getInstance().getTvShowPlugins());
-    // break;
-    // default:
-    // break;
-    // }
-    //
-    // // TODO: add XBMC scrapers
-    // for (IMediaProvider p : plugins) {
-    // MediaProviderInfo pi = p.getProviderInfo();
-    // MediaScraper ms = new MediaScraper(type, pi.getId(), pi.getName());
-    // ms.setSummary(pi.getDescription());
-    // scraper.add(ms);
-    // }
+    ArrayList<IMediaProvider> plugins = new ArrayList<IMediaProvider>();
+    switch (type) {
+      case MOVIE:
+        plugins.addAll(PluginManager.getInstance().getMetadataPlugins());
+        break;
+      case TV_SHOW:
+        plugins.addAll(PluginManager.getInstance().getTvShowPlugins());
+        break;
+      default:
+        break;
+    }
+    for (IMediaProvider p : plugins) {
+      MediaProviderInfo pi = p.getProviderInfo();
+      MediaScraper ms = new MediaScraper(type, pi.getId(), pi.getName());
+      ms.setSummary(pi.getDescription());
+      scraper.add(ms);
+    }
+
+    // XBMC scrapers
+    for (XbmcScraper sc : XbmcUtil.getAllScrapers()) {
+      MediaScraper ms = (MediaScraper) sc;
+      if (ms.getType() == type) {
+        scraper.add(ms);
+      }
+    }
+
     return scraper;
   }
 
