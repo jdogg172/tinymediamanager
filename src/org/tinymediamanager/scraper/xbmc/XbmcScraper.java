@@ -29,6 +29,7 @@ public class XbmcScraper extends MediaScraper {
    */
   public XbmcScraper(File scraperFolder) {
     super(null, null, null); // dummy constructor
+    setXbmcScraper(true);
 
     try {
       File info = new File(scraperFolder, "addon.xml");

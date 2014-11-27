@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import net.xeoh.plugins.base.annotations.Capabilities;
 import net.xeoh.plugins.base.annotations.PluginImplementation;
 
 import org.apache.commons.lang3.StringUtils;
@@ -86,6 +87,11 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
 
   public TmdbMetadataProvider() throws Exception {
     initAPI();
+  }
+
+  @Capabilities
+  public String[] caps() {
+    return new String[] { "author:myron", "id:themoviedb.org" };
   }
 
   // thread safe initialization of the API
@@ -287,14 +293,19 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
 
     int tmdbId = 0;
 
-    // tmdbId from searchResult
-    if (options.getResult() != null) {
-      tmdbId = Integer.parseInt(options.getResult().getId());
-    }
+    try {
+      // tmdbId from searchResult
+      if (options.getResult() != null) {
+        tmdbId = Integer.parseInt(options.getResult().getId());
+      }
 
-    // tmdbId from option
-    if (tmdbId == 0) {
-      tmdbId = options.getTmdbId();
+      // tmdbId from option
+      if (tmdbId == 0) {
+        tmdbId = options.getTmdbId();
+      }
+    }
+    catch (Exception e) {
+      // TODO: handle exception
     }
 
     // imdbId from option

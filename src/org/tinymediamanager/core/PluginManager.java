@@ -9,6 +9,7 @@ import net.xeoh.plugins.base.impl.PluginManagerFactory;
 import net.xeoh.plugins.base.options.GetPluginOption;
 import net.xeoh.plugins.base.options.addpluginsfrom.OptionReportAfter;
 import net.xeoh.plugins.base.options.getplugin.OptionCapabilities;
+import net.xeoh.plugins.base.util.JSPFProperties;
 import net.xeoh.plugins.base.util.PluginManagerUtil;
 import net.xeoh.plugins.base.util.uri.ClassURI;
 
@@ -21,24 +22,28 @@ import org.tinymediamanager.scraper.IMediaSubtitleProvider;
 import org.tinymediamanager.scraper.IMediaTrailerProvider;
 import org.tinymediamanager.scraper.ITvShowMetadataProvider;
 import org.tinymediamanager.scraper.MediaScraper;
+import org.tinymediamanager.scraper.xbmc.XbmcMetadataProvider;
+import org.tinymediamanager.scraper.xbmc.XbmcScraper;
 
 public class PluginManager {
-  private final static Logger                              LOGGER = LoggerFactory.getLogger(PluginManager.class);
-  private static final net.xeoh.plugins.base.PluginManager pm     = PluginManagerFactory.createPluginManager();
-  private static final PluginManagerUtil                   pmu    = new PluginManagerUtil(pm);
-  private static PluginManager                             instance;
+  private final static Logger                        LOGGER = LoggerFactory.getLogger(PluginManager.class);
+  private static net.xeoh.plugins.base.PluginManager pm;
+  private static PluginManagerUtil                   pmu;
+  private static PluginManager                       instance;
 
   public PluginManager() {
   }
 
   public synchronized static PluginManager getInstance() {
     if (instance == null) {
-      // JSPFProperties props = new JSPFProperties();
-      // props.setProperty(PluginManager.class, "cache.enabled", "true");
-      // props.setProperty(PluginManager.class, "cache.mode", "weak"); // optional
-      // props.setProperty(PluginManager.class, "cache.file", "jspf.cache");
+      JSPFProperties props = new JSPFProperties();
+      props.setProperty(PluginManager.class, "cache.enabled", "true");
+      props.setProperty(PluginManager.class, "cache.mode", "weak"); // optional
+      props.setProperty(PluginManager.class, "cache.file", "jspf.cache");
 
       instance = new PluginManager();
+      pm = PluginManagerFactory.createPluginManager(props);
+      pmu = new PluginManagerUtil(pm);
 
       long start = System.currentTimeMillis();
       LOGGER.debug("loading inline plugins...");
@@ -57,7 +62,7 @@ public class PluginManager {
       // pm.addPluginsFrom(ClassURI.PLUGIN(TraktTv.class));
       // pm.addPluginsFrom(ClassURI.PLUGIN(ZelluloidMetadataProvider.class));
       long end = System.currentTimeMillis();
-      LOGGER.info("Done loading plugins - took " + (end - start) + " - " + Utils.MSECtoHHMMSS(end - start));
+      LOGGER.debug("Done loading plugins - took " + (end - start) + " - " + Utils.MSECtoHHMMSS(end - start));
 
       // dedicated folder just for plugins
       LOGGER.debug("loading external plugins...");
@@ -76,14 +81,19 @@ public class PluginManager {
     switch (scraper.getType()) {
       case MOVIE:
         c = IMediaMetadataProvider.class;
+        break;
       case TV_SHOW:
         c = ITvShowMetadataProvider.class;
+        break;
       case ARTWORK:
         c = IMediaArtworkProvider.class;
+        break;
       case TRAILER:
         c = IMediaTrailerProvider.class;
+        break;
       case SUBTITLE:
         c = IMediaSubtitleProvider.class;
+        break;
       case ALBUM:
       case ARTIST:
       case LIBRARY:
@@ -104,7 +114,14 @@ public class PluginManager {
    */
   public Plugin getPlugin(MediaScraper scraper) {
     Class paramClass = ScraperToImplClass(scraper);
-    return pm.getPlugin(paramClass, new OptionCapabilities("id:" + scraper.getId()));
+    if (scraper.isXbmcScraper()) {
+      XbmcScraper xs = (XbmcScraper) scraper;
+      XbmcMetadataProvider mp = new XbmcMetadataProvider(xs);
+      return mp;
+    }
+    else {
+      return pm.getPlugin(paramClass, new OptionCapabilities("id:" + scraper.getId()));
+    }
   }
 
   /**
@@ -134,7 +151,7 @@ public class PluginManager {
   /**
    * All plugins implementing the IMediaMetadataProvider
    */
-  public List<IMediaMetadataProvider> getMetadataPlugins() {
+  public List<IMediaMetadataProvider> getMoviePlugins() {
     ArrayList<IMediaMetadataProvider> plugins = new ArrayList<IMediaMetadataProvider>();
     for (Plugin p : pmu.getPlugins(IMediaMetadataProvider.class)) {
       plugins.add((IMediaMetadataProvider) p);

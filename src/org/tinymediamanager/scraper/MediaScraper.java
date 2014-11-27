@@ -21,6 +21,7 @@ public class MediaScraper {
   private String      summary;
   private String      description;
   private ScraperType type;
+  private boolean     xbmcScraper = false;
 
   public MediaScraper(ScraperType type, String id, String name) {
     this.type = type;
@@ -81,6 +82,14 @@ public class MediaScraper {
     this.type = type;
   }
 
+  public boolean isXbmcScraper() {
+    return xbmcScraper;
+  }
+
+  public void setXbmcScraper(boolean xbmcScraper) {
+    this.xbmcScraper = xbmcScraper;
+  }
+
   /**
    * returns a MediaScraper from a given type - found via plugins<br>
    * use .toArray() for putting this in a ComboBox
@@ -95,7 +104,7 @@ public class MediaScraper {
     ArrayList<IMediaProvider> plugins = new ArrayList<IMediaProvider>();
     switch (type) {
       case MOVIE:
-        plugins.addAll(PluginManager.getInstance().getMetadataPlugins());
+        plugins.addAll(PluginManager.getInstance().getMoviePlugins());
         break;
       case TV_SHOW:
         plugins.addAll(PluginManager.getInstance().getTvShowPlugins());
@@ -112,6 +121,8 @@ public class MediaScraper {
       default:
         break;
     }
+    // plugins.remove(XbmcMetadataProvider.class); // remove the "base" xbmc scraper
+
     for (IMediaProvider p : plugins) {
       MediaProviderInfo pi = p.getProviderInfo();
       MediaScraper ms = new MediaScraper(type, pi.getId(), pi.getName());

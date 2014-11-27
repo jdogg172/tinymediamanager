@@ -22,7 +22,7 @@ public class Plugins {
 
     System.out.println("------------------");
     System.out.println("classes implementing metadata scraping:");
-    for (IMediaMetadataProvider p : pm.getMetadataPlugins()) {
+    for (IMediaMetadataProvider p : pm.getMoviePlugins()) {
       System.out.println("  " + p.getProviderInfo());
     }
 

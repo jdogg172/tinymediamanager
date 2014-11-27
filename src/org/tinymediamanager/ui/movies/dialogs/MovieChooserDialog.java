@@ -57,6 +57,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
 import org.tinymediamanager.core.MediaFileType;
+import org.tinymediamanager.core.PluginManager;
 import org.tinymediamanager.core.entities.MediaFile;
 import org.tinymediamanager.core.movie.MovieList;
 import org.tinymediamanager.core.movie.MovieModuleManager;
@@ -629,8 +630,10 @@ public class MovieChooserDialog extends TmmDialog implements ActionListener {
 
     @Override
     public void actionPerformed(ActionEvent e) {
-      MovieScrapers selectedScraper = (MovieScrapers) cbScraper.getSelectedItem();
-      metadataProvider = MovieList.getInstance().getMetadataProvider(selectedScraper);
+      MediaScraper selectedScraper = (MediaScraper) cbScraper.getSelectedItem();
+      PluginManager pm = PluginManager.getInstance();
+      metadataProvider = (IMediaMetadataProvider) pm.getPlugin(selectedScraper);
+      System.out.println(metadataProvider.getProviderInfo());
       searchMovie(textFieldSearchString.getText(), null);
     }
   }
