@@ -1,3 +1,21 @@
+Version 2.6.5
+=======================
++ enhanced TV show and movie renamer (http://goo.gl/8pbkFj)
+  IMPORTANT: REVIEW YOUR TV SHOW RENAMER SETTINGS!
+  
++ DVD ordering of episodes (http://goo.gl/YBD5qJ)
++ write thumb url into the NFO for multi episode files
++ added h265 logo
++ (experimental) added Rotten Tomates scraper
++ added downloading of custom image-urls in the image chooser
+x added some workarounds for failing TVDB searches
+x proper handling of the watched state in the NFO
+x catching some NFO parsing problems
+x improved parsing of imdb plot
+x fixed some minor issues with the command line version
+x fixed Mac OSX startup script
+x fixed some export template issues
+
 Version 2.6.4 
 =======================
 + changed Fanart.tv to v3 API (with clientKey)

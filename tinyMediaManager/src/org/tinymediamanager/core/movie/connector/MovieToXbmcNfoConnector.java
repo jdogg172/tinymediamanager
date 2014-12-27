@@ -326,19 +326,9 @@ public class MovieToXbmcNfoConnector {
 
     xbmc.tagline = movie.getTagline();
     xbmc.runtime = String.valueOf(movie.getRuntime());
-    if (StringUtils.isNotBlank(movie.getArtworkFilename(MediaFileType.POSTER))) {
-      xbmc.thumb = "";
-    }
-    else {
-      xbmc.thumb = movie.getPosterUrl();
-    }
+    xbmc.thumb = movie.getPosterUrl();
+    xbmc.fanart = movie.getFanartUrl();
 
-    if (StringUtils.isNotBlank(movie.getArtworkFilename(MediaFileType.FANART))) {
-      xbmc.fanart = "";
-    }
-    else {
-      xbmc.fanart = movie.getFanartUrl();
-    }
     xbmc.id = movie.getImdbId();
     xbmc.tmdbId = movie.getTmdbId();
 
@@ -356,6 +346,9 @@ public class MovieToXbmcNfoConnector {
     xbmc.watched = movie.isWatched();
     if (xbmc.watched) {
       xbmc.playcount = 1;
+    }
+    else {
+      xbmc.playcount = 0;
     }
 
     xbmc.languages = movie.getSpokenLanguages();
@@ -731,6 +724,8 @@ public class MovieToXbmcNfoConnector {
 
     // now trying to parse it via string
     String completeNFO = FileUtils.readFileToString(nfoFile, "UTF-8").trim().replaceFirst("^([\\W]+)<", "<");
+    completeNFO = completeNFO.replace("<movie>",
+        "<movie xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
     Reader in = new StringReader(completeNFO);
     return (MovieToXbmcNfoConnector) um.unmarshal(in);
   }
