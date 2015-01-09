@@ -191,9 +191,15 @@ public class TvShowRenamer {
     // create SeasonDir
     // String seasonName = "Season " + String.valueOf(ep.getSeason());
     String seasonName = generateSeasonDir(SETTINGS.getRenamerSeasonFoldername(), ep);
-    File seasonDir = new File(show.getPath(), seasonName);
-    if (!seasonDir.exists()) {
-      seasonDir.mkdir();
+    File seasonDir = null;
+    if (StringUtils.isNotBlank(seasonName)) {
+      seasonDir = new File(show.getPath(), seasonName);
+      if (!seasonDir.exists()) {
+        seasonDir.mkdir();
+      }
+    }
+    else {
+      seasonDir = new File(show.getPath());
     }
 
     // rename epFolder accordingly
@@ -432,7 +438,7 @@ public class TvShowRenamer {
     seasonDir = seasonDir.replace("$2", lz(episode.getSeason()));
 
     // only allow empty season dir if the season is in the filename
-    if (seasonDir.isEmpty() && (!SETTINGS.getRenamerFilename().contains("$1") && !SETTINGS.getRenamerFilename().contains("$2"))) {
+    if (StringUtils.isBlank(seasonDir) && !(SETTINGS.getRenamerFilename().contains("$1") || SETTINGS.getRenamerFilename().contains("$2"))) {
       seasonDir = "Season " + String.valueOf(episode.getSeason());
     }
     return seasonDir;
@@ -588,6 +594,9 @@ public class TvShowRenamer {
       newDestination = newDestination.replaceAll(" ", SETTINGS.getRenamerSpaceReplacement());
     }
 
+    // replace trailing dots and spaces
+    newDestination = newDestination.replaceAll("[ \\.]+$", "");
+
     return newDestination.trim();
   }
 
@@ -599,6 +608,17 @@ public class TvShowRenamer {
       replacingCleaned = replacement.replaceAll("([\"\\:<>|/?*])", "");
     }
     return destination.replace(token, replacingCleaned);
+  }
+
+  /**
+   * replaces all invalid/illegal characters for filenames with ""
+   * 
+   * @param source
+   *          string to clean
+   * @return cleaned string
+   */
+  public static String replaceInvalidCharacters(String source) {
+    return source.replaceAll("([\"\\\\:<>|/?*])", "");
   }
 
 }
