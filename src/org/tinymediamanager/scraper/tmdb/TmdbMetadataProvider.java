@@ -183,7 +183,6 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
         }
         catch (MovieDbException e) {
           LOGGER.warn("problem getting data vom tmdb: " + e.getMessage());
-
           // remove cached request
           clearTmdbCache();
         }
@@ -199,7 +198,6 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
         }
         catch (MovieDbException e) {
           LOGGER.warn("problem getting data vom tmdb: " + e.getMessage());
-
           // remove cached request
           clearTmdbCache();
         }
@@ -214,7 +212,6 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
         }
         catch (MovieDbException e) {
           LOGGER.warn("problem getting data vom tmdb: " + e.getMessage());
-
           // remove cached request
           clearTmdbCache();
         }
@@ -225,12 +222,12 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
       if (searchString.matches(".*\\s\\d{4}$") && (moviesFound == null || moviesFound.size() == 0)) {
         // nada found & last part seems to be date; strip off and try again
         searchString = searchString.replaceFirst("\\s\\d{4}$", "");
+        trackConnections();
         try {
           moviesFound = tmdb.searchMovie(searchString, year, query.get(MediaSearchOptions.SearchParam.LANGUAGE), false, 0).getResults();
         }
         catch (MovieDbException e) {
           LOGGER.warn("problem getting data vom tmdb: " + e.getMessage());
-
           // remove cached request
           clearTmdbCache();
         }
@@ -238,7 +235,9 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
       }
     }
 
-    LOGGER.info("found " + moviesFound.size() + " results");
+    if (moviesFound != null) {
+      LOGGER.info("found " + moviesFound.size() + " results");
+    }
 
     if (moviesFound == null || moviesFound.size() == 0) {
       return resultList;
@@ -256,7 +255,7 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
         // parse release date to year
         String releaseDate = movie.getReleaseDate();
         if (releaseDate != null && releaseDate.length() > 3) {
-          sr.setYear(movie.getReleaseDate().substring(0, 4));
+          sr.setYear(releaseDate.substring(0, 4));
         }
 
         // populate extra args
@@ -283,9 +282,9 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
   public MediaMetadata getMetadata(MediaScrapeOptions options) throws Exception {
     LOGGER.debug("getMetadata() " + options.toString());
     // check if there is a md in the result
-    if (options.getResult() != null && options.getResult().getMetadata() != null) {
+    if (options.getResult() != null && options.getResult().getMediaMetadata() != null) {
       LOGGER.debug("TMDB: getMetadata from cache: " + options.getResult());
-      return options.getResult().getMetadata();
+      return options.getResult().getMediaMetadata();
     }
 
     // get ids to scrape
@@ -795,8 +794,18 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
       trackConnections();
       info = tmdb.getCollectionInfo(tmdbId, options.getLanguage().name());
       if (StringUtils.isBlank(info.getOverview())) {
+        String title = "";
+        // store the title in the desired language if availbable
+        if (StringUtils.isNotBlank(info.getName())) {
+          title = info.getName();
+        }
         // fallback to en
         info = tmdb.getCollectionInfo(tmdbId, "en");
+
+        // restore title
+        if (StringUtils.isNotBlank(title)) {
+          info.setName(title);
+        }
       }
     }
     String baseUrl = tmdb.getConfiguration().getBaseUrl();

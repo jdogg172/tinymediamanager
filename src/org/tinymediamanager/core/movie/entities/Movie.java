@@ -310,7 +310,17 @@ public class Movie extends MediaEntity {
    * 
    * @return the trailers
    */
+  @Deprecated
   public List<MediaTrailer> getTrailers() {
+    return this.trailer;
+  }
+
+  /**
+   * Gets the trailers
+   * 
+   * @return the trailers
+   */
+  public List<MediaTrailer> getTrailer() {
     return this.trailer;
   }
 
@@ -1586,6 +1596,16 @@ public class Movie extends MediaEntity {
     }
 
     return "";
+  }
+
+  public int getMediaInfoVideoBitrate() {
+    List<MediaFile> videos = getMediaFiles(MediaFileType.VIDEO);
+    if (videos.size() > 0) {
+      MediaFile mediaFile = videos.get(0);
+      return mediaFile.getOverallBitRate();
+    }
+
+    return 0;
   }
 
   /**

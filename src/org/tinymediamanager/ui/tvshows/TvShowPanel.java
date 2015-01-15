@@ -75,6 +75,8 @@ import org.tinymediamanager.ui.components.ZebraJTree;
 import org.tinymediamanager.ui.tvshows.TvShowExtendedMatcher.SearchOptions;
 import org.tinymediamanager.ui.tvshows.actions.TvShowBulkEditAction;
 import org.tinymediamanager.ui.tvshows.actions.TvShowChangeSeasonPosterAction;
+import org.tinymediamanager.ui.tvshows.actions.TvShowChangeToAiredOrderAction;
+import org.tinymediamanager.ui.tvshows.actions.TvShowChangeToDvdOrderAction;
 import org.tinymediamanager.ui.tvshows.actions.TvShowClearImageCacheAction;
 import org.tinymediamanager.ui.tvshows.actions.TvShowDeleteAction;
 import org.tinymediamanager.ui.tvshows.actions.TvShowEditAction;
@@ -109,6 +111,7 @@ import com.jtattoo.plaf.JTattooUtilities;
  */
 public class TvShowPanel extends JPanel {
   private static final long           serialVersionUID              = -1923811385292825136L;
+  /** @wbp.nls.resourceBundle messages */
   private static final ResourceBundle BUNDLE                        = ResourceBundle.getBundle("messages", new UTF8Control()); //$NON-NLS-1$
 
   TvShowSelectionModel                tvShowSelectionModel;
@@ -148,6 +151,8 @@ public class TvShowPanel extends JPanel {
   private final Action                actionExport                  = new TvShowExportAction();
   private final Action                actionSyncTrakt               = new TvShowSyncTraktTvAction();
   private final Action                actionSyncWatchedTrakt        = new TvShowSyncWatchedTraktTvAction();
+  private final Action                actionChangeToDvdOrder        = new TvShowChangeToDvdOrderAction();
+  private final Action                actionChangeToAiredOrder      = new TvShowChangeToAiredOrderAction();
 
   private int                         width                         = 0;
   private JTextField                  textField;
@@ -235,7 +240,7 @@ public class TvShowPanel extends JPanel {
     buttonUpdateDatasource.setHorizontalAlignment(JButton.LEFT);
     // buttonScrape.setMargin(new Insets(2, 2, 2, 24));
     buttonUpdateDatasource.setSplitWidth(18);
-    buttonUpdateDatasource.setToolTipText(BUNDLE.getString("update.datasource"));  //$NON-NLS-1$
+    buttonUpdateDatasource.setToolTipText(BUNDLE.getString("update.datasource")); //$NON-NLS-1$
     buttonUpdateDatasource.addSplitButtonActionListener(new SplitButtonActionListener() {
       public void buttonClicked(ActionEvent e) {
         actionUpdateDatasources.actionPerformed(e);
@@ -532,6 +537,8 @@ public class TvShowPanel extends JPanel {
     menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_W, ActionEvent.CTRL_MASK + ActionEvent.SHIFT_MASK));
     menuItem = menuEdit.add(actionChangeSeasonPoster2);
     menuItem.setMnemonic(KeyEvent.VK_S);
+    menuEdit.add(actionChangeToDvdOrder);
+    menuEdit.add(actionChangeToAiredOrder);
 
     menu.add(menuEdit);
     menu.add(actionRewriteTvShowNfo);
@@ -576,6 +583,8 @@ public class TvShowPanel extends JPanel {
     popupMenu.add(actionChangeSeasonPoster2);
     popupMenu.add(actionBatchEdit);
     popupMenu.add(actionSetWatchedFlag);
+    popupMenu.add(actionChangeToDvdOrder);
+    popupMenu.add(actionChangeToAiredOrder);
     popupMenu.add(actionRewriteTvShowNfo);
     popupMenu.add(actionRewriteTvShowEpisodeNfo);
     // popupMenu.add(actionBatchEdit);
