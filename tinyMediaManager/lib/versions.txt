@@ -21,13 +21,14 @@ jackson-annotations-2.1.2.jar
 jackson-core-2.1.2.jar
 jackson-databind-2.1.2.jar
 jcl-over-slf4j-1.7.5.jar
+jtidy-r938.jar
 jdom.jar
 jgoodies-common-1.8.0.jar
 jmte-unbundled-3.1.jar
 jna-4.1.0.jar
 jsoup-1.7.1.jar
 JSplitButton_1.2.jar
-JTattoo-1.6.10.jar - min 
+JTattoo-1.6.11.jar - min 
 LigthBox.jar
 log4j-over-slf4j.jar
 logback-classic-1.0.11.jar

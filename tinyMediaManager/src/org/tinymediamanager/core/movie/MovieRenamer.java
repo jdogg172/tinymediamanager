@@ -88,10 +88,10 @@ public class MovieRenamer {
         }
         // shortname = shortname.replaceAll("\\p{Punct}", "").trim(); // NEVER EVER!!!
 
-        for (String l : langArray) {
-          if (shortname.equalsIgnoreCase(l) || shortname.matches("(?i).*[ _.-]+" + l + "$")) {
-            lang = Utils.getDisplayLanguage(l);
-            LOGGER.debug("found language '" + l + "' in subtitle; displaying it as '" + lang + "'");
+        for (String s : langArray) {
+          if (shortname.equalsIgnoreCase(s) || shortname.matches("(?i).*[ _.-]+" + s + "$")) {
+            lang = Utils.getIso3LanguageFromLocalizedString(s);
+            LOGGER.debug("found language '" + s + "' in subtitle; displaying it as '" + lang + "'");
             break;
           }
         }
@@ -192,7 +192,8 @@ public class MovieRenamer {
       File srcDir = new File(oldPathname);
       File destDir = new File(newPathname);
       // move directory if needed
-      if (!srcDir.equals(destDir)) {
+      // if (!srcDir.equals(destDir)) {
+      if (!srcDir.getAbsolutePath().equals(destDir.getAbsolutePath())) {
         if (!movie.isMultiMovieDir()) {
           boolean ok = false;
           try {

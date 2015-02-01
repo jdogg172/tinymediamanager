@@ -35,6 +35,7 @@ import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.core.movie.MovieScraperMetadataConfig;
 import org.tinymediamanager.core.movie.MovieSearchAndScrapeOptions;
 import org.tinymediamanager.core.movie.entities.Movie;
+import org.tinymediamanager.core.movie.entities.MovieTrailer;
 import org.tinymediamanager.core.threading.TmmTask;
 import org.tinymediamanager.core.threading.TmmTaskManager;
 import org.tinymediamanager.core.threading.TmmThreadPool;
@@ -203,7 +204,8 @@ public class MovieScrapeTask extends TmmThreadPool {
       }
       catch (Exception e) {
         LOGGER.error("Thread crashed", e);
-        MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, "MovieScraper", "message.scrape.threadcrashed"));
+        MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, "MovieScraper", "message.scrape.threadcrashed", new String[] { ":",
+            e.getLocalizedMessage() }));
       }
     }
 
@@ -269,13 +271,13 @@ public class MovieScrapeTask extends TmmThreadPool {
       return artwork;
     }
 
-    private List<MediaTrailer> getTrailers(Movie movie, MediaMetadata metadata, List<IMediaTrailerProvider> trailerProviders) {
-      List<MediaTrailer> trailers = new ArrayList<MediaTrailer>();
+    private List<MovieTrailer> getTrailers(Movie movie, MediaMetadata metadata, List<IMediaTrailerProvider> trailerProviders) {
+      List<MovieTrailer> trailers = new ArrayList<MovieTrailer>();
 
       // add local trailers!
       for (MediaFile mf : movie.getMediaFiles(MediaFileType.TRAILER)) {
         LOGGER.debug("adding local trailer " + mf.getFilename());
-        MediaTrailer mt = new MediaTrailer();
+        MovieTrailer mt = new MovieTrailer();
         mt.setName(mf.getFilename());
         mt.setProvider("downloaded");
         mt.setQuality(mf.getVideoFormat());
@@ -296,7 +298,10 @@ public class MovieScrapeTask extends TmmThreadPool {
       for (IMediaTrailerProvider trailerProvider : trailerProviders) {
         try {
           List<MediaTrailer> foundTrailers = trailerProvider.getTrailers(options);
-          trailers.addAll(foundTrailers);
+          for (MediaTrailer mediaTrailer : foundTrailers) {
+            MovieTrailer movieTrailer = new MovieTrailer(mediaTrailer);
+            trailers.add(movieTrailer);
+          }
         }
         catch (Exception e) {
           LOGGER.error("getTrailers", e);

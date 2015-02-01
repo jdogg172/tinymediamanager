@@ -16,32 +16,35 @@
 package org.tinymediamanager;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
 import javax.persistence.EntityManager;
-import javax.persistence.EntityManagerFactory;
-import javax.persistence.Persistence;
-import javax.persistence.PersistenceException;
 import javax.swing.JOptionPane;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.SystemUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.core.Constants;
 import org.tinymediamanager.core.MediaFileType;
+import org.tinymediamanager.core.Utils;
 import org.tinymediamanager.core.entities.MediaFile;
+import org.tinymediamanager.core.entities.MediaFileAudioStream;
+import org.tinymediamanager.core.entities.MediaFileSubtitle;
 import org.tinymediamanager.core.movie.MovieList;
 import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.core.movie.entities.Movie;
-import org.tinymediamanager.core.movie.entities.MovieSet;
+import org.tinymediamanager.core.movie.entities.MovieTrailer;
 import org.tinymediamanager.core.tvshow.TvShowList;
 import org.tinymediamanager.core.tvshow.TvShowModuleManager;
 import org.tinymediamanager.core.tvshow.entities.TvShow;
 import org.tinymediamanager.core.tvshow.entities.TvShowEpisode;
-import org.tinymediamanager.scraper.MediaTrailer;
+
+import com.sun.jna.Platform;
 
 /**
  * The class UpdateTasks. To perform needed update tasks
@@ -121,7 +124,7 @@ public class UpgradeTasks {
       EntityManager entityManager = MovieModuleManager.getInstance().getEntityManager();
       entityManager.getTransaction().begin();
       for (Movie movie : movieList.getMovies()) {
-        for (MediaTrailer trailer : movie.getTrailers()) {
+        for (MovieTrailer trailer : movie.getTrailers()) {
           // 720p (mp4)
           String quality = trailer.getQuality().split(" ")[0];
           trailer.setQuality(quality);
@@ -236,6 +239,66 @@ public class UpgradeTasks {
       entityManager.getTransaction().commit();
     }
 
+    if (compareVersion(v, "2.6.6") < 0) {
+      LOGGER.info("Performing upgrade tasks to version 2.6.6");
+      if (SystemUtils.IS_OS_LINUX) {
+        TmmOsUtils.createDesktopFileForLinux(new File(TmmOsUtils.DESKTOP_FILE));
+      }
+
+      // upgrade ALL String languages to ISO3
+      EntityManager entityManager = MovieModuleManager.getInstance().getEntityManager();
+      entityManager.getTransaction().begin();
+      for (Movie movie : movieList.getMovies()) {
+        for (MediaFile mf : movie.getMediaFiles()) {
+          for (MediaFileAudioStream mfa : mf.getAudioStreams()) {
+            if (!StringUtils.isEmpty(mfa.getLanguage())) {
+              mfa.setLanguage(Utils.getIso3LanguageFromLocalizedString(mfa.getLanguage()));
+            }
+          }
+          for (MediaFileSubtitle mfs : mf.getSubtitles()) {
+            if (!StringUtils.isEmpty(mfs.getLanguage())) {
+              mfs.setLanguage(Utils.getIso3LanguageFromLocalizedString(mfs.getLanguage()));
+            }
+          }
+        }
+      }
+      entityManager.getTransaction().commit();
+
+      // TV Shows
+      entityManager.getTransaction().begin();
+      for (TvShow show : tvShowList.getTvShows()) {
+        // show MFs
+        for (MediaFile mf : show.getMediaFiles()) {
+          for (MediaFileAudioStream mfa : mf.getAudioStreams()) {
+            if (!StringUtils.isEmpty(mfa.getLanguage())) {
+              mfa.setLanguage(Utils.getIso3LanguageFromLocalizedString(mfa.getLanguage()));
+            }
+          }
+          for (MediaFileSubtitle mfs : mf.getSubtitles()) {
+            if (!StringUtils.isEmpty(mfs.getLanguage())) {
+              mfs.setLanguage(Utils.getIso3LanguageFromLocalizedString(mfs.getLanguage()));
+            }
+          }
+        }
+        // Episode MFs
+        for (TvShowEpisode episode : show.getEpisodes()) {
+          for (MediaFile mf : episode.getMediaFiles()) {
+            for (MediaFileAudioStream mfa : mf.getAudioStreams()) {
+              if (!StringUtils.isEmpty(mfa.getLanguage())) {
+                mfa.setLanguage(Utils.getIso3LanguageFromLocalizedString(mfa.getLanguage()));
+              }
+            }
+            for (MediaFileSubtitle mfs : mf.getSubtitles()) {
+              if (!StringUtils.isEmpty(mfs.getLanguage())) {
+                mfs.setLanguage(Utils.getIso3LanguageFromLocalizedString(mfs.getLanguage()));
+              }
+            }
+          }
+        }
+      }
+      entityManager.getTransaction().commit();
+    }
+
   }
 
   /**
@@ -267,88 +330,83 @@ public class UpgradeTasks {
   }
 
   /**
-   * Convert the database from the old combined format (tmm.odb) to the module specific parts
+   * rename downloaded files (getdown.jar, ...)
    */
-  public static void convertDatabase() {
-    File oldDb = new File("tmm.odb");
-    if (oldDb.exists()) {
-      try {
-        // convert old Database into the new one
-        // a) start the database connections
-        EntityManager oldEntityManager = startUpOldDatabase();
-        MovieModuleManager.getInstance().startUp();
-        TvShowModuleManager.getInstance().startUp();
-
-        // b) load entities
-        MovieList.getInstance().loadMoviesFromDatabase(oldEntityManager);
-        TvShowList.getInstance().loadTvShowsFromDatabase(oldEntityManager);
-
-        // c) persist entities to the new databases
-        EntityManager entityManager = MovieModuleManager.getInstance().getEntityManager();
-        entityManager.getTransaction().begin();
-        for (Movie movie : MovieList.getInstance().getMovies()) {
-          oldEntityManager.detach(movie);
-          movie.saveToDb();
+  public static void renameDownloadedFiles() {
+    // self updater
+    File file = new File("getdown-new.jar");
+    if (file.exists() && file.length() > 100000) {
+      File cur = new File("getdown.jar");
+      if (file.length() != cur.length() || !cur.exists()) {
+        try {
+          FileUtils.copyFile(file, cur);
         }
-        for (MovieSet movieSet : MovieList.getInstance().getMovieSetList()) {
-          oldEntityManager.detach(movieSet);
-          movieSet.saveToDb();
+        catch (IOException e) {
+          LOGGER.error("Could not update the updater!");
         }
-        entityManager.getTransaction().commit();
+      }
+    }
 
-        entityManager = TvShowModuleManager.getInstance().getEntityManager();
-
-        for (TvShow show : TvShowList.getInstance().getTvShows()) {
-          oldEntityManager.detach(show);
-          entityManager.getTransaction().begin();
-          show.saveToDb();
-          entityManager.getTransaction().commit();
+    // exe launchers
+    if (Platform.isWindows()) {
+      file = new File("tinyMediaManager.new");
+      if (file.exists() && file.length() > 10000 && file.length() < 50000) {
+        File cur = new File("tinyMediaManager.exe");
+        try {
+          FileUtils.copyFile(file, cur);
         }
-
-        // close database connections
-        MovieModuleManager.getInstance().shutDown();
-        TvShowModuleManager.getInstance().shutDown();
-
-        closeOldDatabase(oldEntityManager);
+        catch (IOException e) {
+          LOGGER.error("Could not update tmm!");
+        }
       }
-      catch (Exception e) {
-        LOGGER.error("could not convert database: ", e);
+      file = new File("tinyMediaManagerUpd.new");
+      if (file.exists() && file.length() > 10000 && file.length() < 50000) {
+        File cur = new File("tinyMediaManagerUpd.exe");
+        try {
+          FileUtils.copyFile(file, cur);
+        }
+        catch (IOException e) {
+          LOGGER.error("Could not update the updater!");
+        }
       }
-
-      // delete the old database
-      oldDb.deleteOnExit();
-    }
-  }
-
-  private static EntityManager startUpOldDatabase() {
-    if (System.getProperty("tmmenhancer") != null) {
-      com.objectdb.Enhancer.enhance("org.tinymediamanager.core.entities.*");
-      com.objectdb.Enhancer.enhance("org.tinymediamanager.core.movie.entities.*");
-      com.objectdb.Enhancer.enhance("org.tinymediamanager.core.tvshow.entities.*");
-    }
-    // get a connection to the database
-    EntityManagerFactory entityManagerFactory = Persistence.createEntityManagerFactory("tmm.odb");
-    EntityManager entityManager;
-    try {
-      entityManager = entityManagerFactory.createEntityManager();
-    }
-    catch (PersistenceException e) {
-      if (e.getCause().getMessage().contains("does not match db file")) {
-        // happens when there's a recovery file which does not match (cannot be recovered) - just delete and try again
-        FileUtils.deleteQuietly(new File("tmm.odb$"));
-        entityManager = entityManagerFactory.createEntityManager();
-      }
-      else {
-        // unknown
-        throw (e);
+      file = new File("tinyMediaManagerCMD.new");
+      if (file.exists() && file.length() > 10000 && file.length() < 50000) {
+        File cur = new File("tinyMediaManagerCMD.exe");
+        try {
+          FileUtils.copyFile(file, cur);
+        }
+        catch (IOException e) {
+          LOGGER.error("Could not update CMD TMM!");
+        }
       }
     }
-    return entityManager;
-  }
 
-  private static void closeOldDatabase(EntityManager em) {
-    EntityManagerFactory emf = em.getEntityManagerFactory();
-    em.close();
-    emf.close();
+    // OSX launcher
+    if (Platform.isMac()) {
+      file = new File("JavaApplicationStub.new");
+      if (file.exists() && file.length() > 0) {
+        File cur = new File("../../MacOS/JavaApplicationStub");
+        try {
+          FileUtils.copyFile(file, cur);
+        }
+        catch (IOException e) {
+          LOGGER.error("Could not update JavaApplicationStub");
+        }
+      }
+    }
+
+    // OSX Info.plist
+    if (Platform.isMac()) {
+      file = new File("Info.plist");
+      if (file.exists() && file.length() > 0) {
+        File cur = new File("../../Info.plist");
+        try {
+          FileUtils.copyFile(file, cur);
+        }
+        catch (IOException e) {
+          LOGGER.error("Could not update JavaApplicationStub");
+        }
+      }
+    }
   }
 }

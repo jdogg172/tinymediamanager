@@ -79,7 +79,8 @@ public class TvShowRenamer {
       File srcDir = new File(oldPathname);
       File destDir = new File(newPathname);
       // move directory if needed
-      if (!srcDir.equals(destDir)) {
+      // if (!srcDir.equals(destDir)) {
+      if (!srcDir.getAbsolutePath().equals(destDir.getAbsolutePath())) {
         try {
           // FileUtils.moveDirectory(srcDir, destDir);
           boolean ok = Utils.moveDirectorySafe(srcDir, destDir);
@@ -221,7 +222,8 @@ public class TvShowRenamer {
         File newDisc = new File(newEpFolder + File.separator + disc.getName()); // old disc name
 
         try {
-          if (!epFolder.equals(newEpFolder)) {
+          // if (!epFolder.equals(newEpFolder)) {
+          if (!epFolder.getAbsolutePath().equals(newEpFolder.getAbsolutePath())) {
             boolean ok = false;
             try {
               ok = Utils.moveDirectorySafe(epFolder, newEpFolder);
@@ -270,7 +272,8 @@ public class TvShowRenamer {
         File newFile = new File(seasonDir, filename);
 
         try {
-          if (!mf.getFile().equals(newFile)) {
+          // if (!mf.getFile().equals(newFile)) {
+          if (!mf.getFile().getAbsolutePath().equals(newFile.getAbsolutePath())) {
             File oldMfFile = mf.getFile();
             boolean ok = false;
             try {
@@ -434,8 +437,12 @@ public class TvShowRenamer {
   public static String generateSeasonDir(String template, TvShowEpisode episode) {
     String seasonDir = template;
 
+    // replace $1 and $2 as the only episode specific tokens
     seasonDir = seasonDir.replace("$1", String.valueOf(episode.getSeason()));
     seasonDir = seasonDir.replace("$2", lz(episode.getSeason()));
+
+    // replace all other tokens
+    seasonDir = createDestination(seasonDir, episode.getTvShow(), new ArrayList<TvShowEpisode>());
 
     // only allow empty season dir if the season is in the filename
     if (StringUtils.isBlank(seasonDir) && !(SETTINGS.getRenamerFilename().contains("$1") || SETTINGS.getRenamerFilename().contains("$2"))) {
@@ -468,8 +475,8 @@ public class TvShowRenamer {
    *          the template
    * @param show
    *          the TV show
-   * @param spieode
-   *          the TV show episode; nullable for TV show root foldername
+   * @param episodes
+   *          the TV show episodes; nullable for TV show root foldername
    * @return the string
    */
   public static String createDestination(String template, TvShow show, List<TvShowEpisode> episodes) {
@@ -482,48 +489,56 @@ public class TvShowRenamer {
     }
 
     // parse out episode depended tokens - for multi EP naming
-    Matcher matcher = multiEpisodeTokenPattern.matcher(template);
-    String episodeTokens = "";
+    if (!episodes.isEmpty()) {
+      Matcher matcher = multiEpisodeTokenPattern.matcher(template);
+      String episodeTokens = "";
 
-    if (matcher.find()) {
-      episodeTokens = matcher.group(0);
+      if (matcher.find()) {
+        episodeTokens = matcher.group(0);
+      }
+
+      String combinedEpisodeParts = "";
+      for (TvShowEpisode episode : episodes) {
+        String episodePart = episodeTokens;
+
+        // remember first episode for media file tokens
+        if (firstEp == null) {
+          firstEp = episode;
+        }
+
+        // Season w/o leading zeros ($1)
+        if (episodePart.contains("$1")) {
+          episodePart = replaceToken(episodePart, "$1", String.valueOf(episode.getSeason()));
+        }
+
+        // Season leading zeros ($2)
+        if (episodePart.contains("$2")) {
+          episodePart = replaceToken(episodePart, "$2", lz(episode.getSeason()));
+        }
+
+        // episode number
+        if (episodePart.contains("$E")) {
+          episodePart = replaceToken(episodePart, "$E", lz(episode.getEpisode()));
+        }
+
+        // episode title
+        if (episodePart.contains("$T")) {
+          episodePart = replaceToken(episodePart, "$T", episode.getTitle());
+        }
+
+        combinedEpisodeParts += episodePart + " ";
+      }
+
+      // and now fill in the (multiple) episode parts
+      if (StringUtils.isNotBlank(episodeTokens)) {
+        newDestination = newDestination.replace(episodeTokens, combinedEpisodeParts);
+      }
     }
-
-    String combinedEpisodeParts = "";
-    for (TvShowEpisode episode : episodes) {
-      String episodePart = episodeTokens;
-
-      // remember first episode for media file tokens
-      if (firstEp == null) {
-        firstEp = episode;
-      }
-
-      // Season w/o leading zeros ($1)
-      if (episodePart.contains("$1")) {
-        episodePart = replaceToken(episodePart, "$1", String.valueOf(episode.getSeason()));
-      }
-
-      // Season leading zeros ($2)
-      if (episodePart.contains("$2")) {
-        episodePart = replaceToken(episodePart, "$2", lz(episode.getSeason()));
-      }
-
-      // episode number
-      if (episodePart.contains("$E")) {
-        episodePart = replaceToken(episodePart, "$E", lz(episode.getEpisode()));
-      }
-
-      // episode title
-      if (episodePart.contains("$T")) {
-        episodePart = replaceToken(episodePart, "$T", episode.getTitle());
-      }
-
-      combinedEpisodeParts += episodePart + " ";
-    }
-
-    // and now fill in the (multiple) episode parts
-    if (StringUtils.isNotBlank(episodeTokens)) {
-      newDestination = newDestination.replace(episodeTokens, combinedEpisodeParts);
+    else {
+      // we're in either TV show folder or season folder generation;
+      // strip out episode tokens
+      newDestination = newDestination.replace("$E", "");
+      newDestination = newDestination.replace("$T", "");
     }
 
     // replace token year ($Y)

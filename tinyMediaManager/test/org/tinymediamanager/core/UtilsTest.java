@@ -2,9 +2,9 @@ package org.tinymediamanager.core;
 
 import java.io.File;
 import java.util.Enumeration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -29,14 +29,6 @@ public class UtilsTest {
     Assert.assertEquals("The Dark Knight", Utils.removeSortableName("Dark Knight, tHE"));
     Assert.assertEquals("A hard days night", Utils.removeSortableName("hard days night, a"));
     Assert.assertEquals("Die Hard", Utils.removeSortableName("Die Hard"));
-  }
-
-  @Test
-  public void testLoc() {
-    Assert.assertEquals("German", Utils.getDisplayLanguage("deu"));
-    Assert.assertEquals("German", Utils.getDisplayLanguage("AUT"));
-    Assert.assertEquals("German", Utils.getDisplayLanguage("GER"));
-    Assert.assertEquals("German", Utils.getDisplayLanguage("ger"));
   }
 
   @Test
@@ -80,8 +72,14 @@ public class UtilsTest {
 
   @Test
   public void locale() {
-    Set<String> langArray = Utils.KEY_TO_LOCALE_MAP.keySet();
-    System.out.println(langArray);
+    for (String s : Locale.getISOLanguages()) {
+      Locale l = new Locale(s);
+      System.out.println(l.getISO3Language());
+    }
+    System.out.println();
+    for (String s : Utils.KEY_TO_LOCALE_MAP.keySet()) {
+      System.out.println(s + " - " + Utils.KEY_TO_LOCALE_MAP.get(s));
+    }
   }
 
   @Test
