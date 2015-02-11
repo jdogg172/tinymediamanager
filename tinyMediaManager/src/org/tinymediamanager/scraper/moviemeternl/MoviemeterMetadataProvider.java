@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -78,9 +78,9 @@ public class MoviemeterMetadataProvider implements IMediaMetadataProvider {
   public MediaMetadata getMetadata(MediaScrapeOptions options) throws Exception {
     LOGGER.debug("getMetadata() " + options.toString());
     // check if there is a md in the result
-    if (options.getResult() != null && options.getResult().getMetadata() != null) {
+    if (options.getResult() != null && options.getResult().getMediaMetadata() != null) {
       LOGGER.debug("MovieMeter: getMetadata from cache: " + options.getResult());
-      return options.getResult().getMetadata();
+      return options.getResult().getMediaMetadata();
     }
 
     // get ids to scrape
@@ -90,7 +90,7 @@ public class MoviemeterMetadataProvider implements IMediaMetadataProvider {
 
     // mmId from searchResult
     if (options.getResult() != null) {
-      mmId = Integer.parseInt(options.getResult().getId());
+      mmId = Integer.parseInt(options.getResult().getId());// Constants.MOVIEMETERID));
     }
 
     // imdbid

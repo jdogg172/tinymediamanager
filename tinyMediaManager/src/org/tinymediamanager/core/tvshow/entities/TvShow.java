@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -92,6 +92,7 @@ public class TvShow extends MediaEntity {
   private String                      status             = "";
   private String                      studio             = "";
   private boolean                     watched            = false;
+  private Date                        lastWatched        = null;
   private String                      sortTitle          = "";
 
   private List<String>                genres             = new ArrayList<String>(1);
@@ -1594,6 +1595,14 @@ public class TvShow extends MediaEntity {
     boolean oldValue = this.watched;
     this.watched = newValue;
     firePropertyChange(WATCHED, oldValue, newValue);
+  }
+
+  public Date getLastWatched() {
+    return lastWatched;
+  }
+
+  public void setLastWatched(Date lastWatched) {
+    this.lastWatched = lastWatched;
   }
 
   /**
