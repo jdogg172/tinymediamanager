@@ -10,7 +10,7 @@ import org.tinymediamanager.scraper.trakttv.TraktTv;
 
 public class TraktTvTest {
 
-  private static final TraktTv t = new TraktTv();
+  private static final TraktTv t = TraktTv.getInstance();
 
   @BeforeClass
   public static void setUpBeforeClass() throws Exception {
@@ -48,7 +48,7 @@ public class TraktTvTest {
 
   @Test
   public void syncTraktTvShowWatched() {
-    // t.syncTraktTvShowWatched();
+    t.syncTraktTvShowWatched();
   }
 
   // @Test
@@ -68,7 +68,7 @@ public class TraktTvTest {
 
   @Test
   public void clearTvShows() {
-    // t.clearTraktTvShowCollection();
+    t.clearTraktTvShows();
   }
 
   @Test
