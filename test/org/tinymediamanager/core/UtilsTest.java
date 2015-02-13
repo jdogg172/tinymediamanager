@@ -2,14 +2,29 @@ package org.tinymediamanager.core;
 
 import java.io.File;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 
 import org.junit.Assert;
 import org.junit.Test;
 
 public class UtilsTest {
+
+  @Test
+  public void map() {
+    HashMap<String, Object> ids = new HashMap<String, Object>(0);
+    ids.put("STR1", "str1");
+    ids.put("STR2", "1000");
+    ids.put("INT1", Integer.valueOf("1000"));
+    ids.put("DUPE", "2000");
+    ids.put("DUPE", Integer.valueOf("1000").intValue());
+    for (String s : ids.keySet()) {
+      Object o = ids.get(s);
+      System.out.println(s + "  " + o + "  " + (o instanceof String ? "String" : "") + (o instanceof Integer ? "Integer" : ""));
+    }
+  }
 
   @Test
   public void getSortableName() {
@@ -42,14 +57,6 @@ public class UtilsTest {
     Assert.assertEquals("L'Âge de Glace", Utils.removeSortableName("Âge de Glace, L'"));
     Assert.assertEquals("L`Âge de Glace", Utils.removeSortableName("Âge de Glace, L`"));
     Assert.assertEquals("L´Âge de Glace", Utils.removeSortableName("Âge de Glace, L´"));
-  }
-
-  @Test
-  public void testLoc() {
-    Assert.assertEquals("German", Utils.getDisplayLanguage("deu"));
-    Assert.assertEquals("German", Utils.getDisplayLanguage("AUT"));
-    Assert.assertEquals("German", Utils.getDisplayLanguage("GER"));
-    Assert.assertEquals("German", Utils.getDisplayLanguage("ger"));
   }
 
   @Test
@@ -93,8 +100,14 @@ public class UtilsTest {
 
   @Test
   public void locale() {
-    Set<String> langArray = Utils.KEY_TO_LOCALE_MAP.keySet();
-    System.out.println(langArray);
+    for (String s : Locale.getISOLanguages()) {
+      Locale l = new Locale(s);
+      System.out.println(l.getISO3Language());
+    }
+    System.out.println();
+    for (String s : Utils.KEY_TO_LOCALE_MAP.keySet()) {
+      System.out.println(s + " - " + Utils.KEY_TO_LOCALE_MAP.get(s));
+    }
   }
 
   @Test

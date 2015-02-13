@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,10 +63,10 @@ public class SyncTraktTvTask extends TmmTask {
 
   @Override
   protected void doInBackground() {
-    TraktTv traktTV = new TraktTv();
+    TraktTv traktTV = TraktTv.getInstance();
 
     if (syncMovies) {
-      publishState(BUNDLE.getString("trakt.sync.moviewatched"), 0); //$NON-NLS-1$
+      publishState(BUNDLE.getString("trakt.sync.movie"), 0); //$NON-NLS-1$
       if (movies.isEmpty()) {
         traktTV.syncTraktMovieCollection();
       }

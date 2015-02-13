@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import net.xeoh.plugins.base.annotations.PluginImplementation;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
@@ -33,22 +34,31 @@ import org.tinymediamanager.core.movie.entities.Movie;
 import org.tinymediamanager.core.tvshow.TvShowList;
 import org.tinymediamanager.core.tvshow.entities.TvShow;
 import org.tinymediamanager.core.tvshow.entities.TvShowEpisode;
+import org.tinymediamanager.core.tvshow.entities.TvShowSeason;
 import org.tinymediamanager.scraper.IMediaProvider;
 import org.tinymediamanager.scraper.MediaProviderInfo;
-import org.tinymediamanager.scraper.util.Pair;
 
 import retrofit.RetrofitError;
 import retrofit.client.Response;
 
-import com.jakewharton.trakt.Trakt;
-import com.jakewharton.trakt.entities.ActionResponse;
-import com.jakewharton.trakt.enumerations.Extended;
-import com.jakewharton.trakt.enumerations.Status;
-import com.jakewharton.trakt.services.MovieService;
-import com.jakewharton.trakt.services.MovieService.Movies;
-import com.jakewharton.trakt.services.MovieService.SeenMovie;
-import com.jakewharton.trakt.services.ShowService;
-import com.jakewharton.trakt.services.ShowService.Show;
+import com.uwetrottmann.trakt.v2.TraktV2;
+import com.uwetrottmann.trakt.v2.entities.BaseEpisode;
+import com.uwetrottmann.trakt.v2.entities.BaseMovie;
+import com.uwetrottmann.trakt.v2.entities.BaseSeason;
+import com.uwetrottmann.trakt.v2.entities.BaseShow;
+import com.uwetrottmann.trakt.v2.entities.MovieIds;
+import com.uwetrottmann.trakt.v2.entities.ShowIds;
+import com.uwetrottmann.trakt.v2.entities.SyncEpisode;
+import com.uwetrottmann.trakt.v2.entities.SyncErrors;
+import com.uwetrottmann.trakt.v2.entities.SyncItems;
+import com.uwetrottmann.trakt.v2.entities.SyncMovie;
+import com.uwetrottmann.trakt.v2.entities.SyncResponse;
+import com.uwetrottmann.trakt.v2.entities.SyncSeason;
+import com.uwetrottmann.trakt.v2.entities.SyncShow;
+import com.uwetrottmann.trakt.v2.entities.SyncStats;
+import com.uwetrottmann.trakt.v2.enums.Extended;
+import com.uwetrottmann.trakt.v2.exceptions.LoginException;
+import com.uwetrottmann.trakt.v2.exceptions.UnauthorizedException;
 
 /**
  * Sync your collection and watched status with Trakt.tv<br>
@@ -60,33 +70,25 @@ import com.jakewharton.trakt.services.ShowService.Show;
  */
 @PluginImplementation
 public class TraktTv implements IMediaProvider {
+  private static final String      CLIENT_ID    = "a8e7e30fd7fd3f397b6e079f9f023e790f9cbd80a2be57c104089174fa8c6d89";
 
   private static final Logger      LOGGER       = LoggerFactory.getLogger(TraktTv.class);
-  private static final Trakt       TRAKT        = new Trakt();
-  private String                   userName     = "";
-  private String                   password     = "";
-  private String                   apiKey       = "";
-  private ActionResponse           response;
-  private static MediaProviderInfo providerInfo = new MediaProviderInfo(Constants.TRAKTTV, "Trakt.tv",
+  private static final TraktV2     TRAKT        = new TraktV2();
+  private static TraktTv           instance;
+  private static MediaProviderInfo providerInfo = new MediaProviderInfo(Constants.TRAKTID, "Trakt.tv",
                                                     "Scraper for Trakt.tv; yes, we can scraper here too :)");
 
-  /**
-   * gets a new Trakt object with settings values (user / pass / apikey)
-   */
-  public TraktTv() {
-    this(Globals.settings.getTraktUsername(), Globals.settings.getTraktPassword(), Globals.settings.getTraktAPI());
+  private SyncResponse             response;
+
+  public static synchronized TraktTv getInstance() {
+    if (instance == null) {
+      instance = new TraktTv();
+      instance.Login();
+    }
+    return instance;
   }
 
-  /**
-   * gets a new Trakt object with custom values (user / passAsSHA1 / apikey)
-   */
-  public TraktTv(String username, String passwordSha1, String userApiKey) {
-    userName = username;
-    password = passwordSha1;
-    apiKey = userApiKey;
-
-    TRAKT.setApiKey(userApiKey);
-    TRAKT.setAuthentication(username, passwordSha1);
+  public TraktTv() {
   }
 
   @Override
@@ -95,13 +97,31 @@ public class TraktTv implements IMediaProvider {
   }
 
   /**
+   * does the setup and login with settings credentials
+   */
+  public void Login() {
+    // TODO: when calling login, check for existing auth. on exception reauth ONCE
+    TRAKT.setApiKey(CLIENT_ID);
+    try {
+      TRAKT.setLoginData(Globals.settings.getTraktUsername(), Globals.settings.getTraktPassword());
+    }
+    catch (LoginException e) {
+      LOGGER.error("Error logging in to Trakt:" + e);
+    }
+    if (LOGGER.isTraceEnabled()) {
+      // when we are on TRACE, show some Trakt debug settings... (need to set after login)
+      TRAKT.setIsDebug(true);
+    }
+  }
+
+  /**
    * do we have values for user/pass/api and are we a donator?!
    * 
    * @return true/false if trakt could be called
    */
   private boolean isEnabled() {
-    if (userName.isEmpty() || password.isEmpty() || apiKey.isEmpty()) {
-      LOGGER.warn("Can't spawn TRAKT.TV - Settings empty.");
+    if (!TRAKT.isTokenSet()) {
+      LOGGER.warn("Can't spawn TRAKT.TV - not logged in");
       return false;
     }
     if (!Globals.isDonator()) {
@@ -111,14 +131,14 @@ public class TraktTv implements IMediaProvider {
     return true;
   }
 
-  /**
-   * gets the underlying Trakt Java Object<br>
-   * 
-   * @return Trakt()
-   */
-  public final Trakt getManager() {
-    return TRAKT;
-  }
+  // @formatter:off
+  // ███╗   ███╗ ██████╗ ██╗   ██╗██╗███████╗███████╗
+  // ████╗ ████║██╔═══██╗██║   ██║██║██╔════╝██╔════╝
+  // ██╔████╔██║██║   ██║██║   ██║██║█████╗  ███████╗
+  // ██║╚██╔╝██║██║   ██║╚██╗ ██╔╝██║██╔══╝  ╚════██║
+  // ██║ ╚═╝ ██║╚██████╔╝ ╚████╔╝ ██║███████╗███████║
+  // ╚═╝     ╚═╝ ╚═════╝   ╚═══╝  ╚═╝╚══════╝╚══════╝
+  // @formatter:on
 
   /**
    * Syncs Trakt.tv collection (specified movies)<br>
@@ -131,12 +151,13 @@ public class TraktTv implements IMediaProvider {
     // *****************************************************************************
     // 1) get diff of TMM <-> Trakt collection
     // *****************************************************************************
-    LOGGER.info("You have " + tmmMovies.size() + " movies in your TMM database");
+    LOGGER.info("got " + tmmMovies.size() + " movies for Trakt.tv collection sync");
 
     // get ALL Trakt movies in collection
-    List<com.jakewharton.trakt.entities.Movie> traktMovies;
+    List<BaseMovie> traktMovies = new ArrayList<BaseMovie>();
+
     try {
-      traktMovies = TRAKT.userService().libraryMoviesCollection(userName, Extended.MIN);
+      traktMovies = TRAKT.sync().collectionMovies(Extended.DEFAULT_MIN);
       LOGGER.info("You have " + traktMovies.size() + " movies in your Trakt.tv collection");
       // Extended.DEFAULT adds url, poster, fanart, banner, genres
       // Extended.MAX adds certs, runtime, and other stuff (useful for scraper!)
@@ -145,15 +166,35 @@ public class TraktTv implements IMediaProvider {
       handleRetrofitError(e);
       return;
     }
+    catch (UnauthorizedException e) {
+      e.printStackTrace();
+    }
 
     // loop over all movies on trakt
-    for (com.jakewharton.trakt.entities.Movie traktMovie : traktMovies) {
+    for (BaseMovie traktMovie : traktMovies) {
       // loop over TMM movies, and check if IMDBID match
       for (int i = tmmMovies.size() - 1; i >= 0; i--) {
         Movie tmmMovie = tmmMovies.get(i);
-        if ((StringUtils.isNotEmpty(traktMovie.imdb_id) && traktMovie.imdb_id.equals(tmmMovie.getImdbId()))
-            || (traktMovie.tmdbId != 0 && traktMovie.tmdbId == tmmMovie.getTmdbId())) {
-          // we have a match; remove it from our list (no need to add)
+
+        if (matches(tmmMovie, traktMovie.movie.ids)) {
+          // we have a movie match
+
+          // update missing IDs (we get them for free :)
+          boolean dirty = updateIDs(tmmMovie, traktMovie.movie.ids);
+
+          if (traktMovie.collected_at != null && !(traktMovie.collected_at.toDate().equals(tmmMovie.getDateAdded()))) {
+            // always set from trakt, if not matched (Trakt = master)
+            LOGGER.debug("Marking movie '" + tmmMovie.getTitle() + "' as collected on " + traktMovie.collected_at.toDate() + " (was "
+                + tmmMovie.getDateAddedAsString() + ")");
+            tmmMovie.setDateAdded(traktMovie.collected_at.toDate());
+            dirty = true;
+          }
+
+          if (dirty) {
+            tmmMovie.saveToDb();
+          }
+
+          // remove it from our list (no need to add)
           tmmMovies.remove(i);
         }
       }
@@ -169,44 +210,39 @@ public class TraktTv implements IMediaProvider {
     // *****************************************************************************
     LOGGER.debug("prepare " + tmmMovies.size() + " movies for Trakt.tv collection sync");
 
-    List<SeenMovie> libMovies = new ArrayList<SeenMovie>(); // array for ALL TMM movies
+    List<SyncMovie> movies = new ArrayList<SyncMovie>();
     int nosync = 0;
     for (Movie tmmMovie : tmmMovies) {
-      if (tmmMovie.getImdbId().isEmpty() && tmmMovie.getTmdbId() == 0) {
-        // do not add to Trakt if we have no IDs
+      if (tmmMovie.getIdAsInt(Constants.TRAKTID) != 0 || !tmmMovie.getIdAsString(Constants.IMDBID).isEmpty()
+          || tmmMovie.getIdAsInt(Constants.TMDBID) != 0) {
+        movies.add(toSyncMovie(tmmMovie, false));
+      }
+      else {
+        // do not add to Trakt if we do not have at least one ID
         nosync++;
         continue;
       }
-      SeenMovie seen = new SeenMovie(tmmMovie.getImdbId());
-      seen.title = tmmMovie.getTitle();
-      seen.imdb_id = tmmMovie.getImdbId();
-      seen.tmdb_id = tmmMovie.getTmdbId();
-      try {
-        seen.year = Integer.valueOf(tmmMovie.getYear());
-      }
-      catch (Exception e) {
-        seen.year = 0;
-      }
-      libMovies.add(seen); // add to lib
     }
     if (nosync > 0) {
       LOGGER.debug("skipping " + nosync + " movies, because they have not been scraped yet!");
     }
 
-    if (libMovies.size() == 0) {
+    if (movies.size() == 0) {
       LOGGER.info("no new movies for Trakt collection sync found.");
       return;
     }
 
     try {
-      LOGGER.info("Adding " + tmmMovies.size() + " movies to Trakt.tv collection");
-      response = TRAKT.movieService().library(new Movies(libMovies));
+      LOGGER.info("Adding " + movies.size() + " movies to Trakt.tv collection");
+      SyncItems items = new SyncItems().movies(movies);
+      response = TRAKT.sync().addItemsToCollection(items);
       LOGGER.info("Trakt add-to-library status:");
       printStatus(response);
     }
-    catch (RetrofitError e) {
-      handleRetrofitError(e);
+    catch (UnauthorizedException e) {
+      e.printStackTrace();
     }
+
   }
 
   /**
@@ -217,7 +253,6 @@ public class TraktTv implements IMediaProvider {
     if (!isEnabled()) {
       return;
     }
-
     syncTraktMovieCollection(new ArrayList<Movie>(MovieList.getInstance().getMovies()));
   }
 
@@ -225,39 +260,67 @@ public class TraktTv implements IMediaProvider {
    * clears the whole Trakt.tv movie collection. Gets all Trakt.tv movies from your collection and removes them from the collection and the watched
    * state; a little helper to initialize the collection
    */
-  public void clearTraktMovieCollection() {
+  public void clearTraktMovies() {
     // *****************************************************************************
-    // 1) get ALL Trakt movies in collection
+    // 1) get ALL Trakt movies in collection / watched
     // *****************************************************************************
-    List<com.jakewharton.trakt.entities.Movie> traktMovies;
+    List<BaseMovie> traktCollection = new ArrayList<BaseMovie>();
+    List<BaseMovie> traktWatched = new ArrayList<BaseMovie>();
     try {
-      traktMovies = TRAKT.userService().libraryMoviesAll(userName, Extended.MIN);
-      LOGGER.info("You have " + traktMovies.size() + " movies in your Trakt.tv collection");
-      // Extended.DEFAULT adds url, poster, fanart, banner, genres
-      // Extended.MAX adds certs, runtime, and other stuff (useful for scraper!)
+      traktCollection = TRAKT.sync().collectionMovies(Extended.DEFAULT_MIN);
+      LOGGER.info("You have " + traktCollection.size() + " movies in your Trakt.tv collection");
+      traktWatched = TRAKT.sync().watchedMovies(Extended.DEFAULT_MIN);
+      LOGGER.info("You have " + traktWatched.size() + " movies watched");
     }
     catch (RetrofitError e) {
       handleRetrofitError(e);
       return;
     }
+    catch (UnauthorizedException e) {
+      e.printStackTrace();
+    }
 
     // *****************************************************************************
-    // 2) remove every movie from the collection/watched state
+    // 2) remove every movie from the COLLECTION state
     // *****************************************************************************
-    List<MovieService.SeenMovie> movies = new ArrayList<MovieService.SeenMovie>();
-    for (com.jakewharton.trakt.entities.Movie traktMovie : traktMovies) {
-      movies.add(new MovieService.SeenMovie(traktMovie.tmdbId));
+    List<SyncMovie> movieToRemove = new ArrayList<SyncMovie>();
+    for (BaseMovie traktMovie : traktCollection) {
+      movieToRemove.add(toSyncMovie(traktMovie));
     }
-    if (!movies.isEmpty()) {
+    if (!movieToRemove.isEmpty()) {
       try {
-        MovieService.Movies traktObj = new Movies(movies);
-        TRAKT.movieService().unlibrary(traktObj);
-        TRAKT.movieService().unseen(traktObj);
-        LOGGER.info("removed " + traktMovies.size() + " movies from your trakt.tv account");
+        SyncItems items = new SyncItems().movies(movieToRemove);
+        TRAKT.sync().deleteItemsFromCollection(items);
+        LOGGER.info("removed " + movieToRemove.size() + " movies from your trakt.tv collection");
       }
       catch (RetrofitError e) {
         handleRetrofitError(e);
         return;
+      }
+      catch (UnauthorizedException e) {
+        e.printStackTrace();
+      }
+    }
+
+    // *****************************************************************************
+    // 3) remove every movie from the WATCHED state
+    // *****************************************************************************
+    movieToRemove.clear();
+    for (BaseMovie traktMovie : traktWatched) {
+      movieToRemove.add(toSyncMovie(traktMovie));
+    }
+    if (!movieToRemove.isEmpty()) {
+      try {
+        SyncItems items = new SyncItems().movies(movieToRemove);
+        TRAKT.sync().deleteItemsFromWatchedHistory(items);
+        LOGGER.info("removed " + movieToRemove.size() + " movies from your trakt.tv watched");
+      }
+      catch (RetrofitError e) {
+        handleRetrofitError(e);
+        return;
+      }
+      catch (UnauthorizedException e) {
+        e.printStackTrace();
       }
     }
   }
@@ -275,9 +338,9 @@ public class TraktTv implements IMediaProvider {
     // *****************************************************************************
     // 1) get all Trakt watched movies and update our "watched" status
     // *****************************************************************************
-    List<com.jakewharton.trakt.entities.Movie> traktMovies;
+    List<BaseMovie> traktMovies = new ArrayList<BaseMovie>();
     try {
-      traktMovies = TRAKT.userService().libraryMoviesWatched(userName, Extended.MIN);
+      traktMovies = TRAKT.sync().watchedMovies(Extended.DEFAULT_MIN);
       LOGGER.info("You have " + traktMovies.size() + " movies marked as 'watched' in your Trakt.tv collection");
       // Extended.DEFAULT adds url, poster, fanart, banner, genres
       // Extended.MAX adds certs, runtime, and other stuff (useful for scraper!)
@@ -286,29 +349,33 @@ public class TraktTv implements IMediaProvider {
       handleRetrofitError(e);
       return;
     }
+    catch (UnauthorizedException e) {
+      e.printStackTrace();
+    }
 
     // loop over all watched movies on trakt
-    for (com.jakewharton.trakt.entities.Movie traktWatched : traktMovies) {
+    for (BaseMovie traktWatched : traktMovies) {
 
       // loop over TMM movies, and check if IMDBID match
       for (Movie tmmMovie : tmmMovies) {
-        boolean dirty = false;
-        if ((StringUtils.isNotEmpty(traktWatched.imdb_id) && traktWatched.imdb_id.equals(tmmMovie.getImdbId()))
-            || (traktWatched.tmdbId != 0 && traktWatched.tmdbId == tmmMovie.getTmdbId())) {
+
+        if (matches(tmmMovie, traktWatched.movie.ids)) {
+          // we have a movie match
 
           // update missing IDs (we get them for free :)
-          if (tmmMovie.getImdbId().isEmpty() && !StringUtils.isEmpty(traktWatched.imdb_id)) {
-            tmmMovie.setImdbId(traktWatched.imdb_id);
-            dirty = true;
-          }
-          if (tmmMovie.getTmdbId() == 0 && traktWatched.tmdbId != 0) {
-            tmmMovie.setTmdbId(traktWatched.tmdbId);
-            dirty = true;
-          }
+          boolean dirty = updateIDs(tmmMovie, traktWatched.movie.ids);
+
           if (!tmmMovie.isWatched()) {
             // save Trakt watched status
             LOGGER.info("Marking movie '" + tmmMovie.getTitle() + "' as watched");
             tmmMovie.setWatched(true);
+            dirty = true;
+          }
+          if (traktWatched.last_watched_at != null && !(traktWatched.last_watched_at.toDate().equals(tmmMovie.getLastWatched()))) {
+            // always set from trakt, if not matched (Trakt = master)
+            LOGGER.debug("Marking movie '" + tmmMovie.getTitle() + "' as watched on " + traktWatched.last_watched_at.toDate() + " (was "
+                + tmmMovie.getLastWatched() + ")");
+            tmmMovie.setLastWatched(traktWatched.last_watched_at.toDate());
             dirty = true;
           }
 
@@ -333,9 +400,9 @@ public class TraktTv implements IMediaProvider {
 
     // ...and subtract the already watched from Trakt
     for (int i = tmmWatchedMovies.size() - 1; i >= 0; i--) {
-      for (com.jakewharton.trakt.entities.Movie traktWatched : traktMovies) {
-        if ((StringUtils.isNotEmpty(traktWatched.imdb_id) && traktWatched.imdb_id.equals(tmmWatchedMovies.get(i).getImdbId()))
-            || (traktWatched.tmdbId != 0 && traktWatched.tmdbId == tmmWatchedMovies.get(i).getTmdbId())) {
+      for (BaseMovie traktWatched : traktMovies) {
+        if ((StringUtils.isNotEmpty(traktWatched.movie.ids.imdb) && traktWatched.movie.ids.imdb.equals(tmmWatchedMovies.get(i).getImdbId()))
+            || (traktWatched.movie.ids.tmdb != 0 && traktWatched.movie.ids.tmdb == tmmWatchedMovies.get(i).getTmdbId())) {
           tmmWatchedMovies.remove(i);
           break;
         }
@@ -348,43 +415,40 @@ public class TraktTv implements IMediaProvider {
     }
 
     LOGGER.debug("prepare " + tmmWatchedMovies.size() + " movies for Trakt.tv sync");
-    List<SeenMovie> seenMovies = new ArrayList<SeenMovie>(); // array for ALL TMM movies
+    List<SyncMovie> movies = new ArrayList<SyncMovie>();
     int nosync = 0;
     for (Movie tmmMovie : tmmWatchedMovies) {
-      if (tmmMovie.getImdbId().isEmpty() && tmmMovie.getTmdbId() == 0) {
-        // do not add to Trakt if we have no IDs
+      if (tmmMovie.getIdAsInt(Constants.TRAKTID) != 0 || !tmmMovie.getIdAsString(Constants.IMDBID).isEmpty()
+          || tmmMovie.getIdAsInt(Constants.TMDBID) != 0) {
+        movies.add(toSyncMovie(tmmMovie, true));
+      }
+      else {
+        // do not add to Trakt if we do not have at least one ID
         nosync++;
         continue;
       }
-      SeenMovie seen = new SeenMovie(tmmMovie.getImdbId());
-      seen.title = tmmMovie.getTitle();
-      seen.imdb_id = tmmMovie.getImdbId();
-      seen.tmdb_id = tmmMovie.getTmdbId();
-      try {
-        seen.year = Integer.valueOf(tmmMovie.getYear());
-      }
-      catch (Exception e) {
-        seen.year = 0;
-      }
-      seenMovies.add(seen); // add to lib
     }
     if (nosync > 0) {
       LOGGER.debug("skipping " + nosync + " movies, because they have not been scraped yet!");
     }
 
-    if (seenMovies.size() == 0) {
+    if (movies.size() == 0) {
       LOGGER.info("no new watched movies for Trakt sync found.");
       return;
     }
 
     try {
-      LOGGER.info("Marking " + seenMovies.size() + " movies as 'watched' to Trakt.tv collection");
-      response = TRAKT.movieService().seen(new Movies(seenMovies));
+      LOGGER.info("Marking " + movies.size() + " movies as 'watched' to Trakt.tv collection");
+      SyncItems items = new SyncItems().movies(movies);
+      response = TRAKT.sync().addItemsToWatchedHistory(items);
       LOGGER.info("Trakt mark-as-watched status:");
       printStatus(response);
     }
     catch (RetrofitError e) {
       handleRetrofitError(e);
+    }
+    catch (UnauthorizedException e) {
+      e.printStackTrace();
     }
   }
 
@@ -400,159 +464,101 @@ public class TraktTv implements IMediaProvider {
     syncTraktMovieWatched(MovieList.getInstance().getMovies());
   }
 
-  /**
-   * simple class to ease diff
-   * 
-   * @author Myron Boyle
-   * 
-   */
-  private class SimpleShow {
-    private String                       title      = "";
-    private int                          year       = 0;
-    private int                          tvdb       = 0;
-    private List<Pair<Integer, Integer>> collection = new ArrayList<Pair<Integer, Integer>>(); // season/episode
-    private List<Pair<Integer, Integer>> watched    = new ArrayList<Pair<Integer, Integer>>(); // season/episode
-
-    public SimpleShow(TvShow show) {
-      this.title = show.getTitle();
-      if (!show.getYear().isEmpty()) {
-        try {
-          this.year = Integer.valueOf(show.getYear());
-        }
-        catch (Exception e) {
-          this.year = 0;
-        }
-      }
-      if (!show.getTvdbId().isEmpty()) {
-        try {
-          this.tvdb = Integer.valueOf(show.getTvdbId());
-        }
-        catch (Exception e) {
-          this.tvdb = 0;
-        }
-      }
-      this.collection = buildSeasonEpArray(show, false);
-      this.watched = buildSeasonEpArray(show, true);
-    }
-  }
+  // @formatter:off
+  //  ████████╗██╗   ██╗███████╗██╗  ██╗ ██████╗ ██╗    ██╗███████╗
+  //  ╚══██╔══╝██║   ██║██╔════╝██║  ██║██╔═══██╗██║    ██║██╔════╝
+  //     ██║   ██║   ██║███████╗███████║██║   ██║██║ █╗ ██║███████╗
+  //     ██║   ╚██╗ ██╔╝╚════██║██╔══██║██║   ██║██║███╗██║╚════██║
+  //     ██║    ╚████╔╝ ███████║██║  ██║╚██████╔╝╚███╔███╔╝███████║
+  //     ╚═╝     ╚═══╝  ╚══════╝╚═╝  ╚═╝ ╚═════╝  ╚══╝╚══╝ ╚══════╝
+  // @formatter:on
 
   /**
-   * Helper function to build simple list of all to-update seasons/episodes from tvshow
-   * 
-   * @param show
-   *          the tvshow
-   * @param watched
-   *          only watched, or all?
-   * @return a list of tupels of season/episode pairs
-   */
-  private synchronized List<Pair<Integer, Integer>> buildSeasonEpArray(TvShow show, boolean watched) {
-    List<Pair<Integer, Integer>> tv = new ArrayList<Pair<Integer, Integer>>();
-    for (TvShowEpisode ep : show.getEpisodes()) {
-      if (watched) {
-        // add only watched
-        if (ep.isWatched()) {
-          tv.add(new Pair<Integer, Integer>(ep.getSeason(), ep.getEpisode()));
-        }
-      }
-      else {
-        // add all
-        tv.add(new Pair<Integer, Integer>(ep.getSeason(), ep.getEpisode()));
-      }
-    }
-    return tv;
-  }
-
-  /**
-   * Syncs Trakt.tv collection (all given TvShows)<br>
-   * Gets all Trakt shows/episodes from collection, matches them to ours, and sends ONLY the new ones back to Trakt
+   * Syncs Trakt.tv collection (gets all IDs & dates, and adds all TMM shows to Trakt)<br>
+   * Do not send diffs, since this is too complicated currently :|
    */
   public void syncTraktTvShowCollection(List<TvShow> tvShows) {
     if (!isEnabled()) {
       return;
     }
 
-    // our simple list of TMM shows
-    List<SimpleShow> tmmShows = new ArrayList<SimpleShow>();
-    for (TvShow show : tvShows) {
-      tmmShows.add(new SimpleShow(show));
-    }
-
     // *****************************************************************************
-    // 1) get all Trakt TvShows/episodes in collection remove from our temp array
+    // 1) sync ALL missing show IDs & dates from trakt
     // *****************************************************************************
-    List<com.jakewharton.trakt.entities.TvShow> traktShows;
+    List<BaseShow> traktShows = new ArrayList<BaseShow>();
     try {
-      traktShows = TRAKT.userService().libraryShowsCollection(userName, Extended.MIN);
+      traktShows = TRAKT.sync().collectionShows(Extended.DEFAULT_MIN);
       LOGGER.info("You have " + traktShows.size() + " TvShows in your Trakt.tv collection");
-      // Extended.DEFAULT adds url, poster, fanart, banner, genres
-      // Extended.MAX adds certs, runtime, and other stuff (useful for scraper!)
+      for (BaseShow traktShow : traktShows) {
+        for (TvShow tmmShow : tvShows) {
+
+          if (matches(tmmShow, traktShow.show.ids)) {
+            // ok, we have a show match
+
+            // update show IDs from trakt
+            boolean dirty = updateIDs(tmmShow, traktShow.show.ids);
+
+            // update collection date from trakt (show)
+            if (traktShow.last_collected_at != null && !(traktShow.last_collected_at.toDate().equals(tmmShow.getDateAdded()))) {
+              // always set from trakt, if not matched (Trakt = master)
+              LOGGER.debug("Marking TvShow '" + tmmShow.getTitle() + "' as collected on " + traktShow.last_collected_at.toDate() + " (was "
+                  + tmmShow.getDateAddedAsString() + ")");
+              tmmShow.setDateAdded(traktShow.last_collected_at.toDate());
+              dirty = true;
+            }
+
+            // update collection date from trakt (episodes)
+            for (BaseSeason bs : traktShow.seasons) {
+              for (BaseEpisode be : bs.episodes) {
+                TvShowEpisode tmmEP = tmmShow.getEpisode(bs.number, be.number);
+                // update ep IDs - NOT YET POSSIBLE
+                // boolean dirty = updateIDs(tmmEP, be.ids);
+
+                if (be.collected_at != null && !(be.collected_at.toDate().equals(tmmEP.getDateAdded()))) {
+                  tmmEP.setDateAdded(be.collected_at.toDate());
+                  dirty = true;
+                }
+              }
+            }
+
+            if (dirty) {
+              tmmShow.saveToDb();
+            }
+
+          }
+        }
+      }
     }
     catch (RetrofitError e) {
       handleRetrofitError(e);
       return;
     }
-
-    // loop over all watched shows on trakt
-    for (com.jakewharton.trakt.entities.TvShow traktShow : traktShows) {
-
-      // loop over TMM shows, and check if TvDB match
-      for (int i = tmmShows.size() - 1; i >= 0; i--) {
-        SimpleShow tmmShow = tmmShows.get(i);
-        // boolean dirty = false;
-        if ((traktShow.tvdb_id != null && traktShow.tvdb_id != 0 && traktShow.tvdb_id.equals(tmmShow.tvdb))) {
-
-          // shows matches, so remove episodes already in tmm
-          for (com.jakewharton.trakt.entities.TvShowSeason traktSeason : traktShow.seasons) {
-            for (int traktEp : traktSeason.episodes.numbers) {
-
-              Pair<Integer, Integer> p = new Pair<Integer, Integer>(traktSeason.season, traktEp);
-              if (tmmShow.collection.contains(p)) {
-                // FIXME: use size() - 1; i >= 0; i-- loop?
-                tmmShow.collection.remove(p);
-              }
-            }
-          }
-
-          if (tmmShow.collection.size() == 0) {
-            LOGGER.debug("all Episodes already on Trakt - removing show '" + tmmShow.title + "' from update");
-            tmmShows.remove(i);
-          }
-
-        } // end tvdb_id matches
-      } // end loop tmmShows
-    } // end loop traktShow
-
-    if (tmmShows.size() == 0) {
-      LOGGER.info("no new TvShows for Trakt collection sync found.");
-      return;
+    catch (UnauthorizedException e) {
+      e.printStackTrace();
     }
 
     // *****************************************************************************
-    // 2) add additionally shows/episodes to your collection
+    // 2) add all our shows to Trakt collection (we have the physical file)
     // *****************************************************************************
-    LOGGER.debug("prepare " + tmmShows.size() + " TvShows for Trakt.tv collection sync");
-    for (SimpleShow tmmShow : tmmShows) {
+    List<SyncShow> tmmShows = new ArrayList<SyncShow>();
+    for (TvShow show : tvShows) {
+      tmmShows.add(toSyncShow(show, false));
+    }
 
-      // add episodes
-      List<com.jakewharton.trakt.services.ShowService.Episodes.Episode> traktEpList = new ArrayList<com.jakewharton.trakt.services.ShowService.Episodes.Episode>();
-      for (Pair<Integer, Integer> p : tmmShow.collection) {
-        traktEpList.add(new com.jakewharton.trakt.services.ShowService.Episodes.Episode(p.first(), p.second()));
-      }
+    try {
+      LOGGER.info("Adding " + tmmShows.size() + " TvShows to Trakt.tv collection");
+      SyncItems items = new SyncItems().shows(tmmShows);
+      response = TRAKT.sync().addItemsToCollection(items);
 
-      ShowService.Episodes traktObj = new ShowService.Episodes(tmmShow.tvdb, traktEpList);
-      traktObj.title = tmmShow.title;
-      traktObj.year = tmmShow.year;
-
-      // phew - we have now our not-yet-in-trakt array, lets do the update :)
-      try {
-        LOGGER.info("Adding " + traktEpList.size() + " episodes of show '" + tmmShow.title + "' to Trakt.tv collection");
-        com.jakewharton.trakt.entities.Response response = TRAKT.showService().episodeLibrary(traktObj);
-        printStatus(response);
-      }
-      catch (RetrofitError e) {
-        handleRetrofitError(e);
-      }
-    } // end show loop
+      LOGGER.info("Trakt add-to-library status:");
+      printStatus(response);
+    }
+    catch (RetrofitError e) {
+      handleRetrofitError(e);
+    }
+    catch (UnauthorizedException e) {
+      e.printStackTrace();
+    }
   }
 
   /**
@@ -563,272 +569,405 @@ public class TraktTv implements IMediaProvider {
     if (!isEnabled()) {
       return;
     }
-
     syncTraktTvShowCollection(new ArrayList<TvShow>(TvShowList.getInstance().getTvShows()));
   }
 
-  /**
-   * clears the whole Trakt.tv TV collection. Gets all Trakt.tv TV shows from your collection and removes them from the collection; a little helper to
-   * initialize the collection
-   */
-  public void clearTraktTvShowCollection() {
-    // *****************************************************************************
-    // 1) get all Trakt TvShows/episodes in collection remove from our temp array
-    // *****************************************************************************
-    List<com.jakewharton.trakt.entities.TvShow> traktShows;
-    try {
-      traktShows = TRAKT.userService().libraryShowsCollection(userName, Extended.MIN);
-      LOGGER.info("You have " + traktShows.size() + " TvShows in your Trakt.tv collection");
-      // Extended.DEFAULT adds url, poster, fanart, banner, genres
-      // Extended.MAX adds certs, runtime, and other stuff (useful for scraper!)
-    }
-    catch (RetrofitError e) {
-      handleRetrofitError(e);
-      return;
-    }
-
-    // *****************************************************************************
-    // 2) remove every TV show from the collection
-    // *****************************************************************************
-    for (com.jakewharton.trakt.entities.TvShow traktShow : traktShows) {
-      try {
-        Show show = new Show(traktShow.tvdb_id);
-        TRAKT.showService().showUnlibrary(show);
-        LOGGER.info("removed " + traktShow.title + " from your trakt.tv collection");
-      }
-      catch (RetrofitError e) {
-        handleRetrofitError(e);
-      }
-    }
-
-    // *****************************************************************************
-    // 3) get all Trakt TvShows/episodes witch watched state (can differ from the collection)
-    // *****************************************************************************
-    try {
-      traktShows = TRAKT.userService().libraryShowsWatched(userName, Extended.MIN);
-      LOGGER.info("You have " + traktShows.size() + " TvShows in your Trakt.tv with watched state");
-      // Extended.DEFAULT adds url, poster, fanart, banner, genres
-      // Extended.MAX adds certs, runtime, and other stuff (useful for scraper!)
-    }
-    catch (RetrofitError e) {
-      handleRetrofitError(e);
-      return;
-    }
-
-    // *****************************************************************************
-    // 4) remove every TV show watched state
-    // *****************************************************************************
-    for (com.jakewharton.trakt.entities.TvShow traktShow : traktShows) {
-      try {
-        List<ShowService.Episodes.Episode> episodes = new ArrayList<ShowService.Episodes.Episode>();
-        for (com.jakewharton.trakt.entities.TvShowSeason season : traktShow.seasons) {
-          for (int episode : season.episodes.numbers) {
-            episodes.add(new ShowService.Episodes.Episode(season.season, episode));
-          }
-        }
-        ShowService.Episodes traktObj = new ShowService.Episodes(traktShow.tvdb_id, episodes);
-        TRAKT.showService().episodeUnseen(traktObj);
-        LOGGER.info("removed " + traktShow.title + " watched state");
-      }
-      catch (RetrofitError e) {
-        handleRetrofitError(e);
-      }
-    }
-  }
-
-  /**
-   * gets ALL watched TvShows from Trakt, and sets the "watched" flag on TMM show/episodes (if TvDB matches)
-   */
-  public void syncTraktTvShowWatched(List<TvShow> tmmShows) {
+  public void syncTraktTvShowWatched(List<TvShow> tvShows) {
     if (!isEnabled()) {
       return;
     }
-    // Call user/library/shows/watched and make sure to send min for the extended parameter. This greatly reduces the data being sent back.
-    // Loop over each show and mark it as watched on TMM.
-    // Using the same data from step 1 as a baseline, see if there is anything newly watched in the media center. If not, no action needed.
-    // If yes, call show/episode/seen for each show to tell trakt they are watched.
 
-    // *****************************************************************************
-    // 1) get all Trakt watched TvShows/episodes and update our "watched" status
-    // *****************************************************************************
-    List<com.jakewharton.trakt.entities.TvShow> traktShows;
+    List<BaseShow> traktShows = new ArrayList<BaseShow>();
     try {
-      traktShows = TRAKT.userService().libraryShowsWatched(userName, Extended.MIN);
-      LOGGER.info("You have " + traktShows.size() + " TvShows marked as 'watched' in your Trakt.tv collection");
-      // Extended.DEFAULT adds url, poster, fanart, banner, genres
-      // Extended.MAX adds certs, runtime, and other stuff (useful for scraper!)
+      traktShows = TRAKT.sync().watchedShows(Extended.DEFAULT_MIN);
+      LOGGER.info("You have " + traktShows.size() + " TvShows marked as watched on Trakt.tv");
+      for (BaseShow traktShow : traktShows) {
+        for (TvShow tmmShow : tvShows) {
+
+          if (matches(tmmShow, traktShow.show.ids)) {
+            // ok, we have a show match
+
+            // update show IDs from trakt
+            boolean dirty = updateIDs(tmmShow, traktShow.show.ids);
+
+            // update watched date from trakt (show)
+            if (traktShow.last_watched_at != null && !(traktShow.last_watched_at.toDate().equals(tmmShow.getLastWatched()))) {
+              // always set from trakt, if not matched (Trakt = master)
+              LOGGER.debug("Marking TvShow '" + tmmShow.getTitle() + "' as watched on " + traktShow.last_watched_at.toDate() + " (was "
+                  + tmmShow.getLastWatched() + ")");
+              tmmShow.setDateAdded(traktShow.last_watched_at.toDate());
+              dirty = true;
+            }
+
+            // update collection date from trakt (episodes)
+            for (BaseSeason bs : traktShow.seasons) {
+              for (BaseEpisode be : bs.episodes) {
+                TvShowEpisode tmmEP = tmmShow.getEpisode(bs.number, be.number);
+                // update ep IDs - NOT YET POSSIBLE
+                // boolean dirty = updateIDs(tmmEP, be.ids);
+
+                if (tmmEP != null && be.last_watched_at != null && !(be.last_watched_at.toDate().equals(tmmEP.getDateAdded()))) {
+                  tmmEP.setDateAdded(be.last_watched_at.toDate());
+                  dirty = true;
+                }
+              }
+            }
+
+            if (dirty) {
+              tmmShow.saveToDb();
+            }
+
+          }
+        }
+      }
     }
     catch (RetrofitError e) {
       handleRetrofitError(e);
       return;
     }
-
-    // loop over all watched shows on trakt
-    for (com.jakewharton.trakt.entities.TvShow watched : traktShows) {
-      // System.out.println("Trakt: " + watched.title + " - " + watched.tvdb_id);
-
-      // loop over TMM shows, and check if TvDB match
-      for (TvShow tmmShow : tmmShows) {
-        // System.out.println("  TMM: " + tmmShow.getTitle() + " - " + tmmShow.getTvdbId());
-        boolean dirty = false;
-        if (watched.tvdb_id != null && watched.tvdb_id != 0 && String.valueOf(watched.tvdb_id).equals(tmmShow.getTvdbId())) {
-
-          // update missing IDs (we get them for free :)
-          if (tmmShow.getImdbId().isEmpty() && !StringUtils.isEmpty(watched.imdb_id)) {
-            tmmShow.setImdbId(watched.imdb_id);
-            dirty = true;
-          }
-          if (tmmShow.getTvdbId().isEmpty() && watched.tvdb_id != null && watched.tvdb_id != 0) {
-            tmmShow.setTvdbId(String.valueOf(watched.tvdb_id));
-            dirty = true;
-          }
-          if (tmmShow.getId(Constants.TVRAGEID) != null && ((String) tmmShow.getId(Constants.TVRAGEID)).isEmpty() && watched.tvrage_id != null
-              && watched.tvrage_id != 0) {
-            tmmShow.setId(Constants.TVRAGEID, watched.tvrage_id);
-            dirty = true;
-          }
-
-          // set show watched (only if COMPLETE watched?!)
-          // if (!tmmShow.isWatched()) {
-          // LOGGER.info("Marking TvShow '" + tmmShow.getTitle() + "' as watched");
-          // tmmShow.setWatched(true);
-          // dirty = true;
-          // }
-
-          // set episodes watched
-          for (com.jakewharton.trakt.entities.TvShowSeason traktSeason : watched.seasons) {
-            for (int traktEp : traktSeason.episodes.numbers) {
-              TvShowEpisode tmmEp = tmmShow.getEpisode(traktSeason.season, traktEp);
-              if (tmmEp != null && !tmmEp.isWatched()) {
-                LOGGER.info("Marking '" + tmmShow.getTitle() + " S:" + tmmEp.getSeason() + " EP:" + tmmEp.getEpisode() + "' as watched");
-                tmmEp.setWatched(true);
-                dirty = true;
-              }
-            }
-          }
-
-          if (dirty) {
-            tmmShow.saveToDb();
-          }
-
-        } // end tvdb_id matches
-      } // end loop tmmShows
-    } // end loop watched
-
-    // *****************************************************************************
-    // 2) remove trakt shows/episodes from ours, to only send the diff
-    // *****************************************************************************
-    // Now get all TMM shows with ONLY watched episodes...
-    List<SimpleShow> tmmWatchedShows = new ArrayList<SimpleShow>();
-    for (TvShow show : tmmShows) {
-      tmmWatchedShows.add(new SimpleShow(show));
-    }
-
-    LOGGER.info("You have now " + tmmWatchedShows.size() + " shows with watched episodes in your TMM database");
-
-    // ...and subtract the already watched from Trakt
-    for (int i = tmmWatchedShows.size() - 1; i >= 0; i--) {
-      SimpleShow wShow = tmmWatchedShows.get(i);
-      for (com.jakewharton.trakt.entities.TvShow watched : traktShows) {
-        if (watched.tvdb_id != null && watched.tvdb_id != 0 && watched.tvdb_id.equals(wShow.tvdb)) {
-
-          // we have a show match - now loop over seasons/episodes and remove already existing in trakt
-          for (com.jakewharton.trakt.entities.TvShowSeason traktSeason : watched.seasons) {
-            for (int traktEp : traktSeason.episodes.numbers) {
-              Pair<Integer, Integer> p = new Pair<Integer, Integer>(traktSeason.season, traktEp);
-              if (wShow.watched.contains(p)) {
-                // we have an EP match - remove EP from "fake" TMM show
-                // FIXME: use size() - 1; i >= 0; i-- loop?
-                wShow.watched.remove(p);
-              }
-            }
-          }
-
-        }
-      }
-      // remove empty shows
-      if (wShow.watched.size() == 0) {
-        tmmWatchedShows.remove(i);
-      }
-    }
-
-    if (tmmWatchedShows.size() == 0) {
-      LOGGER.info("no new watched TvShows for Trakt sync found.");
-      return;
+    catch (UnauthorizedException e) {
+      e.printStackTrace();
     }
 
     // *****************************************************************************
-    // 3) mark additionally "watched" shows/episodes as 'seen' on Trakt
+    // 2) add all our shows to Trakt watched
     // *****************************************************************************
-    LOGGER.debug("prepare " + tmmWatchedShows.size() + " TvShows for Trakt.tv sync");
-    for (SimpleShow tmmShow : tmmWatchedShows) {
+    List<SyncShow> tmmShows = new ArrayList<SyncShow>();
+    for (TvShow show : tvShows) {
+      tmmShows.add(toSyncShow(show, true));
+    }
 
-      // add episodes
-      List<com.jakewharton.trakt.services.ShowService.Episodes.Episode> traktEpList = new ArrayList<com.jakewharton.trakt.services.ShowService.Episodes.Episode>();
-      for (Pair<Integer, Integer> p : tmmShow.watched) {
-        traktEpList.add(new com.jakewharton.trakt.services.ShowService.Episodes.Episode(p.first(), p.second()));
-      }
+    try {
+      LOGGER.info("Adding " + tmmShows.size() + " TvShows as watched on Trakt.tv");
+      SyncItems items = new SyncItems().shows(tmmShows);
+      response = TRAKT.sync().addItemsToWatchedHistory(items);
 
-      ShowService.Episodes traktObj = new ShowService.Episodes(tmmShow.tvdb, traktEpList);
-      traktObj.title = tmmShow.title;
-      traktObj.year = tmmShow.year;
+      LOGGER.info("Trakt add-to-library status:");
+      printStatus(response);
+    }
+    catch (RetrofitError e) {
+      handleRetrofitError(e);
+    }
+    catch (UnauthorizedException e) {
+      e.printStackTrace();
+    }
 
-      // phew - we have now our not-yet-in-trakt array, lets do the update :)
-      try {
-        LOGGER.info("Marking " + traktEpList.size() + " episodes of show '" + tmmShow.title + "' as 'watched' to Trakt.tv collection");
-        com.jakewharton.trakt.entities.Response response = TRAKT.showService().episodeSeen(traktObj);
-        printStatus(response);
-      }
-      catch (RetrofitError e) {
-        handleRetrofitError(e);
-      }
-    } // end show loop
   }
 
-  /**
-   * gets ALL watched TvShows from Trakt, and sets the "watched" flag on TMM show/episodes (if TvDB matches)
-   */
   public void syncTraktTvShowWatched() {
     if (!isEnabled()) {
       return;
     }
-
     syncTraktTvShowWatched(new ArrayList<TvShow>(TvShowList.getInstance().getTvShows()));
   }
 
   /**
-   * prints some trakt status
-   * 
-   * @param reponse
-   *          the reponse
+   * clears the whole Trakt.tv movie collection. Gets all Trakt.tv movies from your collection and removes them from the collection and the watched
+   * state; a little helper to initialize the collection
    */
-  private void printStatus(ActionResponse resp) {
-    if (resp != null) {
-      LOGGER.info("Status           : " + resp.status);
-      if (!resp.status.equals(Status.SUCCESS)) {
-        LOGGER.error("Error            : " + resp.error);
-        LOGGER.error("Message          : " + resp.message);
+  public void clearTraktTvShows() {
+    // *****************************************************************************
+    // 1) get ALL Trakt shows in collection / watched
+    // *****************************************************************************
+    List<BaseShow> traktCollection = new ArrayList<BaseShow>();
+    List<BaseShow> traktWatched = new ArrayList<BaseShow>();
+    try {
+      traktCollection = TRAKT.sync().collectionShows(Extended.DEFAULT_MIN);
+      LOGGER.info("You have " + traktCollection.size() + " shows in your Trakt.tv collection");
+      traktWatched = TRAKT.sync().watchedShows(Extended.DEFAULT_MIN);
+      LOGGER.info("You have " + traktWatched.size() + " shows watched");
+    }
+    catch (RetrofitError e) {
+      handleRetrofitError(e);
+      return;
+    }
+    catch (UnauthorizedException e) {
+      e.printStackTrace();
+    }
+
+    // *****************************************************************************
+    // 2) remove every shows from the COLLECTION state
+    // *****************************************************************************
+    List<SyncShow> showToRemove = new ArrayList<SyncShow>();
+    for (BaseShow traktShow : traktCollection) {
+      showToRemove.add(toSyncShow(traktShow));
+    }
+    if (!showToRemove.isEmpty()) {
+      try {
+        SyncItems items = new SyncItems().shows(showToRemove);
+        TRAKT.sync().deleteItemsFromCollection(items);
+        LOGGER.info("removed " + showToRemove.size() + " shows from your trakt.tv collection");
       }
-      LOGGER.info("Inserted         : " + resp.inserted);
-      LOGGER.info("Already inserted : " + resp.already_exist);
-      LOGGER.info("Skipped          : " + resp.skipped);
+      catch (RetrofitError e) {
+        handleRetrofitError(e);
+        return;
+      }
+      catch (UnauthorizedException e) {
+        e.printStackTrace();
+      }
+    }
+
+    // *****************************************************************************
+    // 3) remove every shows from the WATCHED state
+    // *****************************************************************************
+    showToRemove.clear();
+    for (BaseShow traktShow : traktWatched) {
+      showToRemove.add(toSyncShow(traktShow));
+    }
+    if (!showToRemove.isEmpty()) {
+      try {
+        SyncItems items = new SyncItems().shows(showToRemove);
+        TRAKT.sync().deleteItemsFromWatchedHistory(items);
+        LOGGER.info("removed " + showToRemove.size() + " shows from your trakt.tv watched");
+      }
+      catch (RetrofitError e) {
+        handleRetrofitError(e);
+        return;
+      }
+      catch (UnauthorizedException e) {
+        e.printStackTrace();
+      }
     }
   }
 
+  // @formatter:off
+  // ██╗   ██╗████████╗██╗██╗     ███████╗
+  // ██║   ██║╚══██╔══╝██║██║     ██╔════╝
+  // ██║   ██║   ██║   ██║██║     ███████╗
+  // ██║   ██║   ██║   ██║██║     ╚════██║
+  // ╚██████╔╝   ██║   ██║███████╗███████║
+  //  ╚═════╝    ╚═╝   ╚═╝╚══════╝╚══════╝
+  // @formatter:on
+
+  private boolean updateIDs(TvShow tmmShow, ShowIds ids) {
+    boolean dirty = false;
+    if (tmmShow.getIdAsString(Constants.IMDBID).isEmpty() && !StringUtils.isEmpty(ids.imdb)) {
+      tmmShow.setId(Constants.IMDBID, ids.imdb);
+      dirty = true;
+    }
+    if (tmmShow.getIdAsInt(Constants.TMDBID) == 0 && ids.tmdb != null && ids.tmdb != 0) {
+      tmmShow.setId(Constants.TMDBID, ids.tmdb);
+      dirty = true;
+    }
+    if (tmmShow.getIdAsInt(Constants.TRAKTID) == 0 && ids.trakt != null && ids.trakt != 0) {
+      tmmShow.setId(Constants.TRAKTID, ids.trakt);
+      dirty = true;
+    }
+    if (tmmShow.getIdAsInt(Constants.TVDBID) == 0 && ids.tvdb != null && ids.tvdb != 0) {
+      tmmShow.setId(Constants.TVDBID, ids.tvdb);
+      dirty = true;
+    }
+    if (tmmShow.getIdAsInt(Constants.TVRAGEID) == 0 && ids.tvrage != null && ids.tvrage != 0) {
+      tmmShow.setId(Constants.TVRAGEID, ids.tvrage);
+      dirty = true;
+    }
+    return dirty;
+  }
+
+  private boolean updateIDs(Movie tmmMovie, MovieIds ids) {
+    boolean dirty = false;
+    if (tmmMovie.getIdAsString(Constants.IMDBID).isEmpty() && !StringUtils.isEmpty(ids.imdb)) {
+      tmmMovie.setId(Constants.IMDBID, ids.imdb);
+      dirty = true;
+    }
+    if (tmmMovie.getIdAsInt(Constants.TMDBID) == 0 && ids.tmdb != null && ids.tmdb != 0) {
+      tmmMovie.setId(Constants.TMDBID, ids.tmdb);
+      dirty = true;
+    }
+    if (tmmMovie.getIdAsInt(Constants.TRAKTID) == 0 && ids.trakt != null && ids.trakt != 0) {
+      tmmMovie.setId(Constants.TRAKTID, ids.trakt);
+      dirty = true;
+    }
+    return dirty;
+  }
+
+  private boolean matches(TvShow tmmShow, ShowIds ids) {
+    if (ids.trakt != 0 && ids.trakt == tmmShow.getIdAsInt(Constants.TRAKTID)) {
+      return true;
+    }
+    if (StringUtils.isNotEmpty(ids.imdb) && ids.imdb.equals(tmmShow.getIdAsString(Constants.IMDBID))) {
+      return true;
+    }
+    if (ids.tmdb != 0 && ids.tmdb == tmmShow.getIdAsInt(Constants.TMDBID)) {
+      return true;
+    }
+    if (ids.tvdb != 0 && ids.tvdb == tmmShow.getIdAsInt(Constants.TVDBID)) {
+      return true;
+    }
+    if (ids.tvrage != 0 && ids.tvrage == tmmShow.getIdAsInt(Constants.TVRAGEID)) {
+      return true;
+    }
+    return false;
+  }
+
+  private boolean matches(Movie tmmMovie, MovieIds ids) {
+    if (ids.trakt != 0 && ids.trakt == tmmMovie.getIdAsInt(Constants.TRAKTID)) {
+      return true;
+    }
+    if (StringUtils.isNotEmpty(ids.imdb) && ids.imdb.equals(tmmMovie.getIdAsString(Constants.IMDBID))) {
+      return true;
+    }
+    if (ids.tmdb != 0 && ids.tmdb == tmmMovie.getIdAsInt(Constants.TMDBID)) {
+      return true;
+    }
+    return false;
+  }
+
+  private SyncMovie toSyncMovie(Movie tmmMovie, boolean watched) {
+    SyncMovie movie = null;
+
+    MovieIds ids = new MovieIds();
+    if (!tmmMovie.getIdAsString(Constants.IMDBID).isEmpty()) {
+      ids.imdb = tmmMovie.getIdAsString(Constants.IMDBID);
+    }
+    if (tmmMovie.getIdAsInt(Constants.TMDBID) != 0) {
+      ids.tmdb = tmmMovie.getIdAsInt(Constants.TMDBID);
+    }
+    if (tmmMovie.getIdAsInt(Constants.TRAKTID) != 0) {
+      ids.trakt = tmmMovie.getIdAsInt(Constants.TRAKTID);
+    }
+
+    if (!watched || (watched && tmmMovie.isWatched())) {
+      movie = new SyncMovie().id(ids).collectedAt(new DateTime(tmmMovie.getDateAdded())).watchedAt(new DateTime(tmmMovie.getLastWatched()));
+    }
+    return movie;
+  }
+
+  private SyncMovie toSyncMovie(BaseMovie baseMovie) {
+    SyncMovie movie = new SyncMovie().id(baseMovie.movie.ids).collectedAt(baseMovie.collected_at).watchedAt(baseMovie.last_watched_at);
+    return movie;
+  }
+
+  private SyncShow toSyncShow(TvShow tmmShow, boolean watched) {
+    SyncShow show = null;
+    ShowIds ids = new ShowIds();
+    if (!tmmShow.getIdAsString(Constants.IMDBID).isEmpty()) {
+      ids.imdb = tmmShow.getIdAsString(Constants.IMDBID);
+    }
+    if (tmmShow.getIdAsInt(Constants.TMDBID) != 0) {
+      ids.tmdb = tmmShow.getIdAsInt(Constants.TMDBID);
+    }
+    if (tmmShow.getIdAsInt(Constants.TVDBID) != 0) {
+      ids.tvdb = tmmShow.getIdAsInt(Constants.TVDBID);
+    }
+    if (tmmShow.getIdAsInt(Constants.TRAKTID) != 0) {
+      ids.trakt = tmmShow.getIdAsInt(Constants.TRAKTID);
+    }
+    if (tmmShow.getIdAsInt(Constants.TVRAGEID) != 0) {
+      ids.tvrage = tmmShow.getIdAsInt(Constants.TVRAGEID);
+    }
+
+    ArrayList<SyncSeason> ss = new ArrayList<SyncSeason>();
+    boolean foundS = false;
+    for (TvShowSeason tmmSeason : tmmShow.getSeasons()) {
+      boolean foundEP = false;
+      ArrayList<SyncEpisode> se = new ArrayList<SyncEpisode>();
+      for (TvShowEpisode tmmEp : tmmSeason.getEpisodes()) {
+        if (!watched || (watched && tmmEp.isWatched())) {
+          se.add(new SyncEpisode().number(tmmEp.getEpisode()).collectedAt(new DateTime(tmmEp.getDateAdded()))
+              .watchedAt(new DateTime(tmmEp.getLastWatched())));
+          foundEP = true;
+        }
+      }
+      if (foundEP) {
+        // do not send empty seasons
+        foundS = true;
+        ss.add(new SyncSeason().number(tmmSeason.getSeason()).episodes(se));
+      }
+    }
+
+    if (foundS) {
+      // we have at least one season/episode, so add it
+      show = new SyncShow().id(ids).collectedAt(new DateTime(tmmShow.getDateAdded())).seasons(ss);
+    }
+    // if nothing added, do NOT send an empty show (to add all)
+    return show;
+  }
+
+  private SyncShow toSyncShow(BaseShow baseShow) {
+    ArrayList<SyncSeason> ss = new ArrayList<SyncSeason>();
+    for (BaseSeason baseSeason : baseShow.seasons) {
+      ArrayList<SyncEpisode> se = new ArrayList<SyncEpisode>();
+      for (BaseEpisode baseEp : baseSeason.episodes) {
+        se.add(new SyncEpisode().number(baseEp.number).collectedAt(new DateTime(baseEp.collected_at)));
+      }
+      ss.add(new SyncSeason().number(baseSeason.number).episodes(se));
+    }
+    SyncShow show = new SyncShow().id(baseShow.show.ids).collectedAt(new DateTime(baseShow.last_collected_at))
+        .watchedAt(new DateTime(baseShow.last_watched_at)).seasons(ss);
+    return show;
+  }
+
   /**
-   * prints some trakt status (TV)
+   * prints some trakt response status
    * 
    * @param reponse
    *          the reponse
    */
-  private void printStatus(com.jakewharton.trakt.entities.Response resp) {
+  private void printStatus(SyncResponse resp) {
     if (resp != null) {
-      LOGGER.info("Status           : " + resp.status);
-      if (!resp.status.equals(Status.SUCCESS)) {
-        LOGGER.error("Error            : " + resp.error);
-        LOGGER.error("Message          : " + resp.message);
+      String info = getStatusString(resp.added);
+      if (!info.isEmpty()) {
+        LOGGER.info("Added       : " + info);
+      }
+      info = getStatusString(resp.existing);
+      if (!info.isEmpty()) {
+        LOGGER.info("Existing    : " + info);
+      }
+      info = getStatusString(resp.deleted);
+      if (!info.isEmpty()) {
+        LOGGER.info("Deleted     : " + info);
+      }
+      info = getStatusString(resp.not_found);
+      if (!info.isEmpty()) {
+        LOGGER.error("Errors      : " + info);
       }
     }
+  }
+
+  private String getStatusString(SyncStats ss) {
+    if (ss == null) {
+      return "";
+    }
+    StringBuilder sb = new StringBuilder(50);
+
+    if (ss.movies != null && ss.movies > 0) {
+      sb.append(ss.movies + " Movies ");
+    }
+    if (ss.shows != null && ss.shows > 0) {
+      sb.append(ss.shows + " Shows ");
+    }
+    if (ss.seasons != null && ss.seasons > 0) {
+      sb.append(ss.seasons + " Seasons ");
+    }
+    if (ss.episodes != null && ss.episodes > 0) {
+      sb.append(ss.episodes + " Episodes");
+    }
+
+    return sb.toString();
+  }
+
+  private String getStatusString(SyncErrors ss) {
+    if (ss == null) {
+      return "";
+    }
+    StringBuilder sb = new StringBuilder(50);
+
+    // TODO: iterate over error array and display which did not work
+    if (ss.movies != null && ss.movies.size() > 0) {
+      sb.append(ss.movies.size() + " Movies ");
+    }
+    if (ss.shows != null && ss.shows.size() > 0) {
+      sb.append(ss.shows.size() + " Shows ");
+    }
+    if (ss.seasons != null && ss.seasons.size() > 0) {
+      sb.append(ss.seasons.size() + " Seasons ");
+    }
+    if (ss.episodes != null && ss.episodes.size() > 0) {
+      sb.append(ss.episodes.size() + " Episodes");
+    }
+
+    return sb.toString();
   }
 
   /**
@@ -853,6 +992,10 @@ public class TraktTv implements IMediaProvider {
         catch (IOException e1) {
           LOGGER.warn("IOException on Trakt error", e1);
         }
+      }
+      if (r.getStatus() == 401) {
+        // not authenticated or token expired - try to login once more
+        // this.Login(); // FIXME: TEST for recursion
       }
     }
     else {

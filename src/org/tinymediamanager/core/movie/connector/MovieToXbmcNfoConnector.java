@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,6 +61,7 @@ import org.tinymediamanager.core.Message.MessageLevel;
 import org.tinymediamanager.core.MessageManager;
 import org.tinymediamanager.core.entities.MediaFile;
 import org.tinymediamanager.core.entities.MediaFileAudioStream;
+import org.tinymediamanager.core.entities.MediaFileSubtitle;
 import org.tinymediamanager.core.movie.MovieList;
 import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.core.movie.MovieNfoNaming;
@@ -70,10 +71,11 @@ import org.tinymediamanager.core.movie.entities.Movie;
 import org.tinymediamanager.core.movie.entities.MovieActor;
 import org.tinymediamanager.core.movie.entities.MovieProducer;
 import org.tinymediamanager.core.movie.entities.MovieSet;
+import org.tinymediamanager.core.movie.entities.MovieTrailer;
 import org.tinymediamanager.scraper.Certification;
 import org.tinymediamanager.scraper.CountryCode;
 import org.tinymediamanager.scraper.MediaGenres;
-import org.tinymediamanager.scraper.MediaTrailer;
+import org.tinymediamanager.scraper.util.ParserUtils;
 
 /**
  * The Class MovieToXbmcNfoConnector.
@@ -406,7 +408,7 @@ public class MovieToXbmcNfoConnector {
     }
 
     xbmc.trailer = "";
-    for (MediaTrailer trailer : new ArrayList<MediaTrailer>(movie.getTrailers())) {
+    for (MovieTrailer trailer : new ArrayList<MovieTrailer>(movie.getTrailers())) {
       if (trailer.getInNfo() && !trailer.getUrl().startsWith("file")) {
         // parse internet trailer url for nfo (do not add local one)
         xbmc.trailer = prepareTrailerForXbmc(trailer);
@@ -435,18 +437,24 @@ public class MovieToXbmcNfoConnector {
     xbmc.sorttitle = movie.getSortTitle();
 
     // fileinfo
+    Fileinfo info = new Fileinfo();
     for (MediaFile mediaFile : movie.getMediaFiles(MediaFileType.VIDEO)) {
       if (StringUtils.isEmpty(mediaFile.getVideoCodec())) {
         break;
       }
 
-      // if (xbmc.fileinfo == null) {
-      Fileinfo info = new Fileinfo();
       info.streamdetails.video.codec = mediaFile.getVideoCodec();
       info.streamdetails.video.aspect = String.valueOf(mediaFile.getAspectRatio());
       info.streamdetails.video.width = mediaFile.getVideoWidth();
       info.streamdetails.video.height = mediaFile.getVideoHeight();
       info.streamdetails.video.durationinseconds = movie.getRuntimeFromMediaFiles();
+      // "Spec": https://github.com/xbmc/xbmc/blob/master/xbmc/guilib/StereoscopicsManager.cpp
+      if (mediaFile.getVideo3DFormat().equals(MediaFile.VIDEO_3D_SBS) || mediaFile.getVideo3DFormat().equals(MediaFile.VIDEO_3D_HSBS)) {
+        info.streamdetails.video.stereomode = "left_right";
+      }
+      else if (mediaFile.getVideo3DFormat().equals(MediaFile.VIDEO_3D_TAB) || mediaFile.getVideo3DFormat().equals(MediaFile.VIDEO_3D_HTAB)) {
+        info.streamdetails.video.stereomode = "top_bottom"; // maybe?
+      }
 
       for (MediaFileAudioStream as : mediaFile.getAudioStreams()) {
         Audio audio = new Audio();
@@ -455,10 +463,22 @@ public class MovieToXbmcNfoConnector {
         audio.channels = String.valueOf(as.getChannelsAsInt());
         info.streamdetails.audio.add(audio);
       }
-      xbmc.fileinfo = info;
+      for (MediaFileSubtitle ss : mediaFile.getSubtitles()) {
+        Subtitle sub = new Subtitle();
+        sub.language = ss.getLanguage();
+        info.streamdetails.subtitle.add(sub);
+      }
       break;
-      // }
     }
+    // add external subtitles to NFO
+    for (MediaFile mediaFile : movie.getMediaFiles(MediaFileType.SUBTITLE)) {
+      for (MediaFileSubtitle ss : mediaFile.getSubtitles()) {
+        Subtitle sub = new Subtitle();
+        sub.language = ss.getLanguage();
+        info.streamdetails.subtitle.add(sub);
+      }
+    }
+    xbmc.fileinfo = info;
 
     // add all unsupported tags again
     xbmc.unsupportedElements.addAll(unsupportedTags);
@@ -676,7 +696,7 @@ public class MovieToXbmcNfoConnector {
         String urlFromNfo = parseTrailerUrl(xbmc.trailer);
         if (!urlFromNfo.startsWith("file")) {
           // only add new MT when not a local file
-          MediaTrailer trailer = new MediaTrailer();
+          MovieTrailer trailer = new MovieTrailer();
           trailer.setName("fromNFO");
           trailer.setProvider("from NFO");
           trailer.setQuality("unknown");
@@ -734,7 +754,7 @@ public class MovieToXbmcNfoConnector {
       completeNFO = matcher
           .replaceFirst("<movie xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
     }
-    Reader in = new StringReader(completeNFO);
+    Reader in = new StringReader(ParserUtils.cleanNfo(completeNFO));
     return (MovieToXbmcNfoConnector) um.unmarshal(in);
   }
 
@@ -775,7 +795,7 @@ public class MovieToXbmcNfoConnector {
     return pureProducers;
   }
 
-  private static String prepareTrailerForXbmc(MediaTrailer trailer) {
+  private static String prepareTrailerForXbmc(MovieTrailer trailer) {
     // youtube trailer are stored in a special notation: plugin://plugin.video.youtube/?action=play_video&videoid=<ID>
     // parse out the ID from the url and store it in the right notation
     Pattern pattern = Pattern.compile("https{0,1}://.*youtube..*/watch\\?v=(.*)$");
@@ -886,14 +906,18 @@ public class MovieToXbmcNfoConnector {
    */
   static class Streamdetails {
     @XmlElement
-    private Video       video;
+    private Video          video;
 
     @XmlElement
-    private List<Audio> audio;
+    private List<Audio>    audio;
+
+    @XmlElement
+    private List<Subtitle> subtitle;
 
     public Streamdetails() {
       video = new Video();
       audio = new ArrayList<Audio>();
+      subtitle = new ArrayList<Subtitle>();
     }
   }
 
@@ -915,6 +939,9 @@ public class MovieToXbmcNfoConnector {
 
     @XmlElement
     private int    durationinseconds;
+
+    @XmlElement
+    private String stereomode;
   }
 
   /*
@@ -929,5 +956,13 @@ public class MovieToXbmcNfoConnector {
 
     @XmlElement
     private String channels;
+  }
+
+  /*
+   * inner class holding details of the subtitle stream
+   */
+  static class Subtitle {
+    @XmlElement
+    private String language;
   }
 }

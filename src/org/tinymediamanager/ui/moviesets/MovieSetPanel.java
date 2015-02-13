@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,9 @@ import java.awt.CardLayout;
 import java.awt.Graphics;
 import java.awt.Insets;
 import java.awt.Rectangle;
+import java.awt.event.ActionEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.util.ResourceBundle;
 
@@ -257,6 +260,16 @@ public class MovieSetPanel extends JPanel {
     // build menu
     buildMenu();
 
+    // add double click listener
+    MouseListener mouseListener = new MouseAdapter() {
+      @Override
+      public void mousePressed(MouseEvent e) {
+        if (e.getClickCount() == 2) {
+          actionEditMovieSet.actionPerformed(new ActionEvent(e, 0, ""));
+        }
+      }
+    };
+    tree.addMouseListener(mouseListener);
   }
 
   private void buildMenu() {

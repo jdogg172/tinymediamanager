@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -197,7 +197,8 @@ public class TvShowScrapeTask extends TmmThreadPool {
 
       catch (Exception e) {
         LOGGER.error("Thread crashed", e);
-        MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, "TvShowScraper", "message.scrape.threadcrashed"));
+        MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, "TvShowScraper", "message.scrape.threadcrashed", new String[] { ":",
+            e.getLocalizedMessage() }));
       }
     }
 

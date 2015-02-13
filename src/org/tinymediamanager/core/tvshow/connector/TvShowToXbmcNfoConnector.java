@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,6 +46,7 @@ import org.apache.commons.lang3.SystemUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
+import org.tinymediamanager.core.Constants;
 import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.Message;
 import org.tinymediamanager.core.Message.MessageLevel;
@@ -55,6 +56,7 @@ import org.tinymediamanager.core.tvshow.entities.TvShow;
 import org.tinymediamanager.core.tvshow.entities.TvShowActor;
 import org.tinymediamanager.scraper.Certification;
 import org.tinymediamanager.scraper.MediaGenres;
+import org.tinymediamanager.scraper.util.ParserUtils;
 
 /**
  * The Class TvShowToXbmcNfoConnector.
@@ -157,8 +159,8 @@ public class TvShowToXbmcNfoConnector {
     }
 
     // set data
-    if (tvShow.getTvdbId() != null) {
-      String tvdbid = tvShow.getTvdbId();
+    String tvdbid = tvShow.getIdAsString(Constants.TVDBID);
+    if (tvdbid.isEmpty()) {
       xbmc.setId(tvdbid);
       xbmc.episodeguide.url.cache = tvdbid + ".xml";
       xbmc.episodeguide.url.url = "http://www.thetvdb.com/api/1D62F2F90030C444/series/" + tvdbid + "/all/"
@@ -309,7 +311,7 @@ public class TvShowToXbmcNfoConnector {
 
     // now trying to parse it via string
     String completeNFO = FileUtils.readFileToString(nfoFile, "UTF-8").trim().replaceFirst("^([\\W]+)<", "<");
-    Reader in = new StringReader(completeNFO);
+    Reader in = new StringReader(ParserUtils.cleanNfo(completeNFO));
     return (TvShowToXbmcNfoConnector) um.unmarshal(in);
   }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package org.tinymediamanager.core.movie;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ListIterator;
 
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlElementWrapper;
@@ -144,6 +145,7 @@ public class MovieSettings extends AbstractModelObject {
   private boolean                       runtimeFromMediaInfo                     = false;
   private boolean                       asciiReplacement                         = false;
   private boolean                       yearColumnVisible                        = true;
+  private boolean                       ratingColumnVisible                      = true;
   private boolean                       nfoColumnVisible                         = true;
   private boolean                       imageColumnVisible                       = true;
   private boolean                       trailerColumnVisible                     = true;
@@ -595,18 +597,23 @@ public class MovieSettings extends AbstractModelObject {
   }
 
   public void addBadWord(String badWord) {
-    if (!badWords.contains(badWord)) {
-      badWords.add(badWord);
+    if (!badWords.contains(badWord.toLowerCase())) {
+      badWords.add(badWord.toLowerCase());
       firePropertyChange(BAD_WORDS, null, badWords);
     }
   }
 
   public void removeBadWord(String badWord) {
-    badWords.remove(badWord);
+    badWords.remove(badWord.toLowerCase());
     firePropertyChange(BAD_WORDS, null, badWords);
   }
 
   public List<String> getBadWords() {
+    // convert to lowercase for easy contains checking
+    ListIterator<String> iterator = badWords.listIterator();
+    while (iterator.hasNext()) {
+      iterator.set(iterator.next().toLowerCase());
+    }
     return badWords;
   }
 
@@ -618,6 +625,16 @@ public class MovieSettings extends AbstractModelObject {
     boolean oldValue = this.yearColumnVisible;
     this.yearColumnVisible = newValue;
     firePropertyChange(YEAR_COLUMN_VISIBLE, oldValue, newValue);
+  }
+
+  public boolean isRatingColumnVisible() {
+    return ratingColumnVisible;
+  }
+
+  public void setRatingColumnVisible(boolean newValue) {
+    boolean oldValue = this.ratingColumnVisible;
+    this.ratingColumnVisible = newValue;
+    firePropertyChange("ratingColumnVisible", oldValue, newValue);
   }
 
   public boolean isNfoColumnVisible() {

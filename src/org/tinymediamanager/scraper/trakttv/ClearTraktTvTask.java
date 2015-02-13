@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,16 +39,16 @@ public class ClearTraktTvTask extends TmmTask {
 
   @Override
   protected void doInBackground() {
-    TraktTv traktTV = new TraktTv();
+    TraktTv traktTV = TraktTv.getInstance();
 
     if (clearMovies) {
       publishState(BUNDLE.getString("trakt.clear.movies"), 0); //$NON-NLS-1$
-      traktTV.clearTraktMovieCollection();
+      traktTV.clearTraktMovies();
     }
 
     if (clearTvShows) {
       publishState(BUNDLE.getString("trakt.clear.tvshows"), 0); //$NON-NLS-1$
-      traktTV.clearTraktTvShowCollection();
+      traktTV.clearTraktTvShows();
     }
   }
 }

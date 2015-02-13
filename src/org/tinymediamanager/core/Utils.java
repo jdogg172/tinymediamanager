@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,30 +73,31 @@ public class Utils {
   private static final Logger                       LOGGER            = LoggerFactory.getLogger(Utils.class);
 
   /**
-   * Map of all known language/country/abbreviations, key is LOWERCASE
+   * Map of all known English/UserLocalized String to base locale, key is LOWERCASE
    */
   public static final LinkedHashMap<String, Locale> KEY_TO_LOCALE_MAP = generateSubtitleLanguageArray();
 
   private static LinkedHashMap<String, Locale> generateSubtitleLanguageArray() {
     Map<String, Locale> langArray = new HashMap<String, Locale>();
 
-    Locale intl = new Locale("en");
+    Locale intl = Locale.ENGLISH;
     Locale locales[] = Locale.getAvailableLocales();
     // all possible variants of language/country/prefixes/non-iso style
     for (Locale locale : locales) {
-      langArray.put(locale.getDisplayLanguage(intl), locale);
-      langArray.put(locale.getDisplayLanguage(), locale);
+      Locale base = new Locale(locale.getLanguage()); // from all, create only the base languages
+      langArray.put(base.getDisplayLanguage(intl), base);
+      langArray.put(base.getDisplayLanguage(), base);
       try {
-        langArray.put(locale.getDisplayLanguage(intl).substring(0, 3), locale); // eg German -> Ger, where iso3=deu
+        langArray.put(base.getDisplayLanguage(intl).substring(0, 3), base); // eg German -> Ger, where iso3=deu
       }
       catch (Exception e) {
         // ignore
       }
-      langArray.put(locale.getISO3Language(), locale);
-      langArray.put(locale.getCountry(), locale);
+      langArray.put(base.getISO3Language(), base);
+      langArray.put(base.getCountry(), base);
       try {
-        String c = locale.getISO3Country();
-        langArray.put(c, locale);
+        String c = base.getISO3Country();
+        langArray.put(c, base);
       }
       catch (MissingResourceException e) {
         // tjo... not available, see javadoc
@@ -122,6 +123,20 @@ public class Utils {
     }
 
     return sortedMap;
+  }
+
+  /**
+   * uses our localized language mapping table, to get the iso3 code
+   * 
+   * @param text
+   * @return 3 chars or empty string
+   */
+  public static String getIso3LanguageFromLocalizedString(String text) {
+    Locale l = KEY_TO_LOCALE_MAP.get(text.toLowerCase());
+    if (l != null) {
+      return l.getISO3Language();
+    }
+    return "";
   }
 
   /**
@@ -174,34 +189,6 @@ public class Utils {
    */
   public static String relPath(File parent, File child) {
     return parent.toURI().relativize(child.toURI()).getPath();
-  }
-
-  /**
-   * gets a locale from specific string
-   * 
-   * @param text
-   * @return Locale or NULL
-   */
-  public static Locale getLocaleFromCountry(String text) {
-    String lang = text.toLowerCase().split("[_.-]")[0];
-    return KEY_TO_LOCALE_MAP.get(lang);
-  }
-
-  /**
-   * gets the localized DisplayLanguage , derived from specific string
-   * 
-   * @param text
-   * @return the displayLanguage or empty string
-   */
-  public static String getDisplayLanguage(String text) {
-    Locale l = getLocaleFromCountry(text);
-    if (l == null) {
-      return "";
-    }
-    else {
-      // return l.getDisplayLanguage(new Locale("en")); // name in english
-      return l.getDisplayLanguage(); // local name
-    }
   }
 
   /**
@@ -514,7 +501,7 @@ public class Utils {
     if (!srcDir.isDirectory()) {
       throw new IOException("Source '" + srcDir + "' is not a directory");
     }
-    if (destDir.exists()) {
+    if (destDir.exists() && !srcDir.equals(destDir)) { // extra check for windows, where the File.equals is case insensitive
       throw new FileExistsException("Destination '" + destDir + "' already exists");
     }
     if (!destDir.getParentFile().exists()) {
@@ -584,7 +571,8 @@ public class Utils {
     if (destFile == null) {
       throw new NullPointerException("Destination must not be null");
     }
-    if (!srcFile.equals(destFile)) {
+    // if (!srcFile.equals(destFile)) {
+    if (!srcFile.getAbsolutePath().equals(destFile.getAbsolutePath())) {
       LOGGER.debug("try to move file " + srcFile.getPath() + " to " + destFile.getPath());
       if (!srcFile.exists()) {
         throw new FileNotFoundException("Source '" + srcFile + "' does not exist");
@@ -592,7 +580,7 @@ public class Utils {
       if (srcFile.isDirectory()) {
         throw new IOException("Source '" + srcFile + "' is a directory");
       }
-      if (destFile.exists()) {
+      if (destFile.exists() && !srcFile.equals(destFile)) { // extra check for windows, where the File.equals is case insensitive
         throw new FileExistsException("Destination '" + destFile + "' already exists");
       }
       if (destFile.isDirectory()) {

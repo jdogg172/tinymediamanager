@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -152,7 +152,7 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
 
     if (StringUtils.isNotEmpty(query.get(MediaSearchOptions.SearchParam.YEAR))) {
       try {
-        Integer.parseInt(query.get(MediaSearchOptions.SearchParam.YEAR));
+        year = Integer.parseInt(query.get(MediaSearchOptions.SearchParam.YEAR));
       }
       catch (Exception e) {
         year = 0;
@@ -267,7 +267,21 @@ public class TmdbMetadataProvider implements IMediaMetadataProvider, IMediaArtwo
         }
         else {
           // compare score based on names
-          sr.setScore(MetadataUtil.calculateScore(searchString, movie.getTitle()));
+          float score = MetadataUtil.calculateScore(searchString, movie.getTitle());
+
+          // score adaption based on the year
+          int resultYear = 0;
+          try {
+            resultYear = Integer.parseInt(sr.getYear());
+          }
+          catch (NumberFormatException e) {
+          }
+          if (year != 0 && year != resultYear) {
+            LOGGER.debug("parsed year does not match search result year - downgrading score by 0.01");
+            score = score - 0.01f;
+          }
+
+          sr.setScore(score);
         }
         resultList.add(sr);
       }

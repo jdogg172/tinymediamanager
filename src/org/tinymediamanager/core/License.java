@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -124,10 +124,12 @@ public class License {
   }
 
   /**
-   * checks if license is valid
+   * checks if license is valid<br>
+   * <b>DO NOT USE THIS - use Globals.isDonator()</b>
    * 
    * @return true or false (false also if not existent)
    */
+  @Deprecated
   public static boolean isValid() {
     if (getLicenseFile() != null) {
       Properties lic = decrypt();
@@ -216,6 +218,7 @@ public class License {
     }
     catch (Exception e) {
       // file not found or whatever
+      LOGGER.error("Error decrypting license file", e);
       return null;
     }
   }
@@ -271,6 +274,7 @@ public class License {
       return true;
     }
     catch (Exception e) {
+      LOGGER.error("Error generating license", e);
       return false;
     }
   }

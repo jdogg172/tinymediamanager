@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,29 +67,30 @@ import org.tinymediamanager.scraper.MediaMetadata;
 @Entity
 @Inheritance(strategy = javax.persistence.InheritanceType.JOINED)
 public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpisode> {
-  private static final Logger LOGGER     = LoggerFactory.getLogger(TvShowEpisode.class);
+  private static final Logger LOGGER      = LoggerFactory.getLogger(TvShowEpisode.class);
 
   @ManyToOne
-  private TvShow              tvShow     = null;
-  private int                 episode    = -1;
-  private int                 season     = -1;
-  private int                 dvdSeason  = -1;
-  private int                 dvdEpisode = -1;
-  private Date                firstAired = null;
-  private String              director   = "";
-  private String              writer     = "";
-  private boolean             disc       = false;
-  private boolean             watched    = false;
-  private int                 votes      = 0;
-  private boolean             subtitles  = false;
-  private boolean             isDvdOrder = false;
+  private TvShow              tvShow      = null;
+  private int                 episode     = -1;
+  private int                 season      = -1;
+  private int                 dvdSeason   = -1;
+  private int                 dvdEpisode  = -1;
+  private Date                firstAired  = null;
+  private String              director    = "";
+  private String              writer      = "";
+  private boolean             disc        = false;
+  private boolean             watched     = false;
+  private Date                lastWatched = null;
+  private int                 votes       = 0;
+  private boolean             subtitles   = false;
+  private boolean             isDvdOrder  = false;
 
   @Transient
-  private boolean             newlyAdded = false;
+  private boolean             newlyAdded  = false;
 
   @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
-  private List<TvShowActor>   actors     = new ArrayList<TvShowActor>(0);
-  private List<String>        tags       = new ArrayList<String>(0);
+  private List<TvShowActor>   actors      = new ArrayList<TvShowActor>(0);
+  private List<String>        tags        = new ArrayList<String>(0);
 
   static {
     mediaFileComparator = new TvShowMediaFileComparator();
@@ -293,7 +294,9 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
   public void setAiredEpisode(int newValue) {
     int oldValue = this.episode;
     this.episode = newValue;
-    firePropertyChange(EPISODE, oldValue, newValue);
+    if (!isDvdOrder) {
+      firePropertyChange(EPISODE, oldValue, newValue);
+    }
     firePropertyChange(AIRED_EPISODE, oldValue, newValue);
   }
 
@@ -321,7 +324,9 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
   public void setAiredSeason(int newValue) {
     int oldValue = this.season;
     this.season = newValue;
-    firePropertyChange(SEASON, oldValue, newValue);
+    if (!isDvdOrder) {
+      firePropertyChange(SEASON, oldValue, newValue);
+    }
     firePropertyChange(AIRED_SEASON, oldValue, newValue);
   }
 
@@ -379,6 +384,12 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
    *          the new metadata
    */
   public void setMetadata(MediaMetadata metadata) {
+    // check against null metadata (e.g. aborted request)
+    if (metadata == null) {
+      LOGGER.error("metadata was null");
+      return;
+    }
+
     boolean writeNewThumb = false;
 
     setTitle(metadata.getStringValue(MediaMetadata.TITLE));
@@ -639,6 +650,14 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
     boolean oldValue = this.watched;
     this.watched = newValue;
     firePropertyChange(WATCHED, oldValue, newValue);
+  }
+
+  public Date getLastWatched() {
+    return lastWatched;
+  }
+
+  public void setLastWatched(Date lastWatched) {
+    this.lastWatched = lastWatched;
   }
 
   /**
@@ -1051,7 +1070,9 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
   public void setDvdSeason(int newValue) {
     int oldValue = this.dvdSeason;
     this.dvdSeason = newValue;
-    firePropertyChange(SEASON, oldValue, newValue);
+    if (isDvdOrder) {
+      firePropertyChange(SEASON, oldValue, newValue);
+    }
     firePropertyChange(DVD_SEASON, oldValue, newValue);
   }
 
@@ -1062,7 +1083,9 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
   public void setDvdEpisode(int newValue) {
     int oldValue = this.dvdEpisode;
     this.dvdEpisode = newValue;
-    firePropertyChange(EPISODE, oldValue, newValue);
+    if (isDvdOrder) {
+      firePropertyChange(EPISODE, oldValue, newValue);
+    }
     firePropertyChange(DVD_EPISODE, oldValue, newValue);
   }
 

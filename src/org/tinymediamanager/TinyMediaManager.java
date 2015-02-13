@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.lang.reflect.Field;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.logging.Level;
@@ -85,8 +86,8 @@ public class TinyMediaManager {
   public static void main(String[] args) {
     // simple parse command line
     if (args != null && args.length > 0) {
+      LOGGER.debug("TMM started with: " + Arrays.toString(args));
       TinyMediaManagerCMD.parseParams(args);
-
       System.setProperty("java.awt.headless", "true");
     }
     else {
@@ -240,8 +241,12 @@ public class TinyMediaManager {
             Globals.settings.setProxy();
           }
 
-          // set native dir (needs to be absolute)
-          // String nativepath = TinyMediaManager.class.getClassLoader().getResource(".").getPath() + "native/";
+          // MediaInfo /////////////////////////////////////////////////////
+          if (g2 != null) {
+            updateProgress(g2, "loading MediaInfo libs", 20);
+            splash.update();
+          }
+
           String nativepath = "native/";
           if (Platform.isWindows()) {
             nativepath += "windows-";
@@ -253,16 +258,26 @@ public class TinyMediaManager {
             nativepath += "mac-";
           }
           nativepath += System.getProperty("os.arch");
-          System.setProperty("jna.library.path", nativepath);
 
-          // MediaInfo /////////////////////////////////////////////////////
-          if (g2 != null) {
-            updateProgress(g2, "loading MediaInfo libs", 20);
-            splash.update();
+          String miv = "";
+          // need that, since we cannot try and reload/unload a Class
+          // MI does not load over UNC, so copy to temp
+          if (System.getProperty("user.dir", "").startsWith("\\\\") || System.getProperty("user.dir", "").startsWith("//")) {
+            LOGGER.debug("We're on a network UNC path!");
+            File tmpDir = new File(System.getProperty("java.io.tmpdir"), "tmm");
+            File nativeDir = new File(tmpDir, nativepath);
+            FileUtils.copyDirectory(new File(nativepath), nativeDir); // same structure
+
+            System.setProperty("jna.library.path", nativeDir.getAbsolutePath());
+            LOGGER.debug("Loading native mediainfo lib from: {}", nativeDir.getAbsolutePath());
+            miv = MediaInfo.version(); // load class
           }
-          LOGGER.debug("Loading native mediainfo lib from: {}", nativepath);
-          // load libMediainfo
-          String miv = MediaInfo.version();
+          else {
+            System.setProperty("jna.library.path", nativepath);
+            LOGGER.debug("Loading native mediainfo lib from: {}", nativepath);
+            miv = MediaInfo.version(); // load class
+          }
+
           if (!StringUtils.isEmpty(miv)) {
             LOGGER.info("Using " + miv);
           }

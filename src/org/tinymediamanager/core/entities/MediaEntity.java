@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -490,6 +490,31 @@ public abstract class MediaEntity extends AbstractModelObject {
 
   public Object getId(String key) {
     return ids.get(key);
+  }
+
+  /**
+   * any ID as String or empty
+   */
+  public String getIdAsString(String key) {
+    Object obj = ids.get(key);
+    if (obj == null) {
+      return "";
+    }
+    return String.valueOf(obj);
+  }
+
+  /**
+   * any ID as int or 0
+   */
+  public int getIdAsInt(String key) {
+    int id = 0;
+    try {
+      id = Integer.valueOf(String.valueOf(ids.get(key)));
+    }
+    catch (Exception e) {
+      return 0;
+    }
+    return id;
   }
 
   public void addToMediaFiles(MediaFile mediaFile) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -242,11 +242,12 @@ public class Url {
       EntityUtils.consume(entity);
     }
     catch (InterruptedIOException e) {
-      LOGGER.info("aborted request: " + logUrl);
-      throw new InterruptedException();
+      LOGGER.info("aborted request (" + e.getMessage() + "): " + logUrl);
+      throw e;
     }
     catch (UnknownHostException e) {
       LOGGER.error("proxy or host not found/reachable", e);
+      throw e;
     }
     catch (Exception e) {
       LOGGER.error("Exception getting url " + logUrl, e);

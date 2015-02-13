@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,7 +71,6 @@ import org.tinymediamanager.scraper.MediaArtwork.MediaArtworkType;
 import org.tinymediamanager.scraper.MediaCastMember;
 import org.tinymediamanager.scraper.MediaGenres;
 import org.tinymediamanager.scraper.MediaMetadata;
-import org.tinymediamanager.scraper.MediaTrailer;
 
 /**
  * The Class TvShow.
@@ -93,6 +92,7 @@ public class TvShow extends MediaEntity {
   private String                      status             = "";
   private String                      studio             = "";
   private boolean                     watched            = false;
+  private Date                        lastWatched        = null;
   private String                      sortTitle          = "";
 
   private List<String>                genres             = new ArrayList<String>(1);
@@ -106,9 +106,6 @@ public class TvShow extends MediaEntity {
 
   @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
   private List<TvShowActor>           actors             = new ArrayList<TvShowActor>();
-
-  @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
-  private List<MediaTrailer>          trailer            = new ArrayList<MediaTrailer>(0);
 
   @Enumerated(EnumType.STRING)
   private Certification               certification      = Certification.NOT_RATED;
@@ -554,6 +551,12 @@ public class TvShow extends MediaEntity {
    *          the config
    */
   public void setMetadata(MediaMetadata metadata, TvShowScraperMetadataConfig config) {
+    // check against null metadata (e.g. aborted request)
+    if (metadata == null) {
+      LOGGER.error("metadata was null");
+      return;
+    }
+
     // check if metadata has at least a name
     if (StringUtils.isEmpty(metadata.getStringValue(MediaMetadata.TITLE))) {
       LOGGER.warn("wanted to save empty metadata for " + getTitle());
@@ -864,6 +867,62 @@ public class TvShow extends MediaEntity {
     String oldValue = getTvdbId();
     ids.put(TVDBID, newValue);
     firePropertyChange(TVDBID, oldValue, newValue);
+  }
+
+  /**
+   * Gets the TraktTV id.
+   * 
+   * @return the TraktTV id
+   */
+  public int getTraktId() {
+    int id = 0;
+    try {
+      id = Integer.valueOf(String.valueOf(ids.get(TRAKTID)));
+    }
+    catch (Exception e) {
+      return 0;
+    }
+    return id;
+  }
+
+  /**
+   * Sets the TvRage id.
+   * 
+   * @param newValue
+   *          the new TraktTV id
+   */
+  public void setTraktId(int newValue) {
+    int oldValue = getTraktId();
+    ids.put(TRAKTID, newValue);
+    firePropertyChange(TRAKTID, oldValue, newValue);
+  }
+
+  /**
+   * Gets the TvRage id.
+   * 
+   * @return the TvRage id
+   */
+  public int getTvRageId() {
+    int id = 0;
+    try {
+      id = Integer.valueOf(String.valueOf(ids.get(TVRAGEID)));
+    }
+    catch (Exception e) {
+      return 0;
+    }
+    return id;
+  }
+
+  /**
+   * Sets the TvRage id.
+   * 
+   * @param newValue
+   *          the new TvRage id
+   */
+  public void setTvRageId(int newValue) {
+    int oldValue = getTvRageId();
+    ids.put(TVRAGEID, newValue);
+    firePropertyChange(TVRAGEID, oldValue, newValue);
   }
 
   /**
@@ -1184,34 +1243,6 @@ public class TvShow extends MediaEntity {
     }
 
     firePropertyChange(ACTORS, null, this.getActors());
-  }
-
-  /**
-   * Gets the trailers.
-   * 
-   * @return the trailers
-   */
-  public List<MediaTrailer> getTrailers() {
-    return this.trailer;
-  }
-
-  /**
-   * Adds the trailer.
-   * 
-   * @param obj
-   *          the obj
-   */
-  public void addTrailer(MediaTrailer obj) {
-    trailer.add(obj);
-    firePropertyChange(TRAILER, null, trailer);
-  }
-
-  /**
-   * Removes the all trailers.
-   */
-  public void removeAllTrailers() {
-    trailer.clear();
-    firePropertyChange(TRAILER, null, trailer);
   }
 
   /**
@@ -1564,6 +1595,14 @@ public class TvShow extends MediaEntity {
     boolean oldValue = this.watched;
     this.watched = newValue;
     firePropertyChange(WATCHED, oldValue, newValue);
+  }
+
+  public Date getLastWatched() {
+    return lastWatched;
+  }
+
+  public void setLastWatched(Date lastWatched) {
+    this.lastWatched = lastWatched;
   }
 
   /**

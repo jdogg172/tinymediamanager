@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,6 +63,7 @@ import org.tinymediamanager.core.movie.MovieList;
 import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.core.movie.MovieScraperMetadataConfig;
 import org.tinymediamanager.core.movie.MovieScrapers;
+import org.tinymediamanager.core.movie.entities.MovieTrailer;
 import org.tinymediamanager.core.movie.entities.Movie;
 import org.tinymediamanager.core.threading.TmmTask;
 import org.tinymediamanager.core.threading.TmmTaskManager;
@@ -74,7 +75,6 @@ import org.tinymediamanager.scraper.MediaLanguages;
 import org.tinymediamanager.scraper.MediaMetadata;
 import org.tinymediamanager.scraper.MediaScraper;
 import org.tinymediamanager.scraper.MediaSearchResult;
-import org.tinymediamanager.scraper.MediaTrailer;
 import org.tinymediamanager.scraper.MediaType;
 import org.tinymediamanager.scraper.ScraperType;
 import org.tinymediamanager.scraper.trakttv.SyncTraktTvTask;
@@ -508,11 +508,11 @@ public class MovieChooserDialog extends TmmDialog implements ActionListener {
 
           // get trailers?
           if (scraperMetadataConfig.isTrailer()) {
-            List<MediaTrailer> trailers = model.getTrailers();
+            List<MovieTrailer> trailers = model.getTrailers();
             // add local trailers!
             for (MediaFile mf : movieToScrape.getMediaFiles(MediaFileType.TRAILER)) {
               LOGGER.debug("adding local trailer " + mf.getFilename());
-              MediaTrailer mt = new MediaTrailer();
+              MovieTrailer mt = new MovieTrailer();
               mt.setName(mf.getFilename());
               mt.setProvider("downloaded");
               mt.setQuality(mf.getVideoFormat());

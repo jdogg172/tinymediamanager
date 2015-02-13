@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,6 @@ package org.tinymediamanager.scraper;
 import java.util.LinkedList;
 import java.util.List;
 
-import javax.persistence.Embeddable;
-
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
@@ -29,7 +27,6 @@ import org.apache.commons.lang3.builder.ToStringStyle;
  * 
  * @author Manuel Laggner
  */
-@Embeddable
 public class MediaCastMember {
 
   /**

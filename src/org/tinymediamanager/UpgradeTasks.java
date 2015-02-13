@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,15 +31,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.core.Constants;
 import org.tinymediamanager.core.MediaFileType;
+import org.tinymediamanager.core.Utils;
 import org.tinymediamanager.core.entities.MediaFile;
+import org.tinymediamanager.core.entities.MediaFileAudioStream;
+import org.tinymediamanager.core.entities.MediaFileSubtitle;
 import org.tinymediamanager.core.movie.MovieList;
 import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.core.movie.entities.Movie;
+import org.tinymediamanager.core.movie.entities.MovieTrailer;
 import org.tinymediamanager.core.tvshow.TvShowList;
 import org.tinymediamanager.core.tvshow.TvShowModuleManager;
 import org.tinymediamanager.core.tvshow.entities.TvShow;
 import org.tinymediamanager.core.tvshow.entities.TvShowEpisode;
-import org.tinymediamanager.scraper.MediaTrailer;
 
 import com.sun.jna.Platform;
 
@@ -121,7 +124,7 @@ public class UpgradeTasks {
       EntityManager entityManager = MovieModuleManager.getInstance().getEntityManager();
       entityManager.getTransaction().begin();
       for (Movie movie : movieList.getMovies()) {
-        for (MediaTrailer trailer : movie.getTrailers()) {
+        for (MovieTrailer trailer : movie.getTrailers()) {
           // 720p (mp4)
           String quality = trailer.getQuality().split(" ")[0];
           trailer.setQuality(quality);
@@ -241,6 +244,59 @@ public class UpgradeTasks {
       if (SystemUtils.IS_OS_LINUX) {
         TmmOsUtils.createDesktopFileForLinux(new File(TmmOsUtils.DESKTOP_FILE));
       }
+
+      // upgrade ALL String languages to ISO3
+      EntityManager entityManager = MovieModuleManager.getInstance().getEntityManager();
+      entityManager.getTransaction().begin();
+      for (Movie movie : movieList.getMovies()) {
+        for (MediaFile mf : movie.getMediaFiles()) {
+          for (MediaFileAudioStream mfa : mf.getAudioStreams()) {
+            if (!StringUtils.isEmpty(mfa.getLanguage())) {
+              mfa.setLanguage(Utils.getIso3LanguageFromLocalizedString(mfa.getLanguage()));
+            }
+          }
+          for (MediaFileSubtitle mfs : mf.getSubtitles()) {
+            if (!StringUtils.isEmpty(mfs.getLanguage())) {
+              mfs.setLanguage(Utils.getIso3LanguageFromLocalizedString(mfs.getLanguage()));
+            }
+          }
+        }
+      }
+      entityManager.getTransaction().commit();
+
+      // TV Shows
+      entityManager.getTransaction().begin();
+      for (TvShow show : tvShowList.getTvShows()) {
+        // show MFs
+        for (MediaFile mf : show.getMediaFiles()) {
+          for (MediaFileAudioStream mfa : mf.getAudioStreams()) {
+            if (!StringUtils.isEmpty(mfa.getLanguage())) {
+              mfa.setLanguage(Utils.getIso3LanguageFromLocalizedString(mfa.getLanguage()));
+            }
+          }
+          for (MediaFileSubtitle mfs : mf.getSubtitles()) {
+            if (!StringUtils.isEmpty(mfs.getLanguage())) {
+              mfs.setLanguage(Utils.getIso3LanguageFromLocalizedString(mfs.getLanguage()));
+            }
+          }
+        }
+        // Episode MFs
+        for (TvShowEpisode episode : show.getEpisodes()) {
+          for (MediaFile mf : episode.getMediaFiles()) {
+            for (MediaFileAudioStream mfa : mf.getAudioStreams()) {
+              if (!StringUtils.isEmpty(mfa.getLanguage())) {
+                mfa.setLanguage(Utils.getIso3LanguageFromLocalizedString(mfa.getLanguage()));
+              }
+            }
+            for (MediaFileSubtitle mfs : mf.getSubtitles()) {
+              if (!StringUtils.isEmpty(mfs.getLanguage())) {
+                mfs.setLanguage(Utils.getIso3LanguageFromLocalizedString(mfs.getLanguage()));
+              }
+            }
+          }
+        }
+      }
+      entityManager.getTransaction().commit();
     }
 
   }
@@ -296,38 +352,32 @@ public class UpgradeTasks {
       file = new File("tinyMediaManager.new");
       if (file.exists() && file.length() > 10000 && file.length() < 50000) {
         File cur = new File("tinyMediaManager.exe");
-        // if (file.length() != cur.length() || !cur.exists()) {
         try {
           FileUtils.copyFile(file, cur);
         }
         catch (IOException e) {
           LOGGER.error("Could not update tmm!");
         }
-        // }
       }
       file = new File("tinyMediaManagerUpd.new");
       if (file.exists() && file.length() > 10000 && file.length() < 50000) {
         File cur = new File("tinyMediaManagerUpd.exe");
-        // if (file.length() != cur.length() || !cur.exists()) {
         try {
           FileUtils.copyFile(file, cur);
         }
         catch (IOException e) {
           LOGGER.error("Could not update the updater!");
         }
-        // }
       }
       file = new File("tinyMediaManagerCMD.new");
       if (file.exists() && file.length() > 10000 && file.length() < 50000) {
         File cur = new File("tinyMediaManagerCMD.exe");
-        // if (file.length() != cur.length() || !cur.exists()) {
         try {
           FileUtils.copyFile(file, cur);
         }
         catch (IOException e) {
           LOGGER.error("Could not update CMD TMM!");
         }
-        // }
       }
     }
 
@@ -336,13 +386,25 @@ public class UpgradeTasks {
       file = new File("JavaApplicationStub.new");
       if (file.exists() && file.length() > 0) {
         File cur = new File("../../MacOS/JavaApplicationStub");
-        if (file.length() != cur.length() || !cur.exists()) {
-          try {
-            FileUtils.copyFile(file, cur);
-          }
-          catch (IOException e) {
-            LOGGER.error("Could not update JavaApplicationStub");
-          }
+        try {
+          FileUtils.copyFile(file, cur);
+        }
+        catch (IOException e) {
+          LOGGER.error("Could not update JavaApplicationStub");
+        }
+      }
+    }
+
+    // OSX Info.plist
+    if (Platform.isMac()) {
+      file = new File("Info.plist");
+      if (file.exists() && file.length() > 0) {
+        File cur = new File("../../Info.plist");
+        try {
+          FileUtils.copyFile(file, cur);
+        }
+        catch (IOException e) {
+          LOGGER.error("Could not update JavaApplicationStub");
         }
       }
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.Globals;
 import org.tinymediamanager.core.AbstractModelObject;
+import org.tinymediamanager.core.Message;
+import org.tinymediamanager.core.Message.MessageLevel;
+import org.tinymediamanager.core.MessageManager;
 import org.tinymediamanager.core.movie.MovieModuleManager;
+import org.tinymediamanager.core.movie.entities.MovieTrailer;
 import org.tinymediamanager.scraper.IMediaArtworkProvider;
 import org.tinymediamanager.scraper.IMediaMetadataProvider;
 import org.tinymediamanager.scraper.IMediaTrailerProvider;
@@ -165,9 +169,13 @@ public class MovieChooserModel extends AbstractModelObject {
     }
     catch (IOException e) {
       LOGGER.error("scrapeMedia", e);
+      MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, "MovieChooser", "message.scrape.threadcrashed", new String[] { ":",
+          e.getLocalizedMessage() }));
     }
     catch (Exception e) {
       LOGGER.error("scrapeMedia", e);
+      MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, "MovieChooser", "message.scrape.threadcrashed", new String[] { ":",
+          e.getLocalizedMessage() }));
     }
   }
 
@@ -201,8 +209,8 @@ public class MovieChooserModel extends AbstractModelObject {
     return artwork;
   }
 
-  public List<MediaTrailer> getTrailers() {
-    List<MediaTrailer> trailers = new ArrayList<MediaTrailer>();
+  public List<MovieTrailer> getTrailers() {
+    List<MovieTrailer> trailers = new ArrayList<MovieTrailer>();
 
     MediaScrapeOptions options = new MediaScrapeOptions();
     options.setMetadata(metadata);
@@ -221,7 +229,10 @@ public class MovieChooserModel extends AbstractModelObject {
     for (IMediaTrailerProvider trailerProvider : trailerProviders) {
       try {
         List<MediaTrailer> foundTrailers = trailerProvider.getTrailers(options);
-        trailers.addAll(foundTrailers);
+        for (MediaTrailer mediaTrailer : foundTrailers) {
+          MovieTrailer movieTrailer = new MovieTrailer(mediaTrailer);
+          trailers.add(movieTrailer);
+        }
       }
       catch (Exception e) {
         LOGGER.warn(e.getMessage());

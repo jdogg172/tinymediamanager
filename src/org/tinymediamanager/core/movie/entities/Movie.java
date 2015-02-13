@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,7 +77,6 @@ import org.tinymediamanager.scraper.MediaCastMember;
 import org.tinymediamanager.scraper.MediaGenres;
 import org.tinymediamanager.scraper.MediaMetadata;
 import org.tinymediamanager.scraper.MediaScrapeOptions;
-import org.tinymediamanager.scraper.MediaTrailer;
 import org.tinymediamanager.scraper.tmdb.TmdbMetadataProvider;
 import org.tinymediamanager.scraper.util.UrlUtil;
 
@@ -102,6 +101,7 @@ public class Movie extends MediaEntity {
   private String              writer          = "";
   private String              dataSource      = "";
   private boolean             watched         = false;
+  private Date                lastWatched     = null;
   private MovieSet            movieSet;
   private boolean             isDisc          = false;
   private String              spokenLanguages = "";
@@ -128,7 +128,7 @@ public class Movie extends MediaEntity {
   private List<MovieProducer> producers       = new ArrayList<MovieProducer>(0);
 
   @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
-  private List<MediaTrailer>  trailer         = new ArrayList<MediaTrailer>(0);
+  private List<MovieTrailer>  trailer         = new ArrayList<MovieTrailer>(0);
 
   @Transient
   private String              titleSortable   = "";
@@ -311,7 +311,7 @@ public class Movie extends MediaEntity {
    * @return the trailers
    */
   @Deprecated
-  public List<MediaTrailer> getTrailers() {
+  public List<MovieTrailer> getTrailers() {
     return this.trailer;
   }
 
@@ -320,7 +320,7 @@ public class Movie extends MediaEntity {
    * 
    * @return the trailers
    */
-  public List<MediaTrailer> getTrailer() {
+  public List<MovieTrailer> getTrailer() {
     return this.trailer;
   }
 
@@ -330,7 +330,7 @@ public class Movie extends MediaEntity {
    * @param obj
    *          the obj
    */
-  public void addTrailer(MediaTrailer obj) {
+  public void addTrailer(MovieTrailer obj) {
     // trailers are (like media files) proxied by objectdb;
     // this is why we need a lock here
     synchronized (getEntityManager()) {
@@ -359,7 +359,7 @@ public class Movie extends MediaEntity {
    *          the MediaTrailer object to download
    * @return true/false if successful
    */
-  public Boolean downloadTrailer(MediaTrailer trailerToDownload) {
+  public Boolean downloadTrailer(MovieTrailer trailerToDownload) {
     try {
       // get trailer filename from first mediafile
       String tfile = MovieRenamer.createDestinationForFilename(MovieModuleManager.MOVIE_SETTINGS.getMovieRenamerFilename(), this) + "-trailer.";
@@ -607,6 +607,34 @@ public class Movie extends MediaEntity {
     int oldValue = getTmdbId();
     ids.put(TMDBID, newValue);
     firePropertyChange(TMDBID, oldValue, newValue);
+  }
+
+  /**
+   * Gets the TraktTV id.
+   * 
+   * @return the TraktTV id
+   */
+  public int getTraktId() {
+    int id = 0;
+    try {
+      id = Integer.valueOf(String.valueOf(ids.get(TRAKTID)));
+    }
+    catch (Exception e) {
+      return 0;
+    }
+    return id;
+  }
+
+  /**
+   * Sets the TraktTV id.
+   * 
+   * @param newValue
+   *          the new TraktTV id
+   */
+  public void setTraktId(int newValue) {
+    int oldValue = getTraktId();
+    ids.put(TRAKTID, newValue);
+    firePropertyChange(TRAKTID, oldValue, newValue);
   }
 
   /**
@@ -937,8 +965,8 @@ public class Movie extends MediaEntity {
    * @param trailers
    *          the new trailers
    */
-  public void setTrailers(List<MediaTrailer> trailers) {
-    MediaTrailer preferredTrailer = null;
+  public void setTrailers(List<MovieTrailer> trailers) {
+    MovieTrailer preferredTrailer = null;
     removeAllTrailers();
 
     // set preferred trailer
@@ -947,7 +975,7 @@ public class Movie extends MediaEntity {
       MovieTrailerSources desiredSource = MovieModuleManager.MOVIE_SETTINGS.getTrailerSource();
 
       // search for quality and provider
-      for (MediaTrailer trailer : trailers) {
+      for (MovieTrailer trailer : trailers) {
         if (desiredQuality.containsQuality(trailer.getQuality()) && desiredSource.containsSource(trailer.getProvider())) {
           trailer.setInNfo(Boolean.TRUE);
           preferredTrailer = trailer;
@@ -957,7 +985,7 @@ public class Movie extends MediaEntity {
 
       // search for quality
       if (preferredTrailer == null) {
-        for (MediaTrailer trailer : trailers) {
+        for (MovieTrailer trailer : trailers) {
           if (desiredQuality.containsQuality(trailer.getQuality())) {
             trailer.setInNfo(Boolean.TRUE);
             preferredTrailer = trailer;
@@ -971,7 +999,7 @@ public class Movie extends MediaEntity {
     if (preferredTrailer != null) {
       addTrailer(preferredTrailer);
     }
-    for (MediaTrailer trailer : trailers) {
+    for (MovieTrailer trailer : trailers) {
       // preferred trailer has already been added
       if (preferredTrailer != null && preferredTrailer == trailer) {
         continue;
@@ -1760,6 +1788,14 @@ public class Movie extends MediaEntity {
    */
   public void setReleaseDate(String dateAsString) throws ParseException {
     setReleaseDate(org.tinymediamanager.scraper.util.StrgUtils.parseDate(dateAsString));
+  }
+
+  public Date getLastWatched() {
+    return lastWatched;
+  }
+
+  public void setLastWatched(Date lastWatched) {
+    this.lastWatched = lastWatched;
   }
 
   @Override

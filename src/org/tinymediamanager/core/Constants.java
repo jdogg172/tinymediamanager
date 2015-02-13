@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 - 2014 Manuel Laggner
+ * Copyright 2012 - 2015 Manuel Laggner
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -111,7 +111,7 @@ public final class Constants {
   public final static String ZELLULOIDID            = "zelluloid";
   public final static String TMDBID                 = "tmdbId";
   public final static String TVDBID                 = "tvdbId";
-  public final static String TRAKTTV                = "traktTv";
+  public final static String TRAKTID                = "traktId";
   public final static String IMDBID                 = "imdbId";
   public final static String TVRAGEID               = "tvrageId";
   public final static String ROTTENTOMATOESID       = "rottentomatoesId";
