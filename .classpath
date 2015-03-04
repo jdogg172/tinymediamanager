@@ -61,5 +61,7 @@
 	<classpathentry kind="lib" path="lib/joda-time.jar"/>
 	<classpathentry kind="lib" path="lib/retrofit.jar"/>
 	<classpathentry kind="lib" path="lib/jspf.core.jar"/>
+	<classpathentry kind="lib" path="lib/api-scraper.jar"/>
+	<classpathentry kind="lib" path="lib/scraper-tmdb.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

@@ -30,6 +30,7 @@ import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.core.movie.entities.Movie;
 import org.tinymediamanager.scraper.MediaMetadata;
 import org.tinymediamanager.scraper.MediaScrapeOptions;
+import org.tinymediamanager.scraper.MediaType;
 import org.tinymediamanager.scraper.tmdb.TmdbMetadataProvider;
 import org.tinymediamanager.ui.UTF8Control;
 
@@ -214,7 +215,7 @@ public class MovieSetChooserModel extends AbstractModelObject {
         if (StringUtils.isEmpty(mis.imdbId)) {
           // get imdbid for this tmdbid
           if (mp != null) {
-            MediaScrapeOptions options = new MediaScrapeOptions();
+            MediaScrapeOptions options = new MediaScrapeOptions(MediaType.MOVIE_SET);
             options.setTmdbId(mis.tmdbId);
             options.setLanguage(MovieModuleManager.MOVIE_SETTINGS.getScraperLanguage());
             options.setCountry(MovieModuleManager.MOVIE_SETTINGS.getCertificationCountry());
@@ -247,7 +248,7 @@ public class MovieSetChooserModel extends AbstractModelObject {
   public void scrapeMetadata() {
     try {
       if (mp != null) {
-        MediaScrapeOptions options = new MediaScrapeOptions();
+        MediaScrapeOptions options = new MediaScrapeOptions(MediaType.MOVIE_SET);
         options.setTmdbId(collection.getId());
         options.setLanguage(MovieModuleManager.MOVIE_SETTINGS.getScraperLanguage());
         options.setCountry(MovieModuleManager.MOVIE_SETTINGS.getCertificationCountry());

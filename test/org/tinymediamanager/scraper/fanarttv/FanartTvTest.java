@@ -19,8 +19,7 @@ public class FanartTvTest {
 
   @Test
   public void test() throws Exception {
-    MediaScrapeOptions o = new MediaScrapeOptions();
-    o.setType(MediaType.TV_SHOW);
+    MediaScrapeOptions o = new MediaScrapeOptions(MediaType.TV_SHOW);
     o.setTmdbId(49040);
     o.setImdbId("tt1194173");
 

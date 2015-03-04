@@ -17,7 +17,7 @@ import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.log4j.Logger;
-import org.tinymediamanager.scraper.IMediaMetadataProvider;
+import org.tinymediamanager.scraper.IMovieMetadataProvider;
 import org.tinymediamanager.scraper.IXBMC;
 import org.tinymediamanager.scraper.MediaArtwork;
 import org.tinymediamanager.scraper.MediaArtwork.MediaArtworkType;
@@ -37,7 +37,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
 @PluginImplementation
-public class XbmcMetadataProvider implements IXBMC, IMediaMetadataProvider {
+public class XbmcMetadataProvider implements IXBMC, IMovieMetadataProvider {
   private static final Logger                 LOGGER                  = Logger.getLogger(XbmcMetadataProvider.class);
   private static final DocumentBuilderFactory factory                 = DocumentBuilderFactory.newInstance();
 

@@ -77,6 +77,7 @@ import org.tinymediamanager.scraper.MediaCastMember;
 import org.tinymediamanager.scraper.MediaGenres;
 import org.tinymediamanager.scraper.MediaMetadata;
 import org.tinymediamanager.scraper.MediaScrapeOptions;
+import org.tinymediamanager.scraper.MediaType;
 import org.tinymediamanager.scraper.tmdb.TmdbMetadataProvider;
 import org.tinymediamanager.scraper.util.UrlUtil;
 
@@ -921,7 +922,7 @@ public class Movie extends MediaEntity {
           // get movieset metadata
           try {
             TmdbMetadataProvider mp = new TmdbMetadataProvider();
-            MediaScrapeOptions options = new MediaScrapeOptions();
+            MediaScrapeOptions options = new MediaScrapeOptions(MediaType.MOVIE_SET);
             options.setTmdbId(col);
             options.setLanguage(MovieModuleManager.MOVIE_SETTINGS.getScraperLanguage());
             options.setCountry(MovieModuleManager.MOVIE_SETTINGS.getCertificationCountry());

@@ -8,7 +8,8 @@ import net.xeoh.plugins.base.Plugin;
 import net.xeoh.plugins.base.impl.PluginManagerFactory;
 import net.xeoh.plugins.base.options.GetPluginOption;
 import net.xeoh.plugins.base.options.addpluginsfrom.OptionReportAfter;
-import net.xeoh.plugins.base.options.getplugin.OptionCapabilities;
+import net.xeoh.plugins.base.options.getplugin.OptionPluginSelector;
+import net.xeoh.plugins.base.options.getplugin.PluginSelector;
 import net.xeoh.plugins.base.util.JSPFProperties;
 import net.xeoh.plugins.base.util.PluginManagerUtil;
 import net.xeoh.plugins.base.util.uri.ClassURI;
@@ -16,10 +17,10 @@ import net.xeoh.plugins.base.util.uri.ClassURI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.scraper.IMediaArtworkProvider;
-import org.tinymediamanager.scraper.IMediaMetadataProvider;
 import org.tinymediamanager.scraper.IMediaProvider;
 import org.tinymediamanager.scraper.IMediaSubtitleProvider;
-import org.tinymediamanager.scraper.IMediaTrailerProvider;
+import org.tinymediamanager.scraper.IMovieMetadataProvider;
+import org.tinymediamanager.scraper.IMovieTrailerProvider;
 import org.tinymediamanager.scraper.ITvShowMetadataProvider;
 import org.tinymediamanager.scraper.MediaScraper;
 import org.tinymediamanager.scraper.xbmc.XbmcMetadataProvider;
@@ -80,7 +81,7 @@ public class PluginManager {
     Class c = IMediaProvider.class;
     switch (scraper.getType()) {
       case MOVIE:
-        c = IMediaMetadataProvider.class;
+        c = IMovieMetadataProvider.class;
         break;
       case TV_SHOW:
         c = ITvShowMetadataProvider.class;
@@ -89,7 +90,7 @@ public class PluginManager {
         c = IMediaArtworkProvider.class;
         break;
       case TRAILER:
-        c = IMediaTrailerProvider.class;
+        c = IMovieTrailerProvider.class;
         break;
       case SUBTITLE:
         c = IMediaSubtitleProvider.class;
@@ -112,7 +113,7 @@ public class PluginManager {
    *          the TMM scraper
    * @return Plugin
    */
-  public Plugin getPlugin(MediaScraper scraper) {
+  public Plugin getPlugin(final MediaScraper scraper) {
     Class paramClass = ScraperToImplClass(scraper);
     if (scraper.isXbmcScraper()) {
       XbmcScraper xs = (XbmcScraper) scraper;
@@ -120,7 +121,17 @@ public class PluginManager {
       return mp;
     }
     else {
-      return pm.getPlugin(paramClass, new OptionCapabilities("id:" + scraper.getId()));
+      // return pm.getPlugin(paramClass, new OptionCapabilities("id:" + scraper.getId()));
+      PluginSelector<Plugin> selector = new PluginSelector<Plugin>() {
+        @Override
+        public boolean selectPlugin(Plugin paramT) {
+          if (paramT instanceof IMediaProvider && ((IMediaProvider) paramT).getProviderInfo().getId().equals(scraper.getId())) {
+            return true;
+          }
+          return false;
+        }
+      };
+      return pm.getPlugin(paramClass, new OptionPluginSelector<Plugin>(selector));
     }
   }
 
@@ -151,10 +162,10 @@ public class PluginManager {
   /**
    * All plugins implementing the IMediaMetadataProvider
    */
-  public List<IMediaMetadataProvider> getMoviePlugins() {
-    ArrayList<IMediaMetadataProvider> plugins = new ArrayList<IMediaMetadataProvider>();
-    for (Plugin p : pmu.getPlugins(IMediaMetadataProvider.class)) {
-      plugins.add((IMediaMetadataProvider) p);
+  public List<IMovieMetadataProvider> getMoviePlugins() {
+    ArrayList<IMovieMetadataProvider> plugins = new ArrayList<IMovieMetadataProvider>();
+    for (Plugin p : pmu.getPlugins(IMovieMetadataProvider.class)) {
+      plugins.add((IMovieMetadataProvider) p);
     }
     return plugins;
   }
@@ -173,10 +184,10 @@ public class PluginManager {
   /**
    * All plugins implementing the IMediaTrailerProvider
    */
-  public List<IMediaTrailerProvider> getTrailerPlugins() {
-    ArrayList<IMediaTrailerProvider> plugins = new ArrayList<IMediaTrailerProvider>();
-    for (Plugin p : pmu.getPlugins(IMediaTrailerProvider.class)) {
-      plugins.add((IMediaTrailerProvider) p);
+  public List<IMovieTrailerProvider> getTrailerPlugins() {
+    ArrayList<IMovieTrailerProvider> plugins = new ArrayList<IMovieTrailerProvider>();
+    for (Plugin p : pmu.getPlugins(IMovieTrailerProvider.class)) {
+      plugins.add((IMovieTrailerProvider) p);
     }
     return plugins;
   }

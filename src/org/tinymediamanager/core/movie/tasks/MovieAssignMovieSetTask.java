@@ -30,6 +30,7 @@ import org.tinymediamanager.core.movie.entities.MovieSet;
 import org.tinymediamanager.core.threading.TmmThreadPool;
 import org.tinymediamanager.scraper.MediaMetadata;
 import org.tinymediamanager.scraper.MediaScrapeOptions;
+import org.tinymediamanager.scraper.MediaType;
 import org.tinymediamanager.scraper.tmdb.TmdbMetadataProvider;
 import org.tinymediamanager.ui.UTF8Control;
 
@@ -79,7 +80,7 @@ public class MovieAssignMovieSetTask extends TmmThreadPool {
       }
       try {
         TmdbMetadataProvider mp = new TmdbMetadataProvider();
-        MediaScrapeOptions options = new MediaScrapeOptions();
+        MediaScrapeOptions options = new MediaScrapeOptions(MediaType.MOVIE);
         options.setLanguage(MovieModuleManager.MOVIE_SETTINGS.getScraperLanguage());
         options.setCountry(MovieModuleManager.MOVIE_SETTINGS.getCertificationCountry());
         options.setScrapeImdbForeignLanguage(MovieModuleManager.MOVIE_SETTINGS.isImdbScrapeForeignLanguage());
@@ -97,7 +98,7 @@ public class MovieAssignMovieSetTask extends TmmThreadPool {
             movieSet.setTmdbId(collectionId);
             // get movieset metadata
             try {
-              options = new MediaScrapeOptions();
+              options = new MediaScrapeOptions(MediaType.MOVIE_SET);
               options.setTmdbId(collectionId);
               options.setLanguage(MovieModuleManager.MOVIE_SETTINGS.getScraperLanguage());
               options.setCountry(MovieModuleManager.MOVIE_SETTINGS.getCertificationCountry());

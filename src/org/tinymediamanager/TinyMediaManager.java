@@ -56,7 +56,6 @@ import org.tinymediamanager.core.Utils;
 import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.core.threading.TmmTaskManager;
 import org.tinymediamanager.core.tvshow.TvShowModuleManager;
-import org.tinymediamanager.scraper.util.CachedUrl;
 import org.tinymediamanager.thirdparty.MediaInfo;
 import org.tinymediamanager.ui.MainWindow;
 import org.tinymediamanager.ui.TmmUIHelper;
@@ -339,13 +338,6 @@ public class TinyMediaManager {
             }
             UpgradeTasks.performUpgradeTasksAfterDatabaseLoading(oldVersion);
           }
-
-          // clean cache ////////////////////////////////////////////////////
-          if (g2 != null) {
-            updateProgress(g2, "cleaning cache", 70);
-            splash.update();
-          }
-          CachedUrl.cleanupCache();
 
           // launch application ////////////////////////////////////////////
           if (g2 != null) {

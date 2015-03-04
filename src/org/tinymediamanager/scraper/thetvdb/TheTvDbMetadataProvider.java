@@ -51,7 +51,6 @@ import org.tinymediamanager.scraper.MediaSearchOptions.SearchParam;
 import org.tinymediamanager.scraper.MediaSearchResult;
 import org.tinymediamanager.scraper.MediaType;
 import org.tinymediamanager.scraper.MetadataUtil;
-import org.tinymediamanager.scraper.util.CachedUrl;
 
 import com.omertron.thetvdbapi.TheTVDBApi;
 import com.omertron.thetvdbapi.model.Actor;
@@ -162,9 +161,8 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
 
     // if there weren't any result AND the searchstring consist only of digits, we try to scrape it directly
     if (results.isEmpty() && searchString.matches("^[0-9]+$")) {
-      MediaScrapeOptions scrapeOptions = new MediaScrapeOptions();
+      MediaScrapeOptions scrapeOptions = new MediaScrapeOptions(MediaType.TV_SHOW);
       scrapeOptions.setId(providerInfo.getId(), searchString);
-      scrapeOptions.setType(MediaType.TV_SHOW);
       scrapeOptions.setLanguage(MediaLanguages.valueOf(language));
       scrapeOptions.setCountry(CountryCode.valueOf(country));
 
@@ -221,7 +219,6 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
     return sr;
   }
 
-  @Override
   public MediaMetadata getTvShowMetadata(MediaScrapeOptions options) throws Exception {
     MediaMetadata md = new MediaMetadata(providerInfo.getId());
     String id = "";
@@ -318,7 +315,6 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
     return md;
   }
 
-  @Override
   public MediaMetadata getEpisodeMetadata(MediaScrapeOptions options) throws Exception {
     MediaMetadata md = new MediaMetadata(providerInfo.getId());
 
@@ -738,7 +734,7 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
   }
 
   private static void clearTvdbCache() {
-    CachedUrl.cleanupCacheForSpecificHost("thetvdb.com");
+    // CachedUrl.cleanupCacheForSpecificHost("thetvdb.com");
   }
 
   /**********************************************************************
@@ -785,5 +781,16 @@ public class TheTvDbMetadataProvider implements ITvShowMetadataProvider, IMediaA
       return arg0.getRating() > arg1.getRating() ? -1 : 1;
     }
 
+  }
+
+  @Override
+  public MediaMetadata getMetadata(MediaScrapeOptions options) throws Exception {
+    if (options.getType() == MediaType.TV_SHOW) {
+      return getTvShowMetadata(options);
+    }
+    else if (options.getType() == MediaType.TV_EPISODE) {
+      return getEpisodeMetadata(options);
+    }
+    throw new Exception("invlid media type");
   }
 }

@@ -54,11 +54,10 @@ public class TvShowScraperTest {
   public void testShowMetadata() {
     try {
       ITvShowMetadataProvider mp = new TheTvDbMetadataProvider();
-      MediaScrapeOptions options = new MediaScrapeOptions();
-      options.setType(MediaType.TV_SHOW);
+      MediaScrapeOptions options = new MediaScrapeOptions(MediaType.TV_SHOW);
       options.setId("tvdb", "81189");
 
-      MediaMetadata md = mp.getTvShowMetadata(options);
+      MediaMetadata md = mp.getMetadata(options);
       System.out.println(md);
     }
     catch (Exception e) {

@@ -78,7 +78,6 @@ public class AniDBMetadataProvider implements ITvShowMetadataProvider, IMediaArt
     return providerInfo;
   }
 
-  @Override
   public MediaMetadata getTvShowMetadata(MediaScrapeOptions options) throws Exception {
     MediaMetadata md = new MediaMetadata(providerInfo.getId());
     String id = "";
@@ -110,9 +109,6 @@ public class AniDBMetadataProvider implements ITvShowMetadataProvider, IMediaArt
     }
     catch (Exception e) {
       LOGGER.error("failed to get TV show metadata: " + e.getMessage());
-
-      // clear cache
-      CachedUrl.removeCachedFileForUrl(url);
     }
 
     if (doc == null || doc.children().size() == 0) {
@@ -228,7 +224,6 @@ public class AniDBMetadataProvider implements ITvShowMetadataProvider, IMediaArt
     }
   }
 
-  @Override
   public MediaMetadata getEpisodeMetadata(MediaScrapeOptions options) throws Exception {
     MediaMetadata md = new MediaMetadata(providerInfo.getId());
 
@@ -275,9 +270,6 @@ public class AniDBMetadataProvider implements ITvShowMetadataProvider, IMediaArt
     }
     catch (Exception e) {
       LOGGER.error("failed to get episode metadata: " + e.getMessage());
-
-      // clear cache
-      CachedUrl.removeCachedFileForUrl(url);
     }
 
     if (doc == null || doc.children().size() == 0) {
@@ -497,9 +489,6 @@ public class AniDBMetadataProvider implements ITvShowMetadataProvider, IMediaArt
     }
     catch (Exception e) {
       LOGGER.error("error getting episode list: " + e.getMessage());
-
-      // clear cache
-      CachedUrl.removeCachedFileForUrl(url);
     }
 
     if (doc == null || doc.children().size() == 0) {
@@ -566,15 +555,9 @@ public class AniDBMetadataProvider implements ITvShowMetadataProvider, IMediaArt
     }
     catch (InterruptedException e) {
       LOGGER.warn("interrupted image download");
-
-      // clear Cache
-      CachedUrl.removeCachedFileForUrl(url);
     }
     catch (IOException e) {
       LOGGER.error("error getting AniDB index");
-
-      // clear Cache
-      CachedUrl.removeCachedFileForUrl(url);
     }
     finally {
       if (scanner != null) {
@@ -668,5 +651,16 @@ public class AniDBMetadataProvider implements ITvShowMetadataProvider, IMediaArt
     float                   rating  = 0;
     String                  summary = "";
     HashMap<String, String> titles  = new HashMap<String, String>();
+  }
+
+  @Override
+  public MediaMetadata getMetadata(MediaScrapeOptions options) throws Exception {
+    if (options.getType() == MediaType.TV_SHOW) {
+      return getTvShowMetadata(options);
+    }
+    else if (options.getType() == MediaType.TV_EPISODE) {
+      return getEpisodeMetadata(options);
+    }
+    throw new Exception("invlid media type");
   }
 }

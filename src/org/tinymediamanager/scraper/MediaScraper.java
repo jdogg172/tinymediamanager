@@ -3,6 +3,7 @@ package org.tinymediamanager.scraper;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
 import org.tinymediamanager.core.PluginManager;
 import org.tinymediamanager.scraper.xbmc.XbmcScraper;
 import org.tinymediamanager.scraper.xbmc.XbmcUtil;
@@ -98,7 +99,7 @@ public class MediaScraper {
    *          Movie or Tv
    * @return
    */
-  public static List<MediaScraper> getMediaScraper(ScraperType type) {
+  public static List<MediaScraper> getMediaScrapers(ScraperType type) {
     ArrayList<MediaScraper> scraper = new ArrayList<MediaScraper>();
 
     ArrayList<IMediaProvider> plugins = new ArrayList<IMediaProvider>();
@@ -139,6 +140,20 @@ public class MediaScraper {
     }
 
     return scraper;
+  }
+
+  public static MediaScraper getMediaScraperById(String id, ScraperType type) {
+    if (StringUtils.isBlank(id)) {
+      return null;
+    }
+
+    List<MediaScraper> scrapers = getMediaScrapers(type);
+    for (MediaScraper scraper : scrapers) {
+      if (scraper.id.equals(id)) {
+        return scraper;
+      }
+    }
+    return null;
   }
 
   @Override

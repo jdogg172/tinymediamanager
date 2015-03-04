@@ -25,7 +25,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tinymediamanager.core.Constants;
-import org.tinymediamanager.scraper.IMediaMetadataProvider;
+import org.tinymediamanager.scraper.IMovieMetadataProvider;
 import org.tinymediamanager.scraper.MediaCastMember;
 import org.tinymediamanager.scraper.MediaCastMember.CastType;
 import org.tinymediamanager.scraper.MediaGenres;
@@ -49,7 +49,7 @@ import org.tinymediamanager.scraper.moviemeternl.model.FilmDetail.Genre;
  * @author Myron Boyle (myron0815@gmx.net)
  */
 @PluginImplementation
-public class MoviemeterMetadataProvider implements IMediaMetadataProvider {
+public class MoviemeterMetadataProvider implements IMovieMetadataProvider {
   private static final Logger      LOGGER       = LoggerFactory.getLogger(MoviemeterMetadataProvider.class);
 
   private static MoviemeterApi     mmapi;

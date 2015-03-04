@@ -63,13 +63,13 @@ import org.tinymediamanager.core.movie.MovieList;
 import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.core.movie.MovieScraperMetadataConfig;
 import org.tinymediamanager.core.movie.MovieScrapers;
-import org.tinymediamanager.core.movie.entities.MovieTrailer;
 import org.tinymediamanager.core.movie.entities.Movie;
+import org.tinymediamanager.core.movie.entities.MovieTrailer;
 import org.tinymediamanager.core.threading.TmmTask;
 import org.tinymediamanager.core.threading.TmmTaskManager;
 import org.tinymediamanager.scraper.IMediaArtworkProvider;
-import org.tinymediamanager.scraper.IMediaMetadataProvider;
-import org.tinymediamanager.scraper.IMediaTrailerProvider;
+import org.tinymediamanager.scraper.IMovieMetadataProvider;
+import org.tinymediamanager.scraper.IMovieTrailerProvider;
 import org.tinymediamanager.scraper.MediaArtwork;
 import org.tinymediamanager.scraper.MediaLanguages;
 import org.tinymediamanager.scraper.MediaMetadata;
@@ -112,9 +112,9 @@ public class MovieChooserDialog extends TmmDialog implements ActionListener {
   private List<MovieChooserModel>                                           moviesFound           = ObservableCollections
                                                                                                       .observableList(new ArrayList<MovieChooserModel>());
   private MovieScraperMetadataConfig                                        scraperMetadataConfig = new MovieScraperMetadataConfig();
-  private IMediaMetadataProvider                                            metadataProvider;
+  private IMovieMetadataProvider                                            metadataProvider;
   private List<IMediaArtworkProvider>                                       artworkProviders;
-  private List<IMediaTrailerProvider>                                       trailerProviders;
+  private List<IMovieTrailerProvider>                                       trailerProviders;
   private boolean                                                           continueQueue         = true;
 
   private SearchTask                                                        activeSearchTask;
@@ -199,7 +199,7 @@ public class MovieChooserDialog extends TmmDialog implements ActionListener {
       }
       {
         // cbScraper = new JComboBox(MovieScrapers.values());
-        cbScraper = new JComboBox(MediaScraper.getMediaScraper(ScraperType.MOVIE).toArray());
+        cbScraper = new JComboBox(MediaScraper.getMediaScrapers(ScraperType.MOVIE).toArray());
         MovieScrapers defaultScraper = MovieModuleManager.MOVIE_SETTINGS.getMovieScraper();
         cbScraper.setSelectedItem(defaultScraper);
         cbScraper.setAction(new ChangeScraperAction());
@@ -649,7 +649,7 @@ public class MovieChooserDialog extends TmmDialog implements ActionListener {
     public void actionPerformed(ActionEvent e) {
       MediaScraper selectedScraper = (MediaScraper) cbScraper.getSelectedItem();
       PluginManager pm = PluginManager.getInstance();
-      metadataProvider = (IMediaMetadataProvider) pm.getPlugin(selectedScraper);
+      metadataProvider = (IMovieMetadataProvider) pm.getPlugin(selectedScraper);
       System.out.println(metadataProvider.getProviderInfo());
       searchMovie(textFieldSearchString.getText(), null);
     }
@@ -688,7 +688,7 @@ public class MovieChooserDialog extends TmmDialog implements ActionListener {
           moviesFound.add(MovieChooserModel.emptyResult);
         }
         else {
-          IMediaMetadataProvider mpFromResult = null;
+          IMovieMetadataProvider mpFromResult = null;
           for (MediaSearchResult result : searchResult) {
             if (mpFromResult == null) {
               mpFromResult = MovieList.getInstance().getMetadataProvider(result.getProviderId());
