@@ -1,3 +1,11 @@
+Upcoming version
+=======================
++ Mirror support: TMM now distibuted on several mirrors for better availability (and error handling for network blockages)
++ added sort option via sort title 
+x renamer: exchange colon with a dash. (even better than removing completely)
+x subtitles: language detection for SUB ones
+
+
 Version 2.6.6
 =======================
 + updated trakt.tv library to the new API
