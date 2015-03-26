@@ -631,6 +631,11 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
     LOGGER.debug("parsing " + dir.getPath());
     // crawl this folder and try to find every episode and its corresponding files in it
     File[] content = dir.listFiles();
+    if (content == null) {
+      LOGGER.error("Whops. Cannot access directory: " + dir.getName());
+      return;
+    }
+
     Arrays.sort(content);
     for (File file : content) {
       if (file.isFile()) {
@@ -762,6 +767,11 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
     File firstVideoFile = null;
 
     File[] content = dir.listFiles();
+    if (content == null) {
+      LOGGER.error("Whops. Cannot access directory: " + dir.getName());
+      return;
+    }
+
     for (File file : content) {
       if (file.isFile()) {
         // check filetype
@@ -869,7 +879,7 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
   /**
    * Find additional episode files.<br>
    * adds everything which starts with "videoFile name"<br>
-   * scans subs/sample/subtitle directories aswell
+   * scans subs/subtitle directories aswell
    * 
    * @param episode
    *          the episode
@@ -902,15 +912,20 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
         episode.addToMediaFiles(mf);
       }
       else {
-        if (file.getName().equalsIgnoreCase("sample") || file.getName().equalsIgnoreCase("subs") || file.getName().equalsIgnoreCase("subtitle")) {
+        if (file.getName().equalsIgnoreCase("subs") || file.getName().equalsIgnoreCase("subtitle")) {
           File[] subDirContent = file.listFiles();
-          for (File subDirFile : subDirContent) {
-            if (FilenameUtils.getBaseName(subDirFile.getName()).startsWith(FilenameUtils.getBaseName(videoFile.getName()))) {
-              MediaFile mf = new MediaFile(subDirFile);
-              if (mf.getType() == MediaFileType.SUBTITLE) {
-                episode.setSubtitles(true);
+          if (subDirContent == null) {
+            LOGGER.error("Whops. Cannot access directory: " + file.getName());
+          }
+          else {
+            for (File subDirFile : subDirContent) {
+              if (FilenameUtils.getBaseName(subDirFile.getName()).startsWith(FilenameUtils.getBaseName(videoFile.getName()))) {
+                MediaFile mf = new MediaFile(subDirFile);
+                if (mf.getType() == MediaFileType.SUBTITLE) {
+                  episode.setSubtitles(true);
+                }
+                episode.addToMediaFiles(mf);
               }
-              episode.addToMediaFiles(mf);
             }
           }
         }

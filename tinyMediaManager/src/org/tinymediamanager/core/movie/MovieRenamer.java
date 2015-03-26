@@ -125,6 +125,17 @@ public class MovieRenamer {
       try {
         boolean ok = Utils.moveFileSafe(sub.getFile(), newFile);
         if (ok) {
+          if (sub.getFilename().endsWith(".sub")) {
+            // when having a .sub, also rename .idx (don't care if error)
+            try {
+              File oldidx = new File(sub.getPath(), sub.getFilename().replaceFirst("sub$", "idx"));
+              File newidx = new File(newFile.getParent(), newSubName.replaceFirst("sub$", "idx"));
+              Utils.moveFileSafe(oldidx, newidx);
+            }
+            catch (Exception e) {
+              // no idx found or error - ignore
+            }
+          }
           m.removeFromMediaFiles(sub);
           MediaFile mf = new MediaFile(newFile);
           MediaFileSubtitle mfs = new MediaFileSubtitle();
@@ -596,8 +607,8 @@ public class MovieRenamer {
     // ######################################################################
     // ## rename THUMBNAILS
     // ######################################################################
-    for (MediaFile unk : movie.getMediaFiles(MediaFileType.THUMB)) {
-      needed.add(unk); // keep all unknown
+    for (MediaFile thumb : movie.getMediaFiles(MediaFileType.THUMB)) {
+      needed.add(thumb); // keep all thumbs
     }
 
     // ######################################################################
@@ -684,18 +695,20 @@ public class MovieRenamer {
     // clean all non tmm nfos
     if (MovieModuleManager.MOVIE_SETTINGS.isMovieRenamerNfoCleanup()) {
       File[] content = new File(movie.getPath()).listFiles();
-      for (File file : content) {
-        if (file.isFile() && file.getName().toLowerCase().endsWith(".nfo")) {
-          // check if it's a tmm nfo
-          boolean supported = false;
-          for (MediaFile nfo : movie.getMediaFiles(MediaFileType.NFO)) {
-            if (nfo.getFilename().equals(file.getName())) {
-              supported = true;
+      if (content != null) {
+        for (File file : content) {
+          if (file.isFile() && file.getName().toLowerCase().endsWith(".nfo")) {
+            // check if it's a tmm nfo
+            boolean supported = false;
+            for (MediaFile nfo : movie.getMediaFiles(MediaFileType.NFO)) {
+              if (nfo.getFilename().equals(file.getName())) {
+                supported = true;
+              }
             }
-          }
-          if (!supported) {
-            LOGGER.debug("Deleting " + file);
-            FileUtils.deleteQuietly(file);
+            if (!supported) {
+              LOGGER.debug("Deleting " + file);
+              FileUtils.deleteQuietly(file);
+            }
           }
         }
       }
@@ -987,13 +1000,16 @@ public class MovieRenamer {
   }
 
   /**
-   * replaces all invalid/illegal characters for filenames with ""
+   * replaces all invalid/illegal characters for filenames with ""<br>
+   * except the colon, which will be changed to a dash
    * 
    * @param source
    *          string to clean
    * @return cleaned string
    */
   public static String replaceInvalidCharacters(String source) {
+    source = source.replaceAll(": ", " - "); // nicer
+    source = source.replaceAll(":", "-"); // nicer
     return source.replaceAll("([\"\\\\:<>|/?*])", "");
   }
 
