@@ -125,6 +125,17 @@ public class MovieRenamer {
       try {
         boolean ok = Utils.moveFileSafe(sub.getFile(), newFile);
         if (ok) {
+          if (sub.getFilename().endsWith(".sub")) {
+            // when having a .sub, also rename .idx (don't care if error)
+            try {
+              File oldidx = new File(sub.getPath(), sub.getFilename().replaceFirst("sub$", "idx"));
+              File newidx = new File(newFile.getParent(), newSubName.replaceFirst("sub$", "idx"));
+              Utils.moveFileSafe(oldidx, newidx);
+            }
+            catch (Exception e) {
+              // no idx found or error - ignore
+            }
+          }
           m.removeFromMediaFiles(sub);
           MediaFile mf = new MediaFile(newFile);
           MediaFileSubtitle mfs = new MediaFileSubtitle();
@@ -236,14 +247,12 @@ public class MovieRenamer {
 
     // cleanup with old movie name
     for (MovieNfoNaming s : MovieNfoNaming.values()) {
-      if (!movie.isDisc() && s == MovieNfoNaming.DISC_NFO) {
-        // this is a corner case
-        // nfoNaming returns an empty string if no disc, so the filename == movie pathname!!
-        // skip that to not accidently delete the movie dir :p
+      String nfoFilename = movie.getNfoFilename(s);
+      if (nfoFilename.isEmpty()) {
         continue;
       }
       // mark all known variants for cleanup
-      MediaFile del = new MediaFile(new File(movie.getPath(), movie.getNfoFilename(s)), MediaFileType.NFO);
+      MediaFile del = new MediaFile(new File(movie.getPath(), nfoFilename), MediaFileType.NFO);
       cleanup.add(del);
     }
     for (MoviePosterNaming s : MoviePosterNaming.values()) {
@@ -372,18 +381,18 @@ public class MovieRenamer {
 
       List<MovieNfoNaming> nfonames = new ArrayList<MovieNfoNaming>();
       if (movie.isMultiMovieDir()) {
-        // Fixate the name regardless of setting
+        // Fixate the name regardless of setting - it can only be that
         nfonames.add(MovieNfoNaming.FILENAME_NFO);
       }
       else {
         nfonames = MovieModuleManager.MOVIE_SETTINGS.getMovieNfoFilenames();
-        if (movie.isDisc()) {
-          nfonames.add(MovieNfoNaming.DISC_NFO); // add additionally the NFO at disc style location
-        }
       }
       for (MovieNfoNaming name : nfonames) {
         MediaFile newMF = new MediaFile(mf);
         newFilename = movie.getNfoFilename(name, newMovieFilename);
+        if (newFilename.isEmpty()) {
+          continue;
+        }
         File newFile = new File(newPathname, newFilename);
         try {
           boolean ok = copyFile(mf.getFile(), newFile);
@@ -598,8 +607,8 @@ public class MovieRenamer {
     // ######################################################################
     // ## rename THUMBNAILS
     // ######################################################################
-    for (MediaFile unk : movie.getMediaFiles(MediaFileType.THUMB)) {
-      needed.add(unk); // keep all unknown
+    for (MediaFile thumb : movie.getMediaFiles(MediaFileType.THUMB)) {
+      needed.add(thumb); // keep all thumbs
     }
 
     // ######################################################################
@@ -686,18 +695,20 @@ public class MovieRenamer {
     // clean all non tmm nfos
     if (MovieModuleManager.MOVIE_SETTINGS.isMovieRenamerNfoCleanup()) {
       File[] content = new File(movie.getPath()).listFiles();
-      for (File file : content) {
-        if (file.isFile() && file.getName().toLowerCase().endsWith(".nfo")) {
-          // check if it's a tmm nfo
-          boolean supported = false;
-          for (MediaFile nfo : movie.getMediaFiles(MediaFileType.NFO)) {
-            if (nfo.getFilename().equals(file.getName())) {
-              supported = true;
+      if (content != null) {
+        for (File file : content) {
+          if (file.isFile() && file.getName().toLowerCase().endsWith(".nfo")) {
+            // check if it's a tmm nfo
+            boolean supported = false;
+            for (MediaFile nfo : movie.getMediaFiles(MediaFileType.NFO)) {
+              if (nfo.getFilename().equals(file.getName())) {
+                supported = true;
+              }
             }
-          }
-          if (!supported) {
-            LOGGER.debug("Deleting " + file);
-            FileUtils.deleteQuietly(file);
+            if (!supported) {
+              LOGGER.debug("Deleting " + file);
+              FileUtils.deleteQuietly(file);
+            }
           }
         }
       }
@@ -989,13 +1000,16 @@ public class MovieRenamer {
   }
 
   /**
-   * replaces all invalid/illegal characters for filenames with ""
+   * replaces all invalid/illegal characters for filenames with ""<br>
+   * except the colon, which will be changed to a dash
    * 
    * @param source
    *          string to clean
    * @return cleaned string
    */
   public static String replaceInvalidCharacters(String source) {
+    source = source.replaceAll(": ", " - "); // nicer
+    source = source.replaceAll(":", "-"); // nicer
     return source.replaceAll("([\"\\\\:<>|/?*])", "");
   }
 
