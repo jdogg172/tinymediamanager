@@ -626,13 +626,16 @@ public class TvShowRenamer {
   }
 
   /**
-   * replaces all invalid/illegal characters for filenames with ""
+   * replaces all invalid/illegal characters for filenames with ""<br>
+   * except the colon, which will be changed to a dash
    * 
    * @param source
    *          string to clean
    * @return cleaned string
    */
   public static String replaceInvalidCharacters(String source) {
+    source = source.replaceAll(": ", " - "); // nicer
+    source = source.replaceAll(":", "-"); // nicer
     return source.replaceAll("([\"\\\\:<>|/?*])", "");
   }
 

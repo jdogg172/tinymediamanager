@@ -80,13 +80,15 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
   private String              writer      = "";
   private boolean             disc        = false;
   private boolean             watched     = false;
-  private Date                lastWatched = null;
   private int                 votes       = 0;
   private boolean             subtitles   = false;
   private boolean             isDvdOrder  = false;
 
   @Transient
   private boolean             newlyAdded  = false;
+
+  @Transient
+  private Date                lastWatched = null;
 
   @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
   private List<TvShowActor>   actors      = new ArrayList<TvShowActor>(0);
@@ -675,67 +677,6 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
 
     return episodes;
   }
-
-  // /**
-  // * Find images.
-  // */
-  // public void findImages() {
-  // // find thumb
-  // findThumb();
-  // }
-  //
-  // /**
-  // * Find thumb.
-  // */
-  // private void findThumb() {
-  // boolean found = false;
-  // // there are 2 possible filenames for thumbs
-  //
-  // // a) episodename-thumb.jpg/png (as described in the xbmc wiki http://wiki.xbmc.org/index.php?title=Frodo_FAQ#Local_images)
-  // Pattern pattern = Pattern.compile("(?i)" + Pattern.quote(getTitle()) + "-thumb\\..{2,4}");
-  // File[] files = new File(path).listFiles();
-  // for (File file : files) {
-  // Matcher matcher = pattern.matcher(file.getName());
-  // if (matcher.matches()) {
-  // setFanart(file);
-  // LOGGER.debug("found thumb " + file.getPath());
-  // found = true;
-  // break;
-  // }
-  // }
-  //
-  // // b) filename-thumb/fanart.jpg/png
-  // if (!found) {
-  // String mediafile = "";
-  // try {
-  // mediafile = FilenameUtils.getBaseName(getMediaFiles(MediaFileType.VIDEO).get(0).getFilename());
-  // }
-  // catch (Exception e) {
-  // System.out.println(path);
-  // }
-  // pattern = Pattern.compile("(?i)" + Pattern.quote(mediafile) + "-(thumb|fanart)\\..{2,4}");
-  // for (File file : files) {
-  // Matcher matcher = pattern.matcher(file.getName());
-  // if (matcher.matches()) {
-  // setFanart(file);
-  // LOGGER.debug("found thumb " + file.getPath());
-  // found = true;
-  // break;
-  // }
-  // }
-  // }
-  //
-  // // if we did not find anything, try to download it
-  // if (!found && StringUtils.isNotEmpty(thumbUrl)) {
-  // writeThumbImage();
-  // found = true;
-  // LOGGER.debug("got thumb url: " + thumbUrl + " ; try to download this");
-  // }
-  //
-  // if (!found) {
-  // LOGGER.debug("Sorry, could not find a thumb.");
-  // }
-  // }
 
   /**
    * Gets the media info video format (i.e. 720p).

@@ -1,3 +1,11 @@
+Upcoming version
+=======================
++ Mirror support: TMM now distibuted on several mirrors for better availability (and error handling for network blockages)
++ added sort option via sort title 
+x renamer: exchange colon with a dash. (even better than removing completely)
+x subtitles: language detection for SUB ones
+
+
 Version 2.6.6
 =======================
 + updated trakt.tv library to the new API
@@ -8,6 +16,8 @@ Version 2.6.6
 + added rating column to the movie table
 + double click in movie set/TV show tree opens the editor
 + added a message history window (menu tools - show message history)
++ added filter option for year (movie)
+x reworked NFO naming. Now be able to add NFO inside DISC folders separately
 x fixed the season template in the TV show renamer
 x fixed renamer (movie & tv shows) for case insensitive file systems
 x better rewriting of movie NFO after movie set editing
