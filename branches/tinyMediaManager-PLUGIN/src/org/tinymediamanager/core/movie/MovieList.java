@@ -65,7 +65,6 @@ import org.tinymediamanager.scraper.MediaSearchOptions.SearchParam;
 import org.tinymediamanager.scraper.MediaSearchResult;
 import org.tinymediamanager.scraper.MediaType;
 import org.tinymediamanager.scraper.ScraperType;
-import org.tinymediamanager.scraper.fanarttv.FanartTvMetadataProvider;
 import org.tinymediamanager.scraper.tmdb.TmdbMetadataProvider;
 import org.tinymediamanager.ui.UTF8Control;
 
@@ -779,7 +778,8 @@ public class MovieList extends AbstractModelObject {
       try {
         if (MovieModuleManager.MOVIE_SETTINGS.isImageScraperFanartTv()) {
           LOGGER.debug("get instance of FanartTvMetadataProvider");
-          artworkProvider = new FanartTvMetadataProvider();
+          artworkProvider = (IMediaArtworkProvider) MediaScraper.getMediaScraperById(FANARTTVID, ScraperType.ARTWORK);
+          // artworkProvider = new FanartTvMetadataProvider();
           artworkProviders.add(artworkProvider);
         }
       }

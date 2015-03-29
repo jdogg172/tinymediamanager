@@ -34,8 +34,6 @@ import org.tinymediamanager.scraper.MediaType;
 import org.tinymediamanager.scraper.tmdb.TmdbMetadataProvider;
 import org.tinymediamanager.ui.UTF8Control;
 
-import com.omertron.themoviedbapi.model.CollectionInfo;
-
 /**
  * The class MovieAssignMovieSetTask. A task to assign the movie set to the given movies
  * 
@@ -104,12 +102,12 @@ public class MovieAssignMovieSetTask extends TmmThreadPool {
               options.setCountry(MovieModuleManager.MOVIE_SETTINGS.getCertificationCountry());
               options.setScrapeImdbForeignLanguage(MovieModuleManager.MOVIE_SETTINGS.isImdbScrapeForeignLanguage());
 
-              CollectionInfo info = mp.getMovieSetMetadata(options);
-              if (info != null && StringUtils.isNotBlank(info.getName())) {
-                movieSet.setTitle(info.getName());
-                movieSet.setPlot(info.getOverview());
-                movieSet.setArtworkUrl(info.getPosterPath(), MediaFileType.POSTER);
-                movieSet.setArtworkUrl(info.getBackdropPath(), MediaFileType.FANART);
+              MediaMetadata info = mp.getMetadata(options);
+              if (info != null && StringUtils.isNotBlank(info.getStringValue(MediaMetadata.TITLE))) {
+                movieSet.setTitle(info.getStringValue(MediaMetadata.TITLE));
+                movieSet.setPlot(info.getStringValue(MediaMetadata.PLOT));
+                movieSet.setArtworkUrl(info.getStringValue(MediaMetadata.POSTER_URL), MediaFileType.POSTER);
+                movieSet.setArtworkUrl(info.getStringValue(MediaMetadata.BACKGROUND_URL), MediaFileType.FANART);
               }
             }
             catch (Exception e) {
