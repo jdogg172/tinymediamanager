@@ -109,6 +109,7 @@ public class Movie extends MediaEntity {
   private Date                releaseDate     = null;
   private boolean             multiMovieDir   = false;                               // we detected more movies in same folder
   private int                 top250          = 0;
+  // missed to set @Enumerated(EnumType.STRING); we must not change it now because it can break databases
   private MovieMediaSource    mediaSource     = MovieMediaSource.UNKNOWN;            // DVD, Bluray, etc
   private boolean             videoIn3D       = false;
 
@@ -955,10 +956,6 @@ public class Movie extends MediaEntity {
         }
       }
     }
-
-    // write NFO
-    writeNFO();
-
   }
 
   /**
@@ -1262,7 +1259,7 @@ public class Movie extends MediaEntity {
         filename = "";
         break;
     }
-    LOGGER.trace("Renaming '" + newMovieFilename + "' with NFO name " + nfo + " to '" + filename + "'");
+    // LOGGER.trace("getNfoFilename: '" + newMovieFilename + "' / " + nfo + " -> '" + filename + "'");
     return filename;
   }
 
@@ -1822,6 +1819,8 @@ public class Movie extends MediaEntity {
       }
     }
     readWriteLock.readLock().unlock();
+
+    writeNFO();
   }
 
   @Override
