@@ -463,14 +463,13 @@ public class TvShowEpisodeEditorDialog extends TmmDialog implements ActionListen
       episodeToEdit.setWriter(tfWriter.getText());
       episodeToEdit.setActors(cast);
 
-      if (StringUtils.isNotEmpty(lblThumb.getImageUrl()) && !lblThumb.getImageUrl().equals(episodeToEdit.getThumbUrl())) {
+      if (StringUtils.isNotEmpty(lblThumb.getImageUrl())
+          && (!lblThumb.getImageUrl().equals(episodeToEdit.getThumbUrl()) || StringUtils.isBlank(episodeToEdit.getThumb()))) {
         episodeToEdit.setThumbUrl(lblThumb.getImageUrl());
         episodeToEdit.writeThumbImage();
       }
 
       episodeToEdit.setTags(tags);
-
-      episodeToEdit.writeNFO();
       episodeToEdit.saveToDb();
 
       setVisible(false);
