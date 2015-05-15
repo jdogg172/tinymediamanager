@@ -1,3 +1,27 @@
+Version 2.6.7
+=======================
+IMPORTANT: with tinyMediaManager version 2.7 we do not support Java6 anymore.
+           If you are still using Java6, please update.
+           
++ updated mediainfo to 0.7.73 (ARM users now have to install the system version of mediainfo for better compatibility)           
++ Mirror support: TMM now distributed on several mirrors for better availability (and error handling for network blockages)
++ Movie renamer: complete rewrite - CHECK YOUR RENAMER SETTINGS!
++ Movie renamer: possible to "downgrade" a movie, when having no distinct folder. (CHECK YOUR FOLDER RENAMER SETTINGS!)
++ added sort option via sort title 
++ added an option to name the episode thumbs without the -thumb postfix (improves compatibility for different media players)
++ added director to movie renamer tokens
++ added DVD order renamer tokens ($3, $4, $D)
+x changed detection of DTS-HD codecs (Kodi will display the right logo now after NFO export)
+x fixed multichannel AAC detection
+x added a warning message when doing an update data source and no data source specified 
+x renamer: exchange colon with a dash. (even better than removing completely)
+x TvShow renamer: remove old/left-over NFOs
+x subtitles: language detection for SUB ones
+x the NFO files has not been updated in some cases
+x TheTvDB search cleans out too much "special" characters
+x fixed occasional UI glitches with TV shows
+x various smaller fixes
+
 Version 2.6.6
 =======================
 + updated trakt.tv library to the new API

@@ -5,7 +5,7 @@
   	<key>CFBundleExecutable</key>
   		<string>JavaApplicationStub</string>
   	<key>CFBundleGetInfoString</key>
-  		<string>tinyMediaManager 2.6.6 for Mac OS X</string>
+  		<string>tinyMediaManager 2.6.7 for Mac OS X</string>
   	<key>CFBundleIconFile</key>
   		<string>tmm.icns</string>
   	<key>CFBundleIdentifier</key>
@@ -21,7 +21,7 @@
   	<key>CFBundleSignature</key>
   		<string>????</string>
   	<key>CFBundleVersion</key>
-  		<string>2.6.6 1933</string>
+  		<string>2.6.7 2013</string>
   	<key>NSHighResolutionCapable</key>
   		<true/>
   	<key>CFBundleDevelopmentRegion</key>
