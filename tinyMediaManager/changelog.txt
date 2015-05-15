@@ -1,4 +1,4 @@
-Upcoming version
+Version 2.6.7
 =======================
 IMPORTANT: with tinyMediaManager version 2.7 we do not support Java6 anymore.
            If you are still using Java6, please update.
