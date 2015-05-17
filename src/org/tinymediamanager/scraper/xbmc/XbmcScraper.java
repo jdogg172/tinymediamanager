@@ -28,7 +28,8 @@ public class XbmcScraper extends MediaScraper {
    * @param scraperFolder
    */
   public XbmcScraper(File scraperFolder) {
-    super(null, null, null); // dummy constructor
+    // FIXME do we need to attach a IMediaProvider here?
+    super(null, null, null, null); // dummy constructor
     setXbmcScraper(true);
 
     try {

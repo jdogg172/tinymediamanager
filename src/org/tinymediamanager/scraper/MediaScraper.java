@@ -1,5 +1,6 @@
 package org.tinymediamanager.scraper;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,19 +16,29 @@ import org.tinymediamanager.scraper.xbmc.XbmcUtil;
  * @author Manuel Laggner
  */
 public class MediaScraper {
+  private String         id;
+  private String         version;
+  private String         name;
+  private String         summary;
+  private String         description;
+  private URL            logoUrl;
+  private ScraperType    type;
+  private IMediaProvider mediaProvider;
+  private boolean        xbmcScraper = false;
 
-  private String      id;
-  private String      version;
-  private String      name;
-  private String      summary;
-  private String      description;
-  private ScraperType type;
-  private boolean     xbmcScraper = false;
-
-  public MediaScraper(ScraperType type, String id, String name) {
+  public MediaScraper(ScraperType type, IMediaProvider mediaProvider, String id, String name) {
+    this.mediaProvider = mediaProvider;
     this.type = type;
     this.id = id;
     this.name = name;
+    if (mediaProvider != null) {
+      this.description = this.summary = mediaProvider.getProviderInfo().getDescription();
+      this.logoUrl = mediaProvider.getProviderInfo().getProviderLogo();
+    }
+    else {
+      this.description = "";
+      this.summary = "";
+    }
   }
 
   @Override
@@ -91,6 +102,14 @@ public class MediaScraper {
     this.xbmcScraper = xbmcScraper;
   }
 
+  public IMediaProvider getMediaProvider() {
+    return this.mediaProvider;
+  }
+
+  public URL getLogoURL() {
+    return this.logoUrl;
+  }
+
   /**
    * returns a MediaScraper from a given type - found via plugins<br>
    * use .toArray() for putting this in a ComboBox
@@ -126,8 +145,7 @@ public class MediaScraper {
 
     for (IMediaProvider p : plugins) {
       MediaProviderInfo pi = p.getProviderInfo();
-      MediaScraper ms = new MediaScraper(type, pi.getId(), pi.getName());
-      ms.setSummary(pi.getDescription());
+      MediaScraper ms = new MediaScraper(type, p, pi.getId(), pi.getName());
       scraper.add(ms);
     }
 
