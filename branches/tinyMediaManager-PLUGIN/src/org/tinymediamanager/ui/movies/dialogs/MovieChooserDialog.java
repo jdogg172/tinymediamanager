@@ -62,7 +62,6 @@ import org.tinymediamanager.core.entities.MediaFile;
 import org.tinymediamanager.core.movie.MovieList;
 import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.core.movie.MovieScraperMetadataConfig;
-import org.tinymediamanager.core.movie.MovieScrapers;
 import org.tinymediamanager.core.movie.entities.Movie;
 import org.tinymediamanager.core.movie.entities.MovieTrailer;
 import org.tinymediamanager.core.threading.TmmTask;
@@ -84,6 +83,7 @@ import org.tinymediamanager.ui.MainWindow;
 import org.tinymediamanager.ui.TmmFontHelper;
 import org.tinymediamanager.ui.UTF8Control;
 import org.tinymediamanager.ui.components.ImageLabel;
+import org.tinymediamanager.ui.components.MediaScraperComboBox;
 import org.tinymediamanager.ui.dialogs.ImageChooserDialog;
 import org.tinymediamanager.ui.dialogs.ImageChooserDialog.ImageType;
 import org.tinymediamanager.ui.dialogs.TmmDialog;
@@ -124,7 +124,7 @@ public class MovieChooserDialog extends TmmDialog implements ActionListener {
    */
   private final JPanel                                                      contentPanel          = new JPanel();
   private JTextField                                                        textFieldSearchString;
-  private JComboBox                                                         cbScraper;
+  private MediaScraperComboBox                                              cbScraper;
   private JTable                                                            table;
   private JLabel                                                            lblMovieName;
   private JTextPane                                                         tpMovieDescription;
@@ -199,8 +199,8 @@ public class MovieChooserDialog extends TmmDialog implements ActionListener {
       }
       {
         // cbScraper = new JComboBox(MovieScrapers.values());
-        cbScraper = new JComboBox(MediaScraper.getMediaScrapers(ScraperType.MOVIE).toArray());
-        MovieScrapers defaultScraper = MovieModuleManager.MOVIE_SETTINGS.getMovieScraper();
+        cbScraper = new MediaScraperComboBox(MovieList.getInstance().getAvailableMediaScrapers());
+        MediaScraper defaultScraper = MediaScraper.getMediaScraperById(MovieModuleManager.MOVIE_SETTINGS.getMovieScraper(), ScraperType.MOVIE);
         cbScraper.setSelectedItem(defaultScraper);
         cbScraper.setAction(new ChangeScraperAction());
         panelSearchField.add(cbScraper, "4, 1, fill, default");

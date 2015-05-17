@@ -509,7 +509,7 @@ public class MovieList extends AbstractModelObject {
       if (sr.isEmpty() && MovieModuleManager.MOVIE_SETTINGS.isScraperFallback()) {
         LOGGER.debug("no result yet - trying alternate scrapers");
 
-        for (MovieScrapers ms : MovieScrapers.values()) {
+        for (MediaScraper ms : getAvailableMediaScrapers()) {
           IMovieMetadataProvider provider2 = getMetadataProvider(ms);
           if (provider.getProviderInfo().equals(provider2.getProviderInfo())) {
             continue;
@@ -530,105 +530,33 @@ public class MovieList extends AbstractModelObject {
     return sr;
   }
 
-  // /**
-  // * Search movie.
-  // *
-  // * @param searchTerm
-  // * the search term
-  // * @param ImdbId
-  // * the imdb id
-  // * @param metadataProvider
-  // * the metadata provider
-  // * @return the list
-  // */
-  // @Deprecated
-  // public List<MediaSearchResult> searchMovie(String searchTerm, String year, String ImdbId, IMovieMetadataProvider metadataProvider) {
-  // List<MediaSearchResult> sr = null;
-  // if (ImdbId != null && !ImdbId.isEmpty()) {
-  // sr = searchMovieByImdbId(ImdbId, metadataProvider);
-  // }
-  // if (sr == null || sr.size() == 0) {
-  // sr = searchMovie(searchTerm, year, metadataProvider);
-  // }
-  //
-  // return sr;
-  // }
-
-  // /**
-  // * Search movie.
-  // *
-  // * @param searchTerm
-  // * the search term
-  // * @param metadataProvider
-  // * the metadata provider
-  // * @return the list
-  // */
-  // @Deprecated
-  // private List<MediaSearchResult> searchMovie(String searchTerm, String year, IMovieMetadataProvider metadataProvider) {
-  // // format searchstring
-  // // searchTerm = MetadataUtil.removeNonSearchCharacters(searchTerm);
-  //
-  // List<MediaSearchResult> searchResult = null;
-  // try {
-  // IMovieMetadataProvider provider = metadataProvider;
-  // // get a new metadataprovider if nothing is set
-  // if (provider == null) {
-  // provider = getMetadataProvider();
-  // }
-  // MediaSearchOptions options = new MediaSearchOptions(MediaType.MOVIE, MediaSearchOptions.SearchParam.QUERY, searchTerm);
-  // options.set(MediaSearchOptions.SearchParam.YEAR, year);
-  // searchResult = provider.search(options);
-  // }
-  // catch (Exception e) {
-  // LOGGER.error("searchMovie", e);
-  // MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, "", "message.movie.searcherror", new String[] { ":",
-  // e.getLocalizedMessage() }));
-  // }
-  //
-  // return searchResult;
-  // }
-
-  // /**
-  // * Search movie.
-  // *
-  // * @param imdbId
-  // * the imdb id
-  // * @param metadataProvider
-  // * the metadata provider
-  // * @return the list
-  // */
-  // @Deprecated
-  // private List<MediaSearchResult> searchMovieByImdbId(String imdbId, IMovieMetadataProvider metadataProvider) {
-  //
-  // List<MediaSearchResult> searchResult = null;
-  // MediaSearchOptions options = new MediaSearchOptions(MediaType.MOVIE);
-  // options.setMediaType(MediaType.MOVIE);
-  // options.set(SearchParam.IMDBID, imdbId);
-  //
-  // try {
-  // IMovieMetadataProvider provider = metadataProvider;
-  // // get a new metadataProvider if no one is set
-  // if (provider == null) {
-  // provider = getMetadataProvider();
-  // }
-  // searchResult = provider.search(options);
-  // }
-  // catch (Exception e) {
-  // LOGGER.warn("failed to search movie with imdbid", e);
-  // searchResult = new ArrayList<MediaSearchResult>();
-  // }
-  //
-  // return searchResult;
-  // }
-
   /**
    * Gets the metadata provider.
    * 
    * @return the metadata provider
+   * @deprecated use the MediaScraper methods now
    */
+  @Deprecated
   public IMovieMetadataProvider getMetadataProvider() {
-    MovieScrapers scraper = MovieModuleManager.MOVIE_SETTINGS.getMovieScraper();
-    return getMetadataProvider(scraper);
+    MediaScraper scraper = MediaScraper.getMediaScraperById(MovieModuleManager.MOVIE_SETTINGS.getMovieScraper(), ScraperType.MOVIE);
+    if (scraper == null) {
+      scraper = MediaScraper.getMediaScraperById(Constants.TMDBID, ScraperType.MOVIE);
+    }
+    return (IMovieMetadataProvider) scraper.getMediaProvider();
+  }
+
+  public List<MediaScraper> getAvailableMediaScrapers() {
+    List<MediaScraper> availableScrapers = MediaScraper.getMediaScrapers(ScraperType.MOVIE);
+    Collections.sort(availableScrapers, new MovieMediaScraperComparator());
+    return availableScrapers;
+  }
+
+  public MediaScraper getDefaultMediaScraper() {
+    MediaScraper scraper = MediaScraper.getMediaScraperById(MovieModuleManager.MOVIE_SETTINGS.getMovieScraper(), ScraperType.MOVIE);
+    if (scraper == null) {
+      scraper = MediaScraper.getMediaScraperById(Constants.TMDBID, ScraperType.MOVIE);
+    }
+    return scraper;
   }
 
   /**
@@ -637,43 +565,49 @@ public class MovieList extends AbstractModelObject {
    * @param scraper
    *          the scraper
    * @return the metadata provider
+   * @deprecated use the MediaScraper methods now
    */
-  public IMovieMetadataProvider getMetadataProvider(MovieScrapers scraper) {
-    IMovieMetadataProvider metadataProvider = null;
-    MediaScraper mediaScraper = null;
-    switch (scraper) {
-      case OFDB:
-        LOGGER.debug("get instance of OfdbMetadataProvider");
-        mediaScraper = MediaScraper.getMediaScraperById(OFDBID, ScraperType.MOVIE);
-        break;
-
-      case ZELLULOID:
-        LOGGER.debug("get instance of ZelluloidMetadataProvider");
-        mediaScraper = MediaScraper.getMediaScraperById(ZELLULOIDID, ScraperType.MOVIE);
-        break;
-
-      case MOVIEMETER:
-        LOGGER.debug("get instance of MoviemeterMetadataProvider");
-        mediaScraper = MediaScraper.getMediaScraperById(MOVIEMETERID, ScraperType.MOVIE);
-        break;
-
-      case IMDB:
-        LOGGER.debug("get instance of ImdbMetadataProvider");
-        mediaScraper = MediaScraper.getMediaScraperById(IMDBID, ScraperType.MOVIE);
-        break;
-
-      case ROTTENTOMATOES:
-        LOGGER.debug("get instance of RottenTomatoesMetadataProvider");
-        mediaScraper = MediaScraper.getMediaScraperById(ROTTENTOMATOESID, ScraperType.MOVIE);
-        break;
-
-      case TMDB:
-      default:
-        LOGGER.debug("get instance of TmdbMetadataProvider");
-        mediaScraper = MediaScraper.getMediaScraperById(TMDBID, ScraperType.MOVIE);
+  @Deprecated
+  public IMovieMetadataProvider getMetadataProvider(MediaScraper scraper) {
+    if (scraper == null) {
+      scraper = MediaScraper.getMediaScraperById(Constants.TMDBID, ScraperType.MOVIE);
     }
+    return (IMovieMetadataProvider) scraper.getMediaProvider();
 
-    metadataProvider = (IMovieMetadataProvider) PluginManager.getInstance().getPlugin(mediaScraper);
+    // MediaScraper mediaScraper = null;
+    // switch (scraper) {
+    // case OFDB:
+    // LOGGER.debug("get instance of OfdbMetadataProvider");
+    // mediaScraper = MediaScraper.getMediaScraperById(OFDBID, ScraperType.MOVIE);
+    // break;
+    //
+    // case ZELLULOID:
+    // LOGGER.debug("get instance of ZelluloidMetadataProvider");
+    // mediaScraper = MediaScraper.getMediaScraperById(ZELLULOIDID, ScraperType.MOVIE);
+    // break;
+    //
+    // case MOVIEMETER:
+    // LOGGER.debug("get instance of MoviemeterMetadataProvider");
+    // mediaScraper = MediaScraper.getMediaScraperById(MOVIEMETERID, ScraperType.MOVIE);
+    // break;
+    //
+    // case IMDB:
+    // LOGGER.debug("get instance of ImdbMetadataProvider");
+    // mediaScraper = MediaScraper.getMediaScraperById(IMDBID, ScraperType.MOVIE);
+    // break;
+    //
+    // case ROTTENTOMATOES:
+    // LOGGER.debug("get instance of RottenTomatoesMetadataProvider");
+    // mediaScraper = MediaScraper.getMediaScraperById(ROTTENTOMATOESID, ScraperType.MOVIE);
+    // break;
+    //
+    // case TMDB:
+    // default:
+    // LOGGER.debug("get instance of TmdbMetadataProvider");
+    // mediaScraper = MediaScraper.getMediaScraperById(TMDBID, ScraperType.MOVIE);
+    // }
+    //
+    // metadataProvider = (IMovieMetadataProvider) PluginManager.getInstance().getPlugin(mediaScraper);
 
     //
     // try {
@@ -689,7 +623,7 @@ public class MovieList extends AbstractModelObject {
 
     // }
 
-    return metadataProvider;
+    // return metadataProvider;
   }
 
   /**
@@ -698,35 +632,43 @@ public class MovieList extends AbstractModelObject {
    * @param providerId
    *          the scraper
    * @return the metadata provider
+   * @deprecated use the MediaScraper methods now
    */
+  @Deprecated
   public IMovieMetadataProvider getMetadataProvider(String providerId) {
-    // FIXME: rework scrapers/providerInfo to contain Movie(Tv)Scrapers enums
-    if (providerId == null || providerId.isEmpty()) {
-      // default
-      return getMetadataProvider(MovieScrapers.TMDB);
+
+    MediaScraper scraper = MediaScraper.getMediaScraperById(providerId, ScraperType.MOVIE);
+    if (scraper == null) {
+      scraper = MediaScraper.getMediaScraperById(Constants.TMDBID, ScraperType.MOVIE);
     }
-    if (providerId.equals(Constants.TMDBID)) {
-      return getMetadataProvider(MovieScrapers.TMDB);
-    }
-    else if (providerId.equals(Constants.IMDBID)) {
-      return getMetadataProvider(MovieScrapers.IMDB);
-    }
-    else if (providerId.equals(Constants.MOVIEMETERID)) {
-      return getMetadataProvider(MovieScrapers.MOVIEMETER);
-    }
-    else if (providerId.equals(Constants.OFDBID)) {
-      return getMetadataProvider(MovieScrapers.OFDB);
-    }
-    else if (providerId.equals(Constants.ZELLULOIDID)) {
-      return getMetadataProvider(MovieScrapers.ZELLULOID);
-    }
-    else if (providerId.equals(Constants.ROTTENTOMATOESID)) {
-      return getMetadataProvider(MovieScrapers.ROTTENTOMATOES);
-    }
-    else {
-      // default
-      return getMetadataProvider(MovieScrapers.TMDB);
-    }
+    return (IMovieMetadataProvider) scraper.getMediaProvider();
+    // // FIXME: rework scrapers/providerInfo to contain Movie(Tv)Scrapers enums
+    // if (providerId == null || providerId.isEmpty()) {
+    // // default
+    // return getMetadataProvider(MovieScrapers.TMDB);
+    // }
+    // if (providerId.equals(Constants.TMDBID)) {
+    // return getMetadataProvider(MovieScrapers.TMDB);
+    // }
+    // else if (providerId.equals(Constants.IMDBID)) {
+    // return getMetadataProvider(MovieScrapers.IMDB);
+    // }
+    // else if (providerId.equals(Constants.MOVIEMETERID)) {
+    // return getMetadataProvider(MovieScrapers.MOVIEMETER);
+    // }
+    // else if (providerId.equals(Constants.OFDBID)) {
+    // return getMetadataProvider(MovieScrapers.OFDB);
+    // }
+    // else if (providerId.equals(Constants.ZELLULOIDID)) {
+    // return getMetadataProvider(MovieScrapers.ZELLULOID);
+    // }
+    // else if (providerId.equals(Constants.ROTTENTOMATOESID)) {
+    // return getMetadataProvider(MovieScrapers.ROTTENTOMATOES);
+    // }
+    // else {
+    // // default
+    // return getMetadataProvider(MovieScrapers.TMDB);
+    // }
   }
 
   /**
@@ -1250,6 +1192,21 @@ public class MovieList extends AbstractModelObject {
       }
       return o1.getTitleSortable().compareToIgnoreCase(o2.getTitleSortable());
     }
+  }
 
+  private class MovieMediaScraperComparator implements Comparator<MediaScraper> {
+    @Override
+    public int compare(MediaScraper o1, MediaScraper o2) {
+      // TMDB is always first, because it is the build in scraper
+      if (o1.getMediaProvider() instanceof TmdbMetadataProvider) {
+        return -1;
+      }
+      if (o2.getMediaProvider() instanceof TmdbMetadataProvider) {
+        return 1;
+      }
+
+      // the rest will be sorted alphabetically by the id
+      return o1.getId().compareTo(o2.getId());
+    }
   }
 }
