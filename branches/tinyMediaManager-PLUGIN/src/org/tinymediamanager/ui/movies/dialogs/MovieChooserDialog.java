@@ -63,6 +63,7 @@ import org.tinymediamanager.core.movie.MovieList;
 import org.tinymediamanager.core.movie.MovieModuleManager;
 import org.tinymediamanager.core.movie.MovieScraperMetadataConfig;
 import org.tinymediamanager.core.movie.entities.Movie;
+import org.tinymediamanager.core.movie.entities.Movie;
 import org.tinymediamanager.core.movie.entities.MovieTrailer;
 import org.tinymediamanager.core.threading.TmmTask;
 import org.tinymediamanager.core.threading.TmmTaskManager;
@@ -522,9 +523,6 @@ public class MovieChooserDialog extends TmmDialog implements ActionListener {
             }
             movieToScrape.setTrailers(trailers);
           }
-
-          // rewrite the complete NFO
-          movieToScrape.writeNFO();
 
           // if configured - sync with trakt.tv
           if (MovieModuleManager.MOVIE_SETTINGS.getSyncTrakt()) {

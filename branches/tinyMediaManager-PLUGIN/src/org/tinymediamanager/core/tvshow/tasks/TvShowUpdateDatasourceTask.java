@@ -125,6 +125,14 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
 
   @Override
   public void doInBackground() {
+    // check if there is at least one DS to update
+    Utils.removeEmptyStringsFromList(dataSources);
+    if (dataSources.isEmpty() && tvShowFolders.isEmpty()) {
+      LOGGER.info("no datasource to update");
+      MessageManager.instance.pushMessage(new Message(MessageLevel.ERROR, "update.datasource", "update.datasource.nonespecified"));
+      return;
+    }
+
     try {
       long start = System.currentTimeMillis();
       start();
@@ -906,7 +914,7 @@ public class TvShowUpdateDatasourceTask extends TmmThreadPool {
           if (vfilename.equals(FilenameUtils.getBaseName(mf.getFilename())) // basename match
               || Utils.cleanStackingMarkers(vfilename).trim().equals(FilenameUtils.getBaseName(mf.getFilename())) // basename w/o stacking
               || episode.getTitle().equals(FilenameUtils.getBaseName(mf.getFilename()))) { // title match
-            mf.setType(MediaFileType.POSTER);
+            mf.setType(MediaFileType.THUMB);
           }
         }
         episode.addToMediaFiles(mf);

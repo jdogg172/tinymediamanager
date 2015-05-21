@@ -18,7 +18,6 @@ package org.tinymediamanager.core.tvshow.entities;
 import static org.tinymediamanager.core.Constants.*;
 
 import java.io.File;
-import java.io.IOException;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -38,12 +37,11 @@ import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.Transient;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.tinymediamanager.core.Constants;
+import org.tinymediamanager.Globals;
 import org.tinymediamanager.core.MediaEntityImageFetcherTask;
 import org.tinymediamanager.core.MediaFileType;
 import org.tinymediamanager.core.Utils;
@@ -371,7 +369,13 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
       // create correct filename
 
       MediaFile mf = getMediaFiles(MediaFileType.VIDEO).get(0);
-      String filename = FilenameUtils.getBaseName(mf.getFilename()) + "-thumb." + FilenameUtils.getExtension(getThumbUrl());
+      String filename;
+      if (Globals.settings.getTvShowSettings().isUseRenamerThumbPostfix()) {
+        filename = FilenameUtils.getBaseName(mf.getFilename()) + "-thumb." + FilenameUtils.getExtension(getThumbUrl());
+      }
+      else {
+        filename = FilenameUtils.getBaseName(mf.getFilename()) + "." + FilenameUtils.getExtension(getThumbUrl());
+      }
 
       // get image in thread
       MediaEntityImageFetcherTask task = new MediaEntityImageFetcherTask(this, getThumbUrl(), MediaArtworkType.THUMB, filename, firstImage);
@@ -455,9 +459,6 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
       }
     }
 
-    // write NFO
-    writeNFO();
-
     // update DB
     saveToDb();
 
@@ -480,9 +481,9 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
     }
 
     TvShowEpisodeToXbmcNfoConnector.setData(episodesInNfo);
-    for (TvShowEpisode episode : episodesInNfo) {
-      episode.saveToDb();
-    }
+    // for (TvShowEpisode episode : episodesInNfo) {
+    // episode.saveToDb();
+    // }
   }
 
   /**
@@ -777,7 +778,25 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
       return getSeason() - otherTvShowEpisode.getSeason();
     }
 
-    return getEpisode() - otherTvShowEpisode.getEpisode();
+    if (getEpisode() != otherTvShowEpisode.getEpisode()) {
+      return getEpisode() - otherTvShowEpisode.getEpisode();
+    }
+
+    // still nothing found? wtf - maybe some of those -1/-1 eps
+    String filename1 = "";
+    try {
+      filename1 = getMediaFiles(MediaFileType.VIDEO).get(0).getFilename();
+    }
+    catch (Exception ignored) {
+    }
+
+    String filename2 = "";
+    try {
+      filename2 = otherTvShowEpisode.getMediaFiles(MediaFileType.VIDEO).get(0).getFilename();
+    }
+    catch (Exception ignored) {
+    }
+    return filename1.compareTo(filename2);
   }
 
   public List<MediaFile> getMediaFilesContainingAudioStreams() {
@@ -858,6 +877,8 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
       }
     }
     readWriteLock.readLock().unlock();
+
+    writeNFO();
   }
 
   @Override
@@ -1050,34 +1071,16 @@ public class TvShowEpisode extends MediaEntity implements Comparable<TvShowEpiso
    * DS\.backup\&lt;moviename&gt;
    */
   public boolean deleteFilesSafely() {
-    String fn = getPath();
-    // inject backup path
-    fn = fn.replace(tvShow.getDataSource(), tvShow.getDataSource() + File.separator + Constants.BACKUP_FOLDER);
+    boolean result = true;
 
-    // create path
-    File backup = new File(fn);
-    if (!backup.exists()) {
-      backup.mkdirs();
-    }
-
-    // backup
-    try {
-      boolean result = true;
-
-      List<MediaFile> mediaFiles = getMediaFiles();
-      for (MediaFile mf : mediaFiles) {
-        // overwrite backup file by deletion prior
-        File newFile = new File(backup, mf.getFilename());
-        FileUtils.deleteQuietly(newFile);
-        result = result && Utils.moveFileSafe(mf.getFile(), newFile);
+    List<MediaFile> mediaFiles = getMediaFiles();
+    for (MediaFile mf : mediaFiles) {
+      if (!mf.deleteSafely(tvShow.getDataSource())) {
+        result = false;
       }
+    }
 
-      return result;
-    }
-    catch (IOException e) {
-      LOGGER.warn("could not delete episode files: " + e.getMessage());
-      return false;
-    }
+    return result;
   }
 
   @Override
