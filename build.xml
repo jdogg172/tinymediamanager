@@ -1,7 +1,7 @@
 <project default="create_tmm_jar" name="Tiny Media Manager">
 
 	<!-- software revision number -->
-	<property name="version" value="2.6.7" /><!-- CHECK UPGRADE TASKS FOR CORRECT VERSION -->
+	<property name="version" value="2.6.8" /><!-- CHECK UPGRADE TASKS FOR CORRECT VERSION -->
 
 	<!-- build directories -->
 	<property name="lib.dir" value="lib" />
@@ -334,6 +334,12 @@
 		<!-- done, move build dir -->
 		<delete dir="build" />
 		<move file="${build.dir}" tofile="build" />
+		
+    <!-- cleanup dist -->
+    <delete includeemptydirs="true">
+      <fileset dir="${dist.dir}" includes="**/*" excludes="*.zip,*.tar.gz" />
+      <dirset dir="${dist.dir}" includes="**/*" />
+    </delete>
 	</target>
 
 	<!--target name="analyze" description="Run analyzers" depends="compile"-->

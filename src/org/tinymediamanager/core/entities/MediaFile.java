@@ -874,18 +874,6 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
     return channels;
   }
 
-  // /**
-  // * Sets the audio channels.
-  // *
-  // * @param newValue
-  // * the new audio channels
-  // */
-  // public void setAudioChannels(String newValue) {
-  // String oldValue = this.audioChannels;
-  // this.audioChannels = newValue;
-  // firePropertyChange("audioChannels", oldValue, newValue);
-  // }
-
   /**
    * returns the exact video resolution.
    * 
@@ -1213,18 +1201,19 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
           String audioAddition = getMediaInfo(StreamKind.Audio, i, "Format_Profile");
           if ("dts".equalsIgnoreCase(audioCodec) && StringUtils.isNotBlank(audioAddition)) {
             if (audioAddition.contains("ES")) {
-              audioCodec = "DTS-ES";
+              audioCodec = "DTSHD-ES";
             }
             if (audioAddition.contains("HRA")) {
-              audioCodec = "DTS-HRA";
+              audioCodec = "DTSHD-HRA";
             }
             if (audioAddition.contains("MA")) {
-              audioCodec = "DTS-MA";
+              audioCodec = "DTSHD-MA";
             }
           }
           stream.setCodec(audioCodec);
 
-          String channels = getMediaInfo(StreamKind.Audio, i, "Channel(s)");
+          // AAC sometimes codes channels into Channel(s)_Original
+          String channels = getMediaInfo(StreamKind.Audio, i, "Channel(s)_Original", "Channel(s)");
           stream.setChannels(StringUtils.isEmpty(channels) ? "" : channels + "ch");
           try {
             String br = getMediaInfo(StreamKind.Audio, i, "BitRate");
@@ -1494,6 +1483,18 @@ public class MediaFile extends AbstractModelObject implements Comparable<MediaFi
    */
   public boolean exists() {
     return getFile().exists();
+  }
+
+  /**
+   * <b>PHYSICALLY</b> deletes a MF by moving it to datasource backup folder<br>
+   * DS\.backup\&lt;filename&gt;<br>
+   * maintaining its orginating directory
+   * 
+   * @param datasource
+   * @return true/false if successful
+   */
+  public boolean deleteSafely(String datasource) {
+    return Utils.deleteFileSafely(getFile(), datasource);
   }
 
   @Override

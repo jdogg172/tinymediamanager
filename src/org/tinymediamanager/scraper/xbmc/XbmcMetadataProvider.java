@@ -16,7 +16,8 @@ import net.xeoh.plugins.base.annotations.PluginImplementation;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tinymediamanager.scraper.IMovieMetadataProvider;
 import org.tinymediamanager.scraper.IXBMC;
 import org.tinymediamanager.scraper.MediaArtwork;
@@ -38,7 +39,7 @@ import org.w3c.dom.NodeList;
 
 @PluginImplementation
 public class XbmcMetadataProvider implements IXBMC, IMovieMetadataProvider {
-  private static final Logger                 LOGGER                  = Logger.getLogger(XbmcMetadataProvider.class);
+  private static final Logger                 LOGGER                  = LoggerFactory.getLogger(XbmcMetadataProvider.class);
   private static final DocumentBuilderFactory factory                 = DocumentBuilderFactory.newInstance();
 
   private static MediaProviderInfo            providerInfo            = new MediaProviderInfo("xbmc", "xbmc.org", "Generic XBMC type scraper");
