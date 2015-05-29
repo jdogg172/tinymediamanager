@@ -1798,6 +1798,11 @@ public class Movie extends MediaEntity {
 
   @Override
   public void saveToDb() {
+    // rewrite NFO (needed before saving)
+    if (dirty) {
+      writeNFO();
+    }
+
     // update/insert this movie to the database
     final EntityManager entityManager = getEntityManager();
     readWriteLock.readLock().lock();
@@ -1816,9 +1821,8 @@ public class Movie extends MediaEntity {
         entityManager.persist(this);
       }
     }
+    dirty = false;
     readWriteLock.readLock().unlock();
-
-    writeNFO();
   }
 
   @Override
